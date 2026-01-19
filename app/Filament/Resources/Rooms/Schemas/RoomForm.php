@@ -39,16 +39,16 @@ class RoomForm
 
                 Section::make('Media')
                     ->schema([
-                        // MAIN IMAGE LOGIC
+                        // MAIN IMAGE LOGIC (S3 Public)
                         FileUpload::make('main_image')
                             ->label('Main Featured Image')
                             ->image()
+                            ->disk('s3') // <-- Upload to S3
+                            ->visibility('public')
                             ->directory('rooms/main')
-                            // Load existing image from DB
                             ->loadStateFromRelationshipsUsing(static function (Model $record) {
                                 return $record->mainImage?->url;
                             })
-                            // Save to our custom images table
                             ->saveRelationshipsUsing(static function (Model $record, $state) {
                                 if (!$state) return;
                                 $record->mainImage()->updateOrCreate(
@@ -57,11 +57,13 @@ class RoomForm
                                 );
                             })->dehydrated(false),
 
-                        // GALLERY LOGIC
+                        // GALLERY LOGIC (S3 Public Multiple)
                         FileUpload::make('gallery_images')
                             ->label('Room Gallery')
                             ->image()
                             ->multiple()
+                            ->disk('s3') // <-- Upload to S3
+                            ->visibility('public')
                             ->directory('rooms/gallery')
                             ->loadStateFromRelationshipsUsing(static function (Model $record) {
                                 return $record->gallery()->pluck('url')->toArray();
