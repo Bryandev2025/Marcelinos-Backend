@@ -49,17 +49,13 @@ jobs:
             **/.git*
             **/.github*
             **/.env
-            **/.env.example
             **/node_modules/**
             **/vendor/**
             **/tests/**
-            **/storage/**
-            **/bootstrap/cache/**
             **/uploads/**
             **/coverage/**
             **/docker/**
             **/docker-compose.yml
-            **/artisan
             **/package-lock.json
             **/yarn.lock
             **/phpunit.xml
