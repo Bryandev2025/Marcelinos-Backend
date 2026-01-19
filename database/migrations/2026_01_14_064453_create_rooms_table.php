@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('name');
             $table->integer('capacity');
             $table->enum('type', ['standard', 'family', 'deluxe']);
-            $table->decimal('price_per_night', 10, 2);
+            $table->decimal('price', 10, 2);
             $table->enum('status', ['available', 'occupied', 'maintenance'])->default('available');
             $table->timestamps();
         });
