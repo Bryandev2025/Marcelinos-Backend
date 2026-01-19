@@ -13,3 +13,5 @@ use Illuminate\App\Http\Controllers\GuestController;
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+
+Route::apiResource('venues', VenueController::class);
