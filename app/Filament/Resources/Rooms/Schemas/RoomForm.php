@@ -24,7 +24,7 @@ class RoomForm
                         Select::make('type')
                             ->options(['standard' => 'Standard', 'family' => 'Family', 'deluxe' => 'Deluxe'])
                             ->required(),
-                        TextInput::make('price_per_night')->required()->numeric()->prefix('₱'),
+                        TextInput::make('price')->required()->numeric()->prefix('₱'),
                         Select::make('status')
                             ->options(['available' => 'Available', 'occupied' => 'Occupied', 'cleaning' => 'Cleaning'])
                             ->default('available')->required(),
