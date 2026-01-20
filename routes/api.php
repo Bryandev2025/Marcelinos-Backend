@@ -14,7 +14,11 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
+<<<<<<< HEAD
 
 
 // Guests can create a booking
 Route::post('/bookings', [BookingController::class, 'store']);
+=======
+Route::apiResource('venues', VenueController::class);
+>>>>>>> a4f84387e100dc68dfdba264fd24e3434c5ddc26
