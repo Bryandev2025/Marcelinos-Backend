@@ -16,7 +16,6 @@ use App\Http\Controllers\API\RoomController;
 use App\Http\Controllers\API\VenueController;
 
 
-
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
