@@ -9,7 +9,6 @@ use Illuminate\App\Http\Controllers\ImagesController;
 use Illuminate\App\Http\Controllers\GuestController;
 
 
-
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
