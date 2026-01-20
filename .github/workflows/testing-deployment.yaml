@@ -63,4 +63,3 @@ jobs:
             **/postcss.config.js
             **/tailwind.config.js
             **/README.md
-            **/*.log

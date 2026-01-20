@@ -1,17 +1,17 @@
 <?php
 
-namespace App\Filament\Resources\Rooms\Schemas;
+namespace App\Filament\Resources\Venues\Schemas;
 
 use App\Models\Image;
 use Filament\Schemas\Schema;
-use Filament\Forms\Components\Select;
-use Illuminate\Database\Eloquent\Model;
 use Filament\Forms\Components\TextInput;
-use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\CheckboxList;
+use Filament\Schemas\Components\Section;
+use Illuminate\Database\Eloquent\Model;
 
-class RoomForm
+class VenuesForm
 {
     public static function configure(Schema $schema): Schema
     {
@@ -19,16 +19,25 @@ class RoomForm
             ->components([
                 Section::make('General Information')
                     ->schema([
-                        TextInput::make('name')->required(),
-                        TextInput::make('capacity')->required()->numeric(),
-                        Select::make('type')
-                            ->options(['standard' => 'Standard', 'family' => 'Family', 'deluxe' => 'Deluxe'])
+                        TextInput::make('name')
+                            ->label('Venue Name')
                             ->required(),
-                        TextInput::make('price')->required()->numeric()->prefix('₱'),
-                        Select::make('status')
-                            ->options(['available' => 'Available', 'occupied' => 'Occupied', 'cleaning' => 'Cleaning'])
-                            ->default('available')->required(),
-                    ])->columns(2),
+
+                        Textarea::make('description')
+                            ->label('Description'),
+
+                        TextInput::make('capacity')
+                            ->label('Capacity')
+                            ->numeric()
+                            ->required(),
+
+                        TextInput::make('price')
+                            ->label('Price')
+                            ->numeric()
+                            ->required()
+                            ->prefix('₱'),
+                    ])
+                    ->columns(2),
 
                 Section::make('Amenities')
                     ->schema([
@@ -39,13 +48,11 @@ class RoomForm
 
                 Section::make('Media')
                     ->schema([
-                        // MAIN IMAGE LOGIC (Public Storage)
+                        // MAIN IMAGE
                         FileUpload::make('main_image')
                             ->label('Main Featured Image')
                             ->image()
-                            ->disk('public')
-                            ->visibility('public')
-                            ->directory('rooms')
+                            ->directory('venues/main')
                             ->loadStateFromRelationshipsUsing(static function (Model $record) {
                                 return $record->mainImage?->url;
                             })
@@ -57,19 +64,16 @@ class RoomForm
                                 );
                             })->dehydrated(false),
 
-                        // GALLERY LOGIC (Public Storage Multiple)
+                        // GALLERY IMAGES
                         FileUpload::make('gallery_images')
-                            ->label('Room Gallery')
+                            ->label('Venue Gallery')
                             ->image()
                             ->multiple()
-                            ->disk('public')
-                            ->visibility('public')
-                            ->directory('rooms/gallery')
+                            ->directory('venues/gallery')
                             ->loadStateFromRelationshipsUsing(static function (Model $record) {
                                 return $record->gallery()->pluck('url')->toArray();
                             })
                             ->saveRelationshipsUsing(static function (Model $record, $state) {
-                                // Clear old gallery and save new ones
                                 $record->gallery()->delete();
                                 if (!$state) return;
                                 foreach ($state as $url) {
@@ -83,4 +87,3 @@ class RoomForm
             ]);
     }
 }
-//Integration
