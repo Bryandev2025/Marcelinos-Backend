@@ -4,10 +4,13 @@ namespace App\Http\Controllers\API;
 
 use App\Models\Room;
 use App\Http\Controllers\Controller;
+<<<<<<< HEAD
 use Illuminate\Http\Request;
 <<<<<<< HEAD
 use App\Models\Room;
 =======
+=======
+>>>>>>> d2be2b6 (added booking controller)
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Exception;
 >>>>>>> 6a55ab0 (index and show updated)
