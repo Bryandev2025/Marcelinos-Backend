@@ -2,9 +2,10 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\API\Bookings;
-use App\Http\Controllers\API\Rooms;
-use App\Http\Controllers\API\Guests;
+use App\Http\Controllers\API\BookingController;
+
+
+
 
 Route::get('/user', function (Request $request) {
     return $request->user();

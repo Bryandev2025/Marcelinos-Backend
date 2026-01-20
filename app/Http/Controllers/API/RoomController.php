@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 
-class Bookings extends Controller
+class RoomController extends Controller
 {
     /**
      * Display all bookings
