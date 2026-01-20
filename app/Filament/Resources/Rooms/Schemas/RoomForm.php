@@ -39,13 +39,13 @@ class RoomForm
 
                 Section::make('Media')
                     ->schema([
-                        // MAIN IMAGE LOGIC (S3 Public)
+                        // MAIN IMAGE LOGIC (Public Storage)
                         FileUpload::make('main_image')
                             ->label('Main Featured Image')
                             ->image()
-                            ->disk('local') // <-- Upload to S3
+                            ->disk('public')
                             ->visibility('public')
-                            ->directory('rooms/main')
+                            ->directory('rooms')
                             ->loadStateFromRelationshipsUsing(static function (Model $record) {
                                 return $record->mainImage?->url;
                             })
@@ -57,12 +57,12 @@ class RoomForm
                                 );
                             })->dehydrated(false),
 
-                        // GALLERY LOGIC (S3 Public Multiple)
+                        // GALLERY LOGIC (Public Storage Multiple)
                         FileUpload::make('gallery_images')
                             ->label('Room Gallery')
                             ->image()
                             ->multiple()
-                            ->disk('s3') // <-- Upload to S3
+                            ->disk('public')
                             ->visibility('public')
                             ->directory('rooms/gallery')
                             ->loadStateFromRelationshipsUsing(static function (Model $record) {
