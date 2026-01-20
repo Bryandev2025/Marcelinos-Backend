@@ -5,10 +5,14 @@
         "This file is @generated automatically"
     ],
 <<<<<<< HEAD
+<<<<<<< HEAD
     "content-hash": "2d4915333f5a7e16feebfc529b2615b8",
 =======
     "content-hash": "e2bc26c38283613236f6edd5bbafe85e",
 >>>>>>> eafa302 (feat: Add AWS S3 support and enhance booking management)
+=======
+    "content-hash": "e2bc26c38283613236f6edd5bbafe85e",
+>>>>>>> 655cf6e (Add AWS S3 filesystem adapter and update dependencies)
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
