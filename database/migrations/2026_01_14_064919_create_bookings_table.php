@@ -13,21 +13,13 @@ return new class extends Migration
     {
         Schema::create('bookings', function (Blueprint $table) {
             $table->id();
+            $table->string('reference_id')->nullable()->unique();
             $table->foreignId('guest_id')->constrained();
-            $table->foreignId('room_id')->nullable()->constrained();
-            $table->foreignId('venue_id')->nullable()->constrained();
+            $table->foreignId('room_id')->constrained();
             $table->dateTime('check_in');
             $table->dateTime('check_out');
             $table->decimal('total_price', 10, 2);
-            $table->enum('status', [
-                                    'pending', 
-                                    'confirmed', 
-                                    'occupied', 
-                                    'completed', 
-                                    'cancelled', 
-                                    'reschedule'
-                                    ])->default('pending');
-            $table->string('payment_reference')->nullable();
+            $table->enum('status', ['pending', 'confirmed', 'occupied', 'completed', 'cancelled'])->default('pending');
             $table->timestamps();
         });
     }
