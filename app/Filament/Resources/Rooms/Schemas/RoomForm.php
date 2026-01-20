@@ -43,7 +43,7 @@ class RoomForm
                         FileUpload::make('main_image')
                             ->label('Main Featured Image')
                             ->image()
-                            ->disk('s3') // <-- Upload to S3
+                            ->disk('local') // <-- Upload to S3
                             ->visibility('public')
                             ->directory('rooms/main')
                             ->loadStateFromRelationshipsUsing(static function (Model $record) {
