@@ -6,7 +6,24 @@ use Illuminate\Database\Eloquent\Model;
 
 class Guest extends Model
 {
-    protected $guarded = []; // Allows all fields to be filled by Filament
+    protected $fillable = [
+    'first_name',
+    'middle_name',
+    'last_name',
+    'email',
+    'contact_num',
+    'gender',
+    'id_type',
+    'id_number',
+    'is_international',
+    'country',
+    'province',
+    'municipality',
+    'barangay',
+    'city',
+    'state_region',
+    ];
+
 
 
         // Link to the ID photo in the images table
