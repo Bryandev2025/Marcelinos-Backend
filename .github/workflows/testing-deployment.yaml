@@ -19,6 +19,8 @@ jobs:
           extensions: mbstring, bcmath, intl, pdo_mysql
           coverage: none
 
+      - name: 📦 Install Composer dependencies
+        run: composer install --no-dev --optimize-autoloader
 
       - name: ⚙️ Optimize Laravel
         run: php artisan optimize
