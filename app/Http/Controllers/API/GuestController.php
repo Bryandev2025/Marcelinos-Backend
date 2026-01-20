@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\Guest;
 // use Carbon\Carbon;
 
-class Guests extends Controller
+class GuestController extends Controller
 {
     public function index()
     {

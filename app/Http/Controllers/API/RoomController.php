@@ -4,10 +4,6 @@ namespace App\Http\Controllers\API;
 
 use App\Models\Room;
 use App\Http\Controllers\Controller;
-use App\Models\Booking;
-use App\Models\Room;
-use Illuminate\Auth\CreatesUserProviders;
-use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Exception;
 
