@@ -2,31 +2,28 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Models\Room;
+use App\Models\Venue;
 use App\Http\Controllers\Controller;
-use App\Models\Booking;
-use App\Models\Room;
-use Illuminate\Auth\CreatesUserProviders;
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Exception;
 
-class RoomController extends Controller
+class VenueController extends Controller
 {
     public function index()
     {
         try {
-            $rooms = Room::latest()->get();
+            $venues = Venue::latest()->get();
 
             return response()->json([
                 'success' => true,
-                'data' => $rooms
+                'data' => $venues
             ], 200);
 
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to fetch rooms',
+                'message' => 'Failed to fetch venues',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -35,23 +32,23 @@ class RoomController extends Controller
     public function show($id)
     {
         try {
-            $room = Room::findOrFail($id);
+            $venue = Venue::findOrFail($id);
 
             return response()->json([
                 'success' => true,
-                'data' => $room
+                'data' => $venue
             ], 200);
 
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Room not found'
+                'message' => 'Venue not found'
             ], 404);
 
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to fetch the room',
+                'message' => 'Failed to fetch the venue',
                 'error' => $e->getMessage()
             ], 500);
         }

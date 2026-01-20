@@ -2,8 +2,14 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\API\BookingController;
+// use Illuminate\App\Http\Controllers\VenueController;
+// use Illuminate\App\Http\Controllers\API\RoomController;
+use Illuminate\App\Http\Controllers\BookingsController;
+use Illuminate\App\Http\Controllers\ImagesController;
+use Illuminate\App\Http\Controllers\GuestController;
 
+use App\Http\Controllers\API\RoomController;
+use App\Http\Controllers\API\VenueController;
 
 
 
@@ -19,7 +25,13 @@ Route::delete('bookings/{id}', [Bookings::class, 'destroy']);
 Route::patch('bookings/{booking}/cancel', [Bookings::class, 'cancel']);
 
 
-Route::apiResource('rooms', Rooms::class);
-Route::apiResource('guests', Guests::class);
-
 Route::get('/booking-receipt/{reference}', [Bookings::class, 'showByReference']);
+Route::apiResource('venues', VenueController::class);
+
+//Room
+Route::get('rooms', [RoomController::class, 'index']);
+Route::get('/rooms/{id}', [RoomController::class, 'show']);
+
+//Venue
+Route::get('/venues', [VenueController::class, 'index']);
+Route::get('/venues/{id}', [VenueController::class, 'show']);
