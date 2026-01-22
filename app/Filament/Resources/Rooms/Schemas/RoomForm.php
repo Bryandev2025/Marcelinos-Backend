@@ -39,16 +39,16 @@ class RoomForm
 
                 Section::make('Media')
                     ->schema([
-                        // MAIN IMAGE LOGIC (Public Storage)
+                        // MAIN IMAGE LOGIC
                         FileUpload::make('main_image')
                             ->label('Main Featured Image')
                             ->image()
-                            ->disk('public')
-                            ->visibility('public')
-                            ->directory('rooms')
+                            ->directory('rooms/main')
+                            // Load existing image from DB
                             ->loadStateFromRelationshipsUsing(static function (Model $record) {
                                 return $record->mainImage?->url;
                             })
+                            // Save to our custom images table
                             ->saveRelationshipsUsing(static function (Model $record, $state) {
                                 if (!$state) return;
                                 $record->mainImage()->updateOrCreate(
@@ -57,13 +57,11 @@ class RoomForm
                                 );
                             })->dehydrated(false),
 
-                        // GALLERY LOGIC (Public Storage Multiple)
+                        // GALLERY LOGIC
                         FileUpload::make('gallery_images')
                             ->label('Room Gallery')
                             ->image()
                             ->multiple()
-                            ->disk('public')
-                            ->visibility('public')
                             ->directory('rooms/gallery')
                             ->loadStateFromRelationshipsUsing(static function (Model $record) {
                                 return $record->gallery()->pluck('url')->toArray();
@@ -83,4 +81,3 @@ class RoomForm
             ]);
     }
 }
-//Integration
