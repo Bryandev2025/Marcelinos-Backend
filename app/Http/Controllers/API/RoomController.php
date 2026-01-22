@@ -12,12 +12,9 @@ class RoomController extends Controller
     public function index()
     {
         try {
+            
             $rooms = Room::latest()->get();
-
-            return response()->json([
-                'success' => true,
-                'data' => $rooms
-            ], 200);
+            return response()->json($rooms, 200);
 
         } catch (Exception $e) {
             return response()->json([
