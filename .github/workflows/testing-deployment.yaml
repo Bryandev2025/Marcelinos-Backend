@@ -46,7 +46,7 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftp
           port: 21
-          server-dir: /test1-marcelinos/
+          server-dir: /marcelinos-api-deployment/
           local-dir: ./
           # IMPORTANT: vendor and public/build are NOT excluded anymore
           exclude: |
