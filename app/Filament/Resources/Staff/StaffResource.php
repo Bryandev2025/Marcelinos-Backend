@@ -15,6 +15,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
+use Illuminate\Database\Eloquent\Builder;
 
 class StaffResource extends Resource
 {
@@ -29,7 +30,14 @@ class StaffResource extends Resource
 
     public static function table(Table $table): Table
 {
-    return StaffTable::configure($table);
+        return StaffTable::configure($table);
+
+}
+
+public static function getEloquentQuery(): Builder
+{
+    // Only show staff users, never admins
+    return parent::getEloquentQuery()->where('role', 'staff');
 }
 
     public static function getRelations(): array

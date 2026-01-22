@@ -4,10 +4,10 @@ namespace App\Filament\Resources\Staff\Tables;
 
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Actions\EditAction;
-use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 
@@ -43,14 +43,12 @@ class StaffTable
                     ])
                     ->sortable(),
 
-                TextColumn::make('is_active')
-                    ->label('Status')
-                    ->badge()
-                    ->getStateUsing(fn ($record) => $record->is_active ? 'Active' : 'Inactive')
-                    ->colors([
-                        'success' => fn ($state) => $state === 'Active',
-                        'danger'  => fn ($state) => $state === 'Inactive',
-                    ])
+                ToggleColumn::make('is_active')
+                    ->label('Active')
+                    ->onColor('success')      // Green
+                    ->offColor('danger')      // Red
+                    ->onIcon('heroicon-o-check-badge')
+                    ->offIcon('heroicon-o-x-mark')
                     ->sortable(),
 
                 TextColumn::make('created_at')
@@ -73,14 +71,6 @@ class StaffTable
             ])
             ->recordActions([
                 EditAction::make(),
-
-                Action::make('toggleActive')
-                    ->label('Activate/Deactivate')
-                    ->icon(fn ($record) => $record->is_active ? 'heroicon-o-user-minus' : 'heroicon-o-user-plus')
-                    ->action(fn ($record) => $record->update([
-                        'is_active' => !$record->is_active,
-                    ]))
-                    ->requiresConfirmation(),
             ])
             ->bulkActions([
                 BulkActionGroup::make([
