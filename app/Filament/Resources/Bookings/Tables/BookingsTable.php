@@ -5,9 +5,13 @@ namespace App\Filament\Resources\Bookings\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Forms\Components\Select;
+use Illuminate\Support\Facades\Auth;
+
 
 class BookingsTable
 {
@@ -68,6 +72,39 @@ class BookingsTable
             ])
             ->recordActions([
                 EditAction::make(),
+            ])
+            ->headerActions([
+                Action::make('generateReport')
+                    ->icon('heroicon-o-ellipsis-vertical')
+                    ->visible(fn () => Auth::check())
+                    ->form([
+                        Select::make('report_period')
+                            ->label('Report Period')
+                            ->options([
+                                'daily' => 'Daily',
+                                'weekly' => 'Weekly',
+                                'monthly' => 'Monthly',
+                                'yearly' => 'Yearly',
+                            ])
+                            ->required()
+                            ->default('daily'),
+
+                        Select::make('report_format')
+                            ->label('Report Format')
+                            ->options([
+                                'csv' => 'CSV',
+                                'pdf' => 'PDF',
+                            ])
+                            ->required()
+                            ->default('csv'),
+                    ])
+                    ->slideOver()
+                    ->action(function (array $data) {
+                        return \App\Services\BookingReportService::generate([
+                            'period' => $data['report_period'],
+                            'format' => $data['report_format'],
+                        ]);
+                    }),
             ])
             ->bulkActions([
                 BulkActionGroup::make([
