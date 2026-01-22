@@ -26,18 +26,10 @@ class StaffResource extends Resource
         return StaffForm::configure($schema);
     }
 
-    public static function table(\Filament\Tables\Table $table): \Filament\Tables\Table
-    {
-    return $table
-        ->columns([
-            TextColumn::make('id')->label('ID')->sortable(),
-            TextColumn::make('name')->label('Full Name')->sortable()->searchable(),
-            TextColumn::make('email')->label('Email')->sortable()->searchable(),
-            TextColumn::make('role')->label('Role')->sortable(),
-            TextColumn::make('created_at')->label('Created')->dateTime()->sortable(),
-        ])
-        ->defaultSort('id', 'desc');
-    }
+    public static function table(Table $table): Table
+{
+    return StaffTable::configure($table);
+}
 
     public static function getRelations(): array
     {
