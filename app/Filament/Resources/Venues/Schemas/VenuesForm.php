@@ -53,6 +53,7 @@ class VenuesForm
                             ->label('Main Featured Image')
                             ->image()
                             ->directory('venues/main')
+                            ->disk('public')
                             ->loadStateFromRelationshipsUsing(static function (Model $record) {
                                 return $record->mainImage?->url;
                             })
@@ -60,7 +61,7 @@ class VenuesForm
                                 if (!$state) return;
                                 $record->mainImage()->updateOrCreate(
                                     ['type' => 'main'],
-                                    ['url' => $state]
+                                    ['url' => 'venues/main/' . basename($state)]
                                 );
                             })->dehydrated(false),
 
@@ -70,6 +71,7 @@ class VenuesForm
                             ->image()
                             ->multiple()
                             ->directory('venues/gallery')
+                            ->disk('public')
                             ->loadStateFromRelationshipsUsing(static function (Model $record) {
                                 return $record->gallery()->pluck('url')->toArray();
                             })
@@ -78,7 +80,7 @@ class VenuesForm
                                 if (!$state) return;
                                 foreach ($state as $url) {
                                     $record->images()->create([
-                                        'url' => $url,
+                                        'url' => 'venues/gallery/' . basename($url),
                                         'type' => 'gallery',
                                     ]);
                                 }

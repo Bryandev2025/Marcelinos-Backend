@@ -20,7 +20,7 @@ class VenuesTable
                 ImageColumn::make('mainImage.url')
                     ->label('Photo')
                     ->circular()
-                    ->defaultImageUrl(url('/images/placeholder-venue.jpg')),
+                    ->defaultImageUrl(url('/images/placeholder-venue.svg')),
 
                 TextColumn::make('name')
                     ->searchable()

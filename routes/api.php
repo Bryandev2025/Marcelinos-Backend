@@ -32,7 +32,7 @@ Route::patch('bookings/{booking}/cancel', [BookingController::class, 'cancel']);
 
 Route::apiResource('guests', GuestController::class);
 
-Route::get('/booking-receipt/{reference}', [BookingsController::class, 'showByReference']);
+Route::get('/booking-receipt/{reference}', [BookingController::class, 'showByReference']);
 
 >>>>>>> a358b7d (modified api.php)
 Route::apiResource('venues', VenueController::class);
