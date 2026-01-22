@@ -12,8 +12,16 @@ class RoomController extends Controller
     public function index()
     {
         try {
-            
-            $rooms = Room::latest()->get();
+            /**
+             * Fetch all rooms and it's related image on Image model
+             * with('mainImage','gallery','amenities') to eager load relationships
+             * fetch by order [standard, family, deluxe]
+             * fetch only rooms with status 'available'
+            */
+            $rooms = Room::with('mainImage', 'gallery', 'amenities')
+                ->where('status', 'available')
+                ->orderByRaw("FIELD(type, 'standard', 'family', 'deluxe')")
+                ->get();
             return response()->json($rooms, 200);
 
         } catch (Exception $e) {
