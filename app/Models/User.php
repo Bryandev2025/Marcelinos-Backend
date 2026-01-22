@@ -17,6 +17,7 @@ class User extends Authenticatable implements FilamentUser
         'email',
         'password',
         'role', // ✅ REQUIRED
+        'is_active',
     ];
 
     protected $hidden = [
@@ -32,12 +33,20 @@ class User extends Authenticatable implements FilamentUser
         ];
     }
 
-    public function canAccessPanel(Panel $panel): bool
-    {
-        return match ($panel->getId()) {
-            'admin' => $this->role === 'admin',
-            'staff' => $this->role === 'staff',
-            default => false, // 🔒 NEVER allow unknown panels
-        };
+    public function canAccessPanel(\Filament\Panel $panel): bool
+{
+    if (! $this->is_active) {
+        return false; // cannot access any panel if inactive
     }
+
+    if ($panel->getId() === 'admin') {
+        return $this->role === 'admin';
+    }
+
+    if ($panel->getId() === 'staff') {
+        return $this->role === 'staff';
+    }
+
+    return true;
+}
 }
