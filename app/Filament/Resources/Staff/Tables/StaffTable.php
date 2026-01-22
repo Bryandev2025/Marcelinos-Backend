@@ -44,7 +44,7 @@ class StaffTable
                     ->sortable(),
 
                 ToggleColumn::make('is_active')
-                    ->label('Active')
+                    ->label('Status')
                     ->onColor('success')      // Green
                     ->offColor('danger')      // Red
                     ->onIcon('heroicon-o-check-badge')
