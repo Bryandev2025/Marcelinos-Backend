@@ -19,7 +19,7 @@ return new class extends Migration
             $table->dateTime('check_out');
             $table->decimal('price', 10, 2);
             $table->string('reference_number')->unique();
-            $table->enum('status', ['pending','confirmed','occupied','checked_in','checked_out','cancelled'])->default('pending');
+            $table->enum('status', ['pending','confirmed','occupied', 'complete', 'checked_in','checked_out','cancelled'])->default('pending');
             $table->timestamps();
         });
 
