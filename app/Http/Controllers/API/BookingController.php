@@ -37,7 +37,7 @@ class BookingController extends Controller
     {
         try {
             $booking = Booking::with(['guest', 'room'])
-                ->where('reference_id', $reference)
+                ->where('reference_number', $reference)
                 ->first();
 
             if (!$booking) {
@@ -50,7 +50,7 @@ class BookingController extends Controller
             $issued_on = Carbon::parse($booking->created_at);
 
             return response()->json([
-                'reference_id' => $booking->reference_id,
+                'reference_number' => $booking->reference_number,
                 'check_in' => $check_in->format('M d, Y'),
                 'check_out' => $check_out->format('M d, Y'),
                 'issued_on' => $issued_on->format('M d, Y'),
@@ -64,7 +64,6 @@ class BookingController extends Controller
                 ],
                 'subtotal' => $booking->total_price,
                 'grand_total' => $booking->total_price,
-                'payment_method' => $booking->payment_method,
             ], 200);
 
         } catch (\Exception $e) {
@@ -81,14 +80,13 @@ class BookingController extends Controller
     {
         $validated = $request->validate(
             [
-                'reference_id' => 'required|string',
+                'reference_number' => 'required|string',
                 'rooms'   => 'required|array|min:1',
                 'rooms.*' => ['required', 'integer', 'distinct', Rule::exists('rooms', 'id')],
                 'check_in'  => 'required|string',
                 'check_out' => 'required|string',
                 'days'      => 'required|integer|min:1',
                 'total_price' => 'required|numeric|min:0',
-                'payment_method' => 'nullable|string|max:100',
             ],
             [
                 'rooms.*.exists' => 'Selected room :input does not exist.',
@@ -140,14 +138,13 @@ class BookingController extends Controller
         foreach ($roomIds as $room_id) {
             $booking = Booking::create([
                 'guest_id'     => $guest->id,
-                'reference_id' => $validated['reference_id'],
+                'reference_number' => $validated['reference_number'],
                 'room_id'      => (int) $room_id,
                 'check_in'     => $checkIn,
                 'check_out'    => $checkOut,
                 'no_of_days'   => $validated['days'],
                 'total_price'  => $validated['total_price'],
                 'status'       => 'pending',
-                'payment_method' => $validated['payment_method'] ?? null,
             ]);
             $bookings[] = $booking;
         }

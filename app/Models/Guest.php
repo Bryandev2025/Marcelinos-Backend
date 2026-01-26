@@ -18,16 +18,13 @@ class Guest extends Model implements HasMedia
         'email',
         'contact_num',
         'gender',
-        'id_type',
-        'id_number',
+
         'is_international',
         'country',
         'province',
         'municipality',
         'barangay',
         'city',
-        'state_region',
-        // 'id_image_path', // uncomment if you add ID upload later
     ];
 
     // Cast fields
@@ -86,22 +83,18 @@ class Guest extends Model implements HasMedia
             'email'            => 'required|email|unique:guests,email',
             'contact_num'      => 'required|string|max:20',
             'gender'           => 'nullable|in:Male,Female,Other',
-            'id_type'          => 'required|string|max:50',
-            'id_number'        => 'required|string|max:100',
             'is_international' => 'required|boolean',
             'country'          => 'nullable|string|max:100',
             'province'         => 'nullable|string|max:100',
             'municipality'     => 'nullable|string|max:100',
             'barangay'         => 'nullable|string|max:100',
             'city'             => 'nullable|string|max:100',
-            'state_region'     => 'nullable|string|max:100',
         ]);
 
         // Default country logic
         if (!$validated['is_international']) {
             $validated['country'] = 'Philippines';
             $validated['city'] = null;
-            $validated['state_region'] = null;
         } else {
             $validated['province'] = null;
             $validated['municipality'] = null;
