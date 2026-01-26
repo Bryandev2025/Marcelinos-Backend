@@ -2,13 +2,12 @@
 
 namespace App\Filament\Resources\Rooms\Tables;
 
-use Filament\Tables\Table;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\ImageColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Actions\EditAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ImageColumn;
+use Filament\Tables\Table;
 
 class RoomsTable
 {
@@ -16,73 +15,58 @@ class RoomsTable
     {
         return $table
             ->columns([
-                // 1. MAIN IMAGE THUMBNAIL
-                ImageColumn::make('mainImage.url')
-                    ->label('Photo')
-                    ->circular()
-                    ->defaultImageUrl(url('/images/placeholder-room.jpg')),
+                // ✅ Featured Image
+                ImageColumn::make('featured_image')
+                    ->label('Featured')
+                    ->getStateUsing(fn($record) => $record->getFirstMediaUrl('featured')),
 
                 TextColumn::make('name')
                     ->searchable()
-                    ->label('Name')
-                    ->extraAttributes(['class' => 'font-bold']),
+                    ->sortable(),
 
                 TextColumn::make('capacity')
                     ->numeric()
-                    ->sortable()
-                    ->alignCenter(),
+                    ->sortable(),
 
                 TextColumn::make('type')
                     ->badge()
-                    ->colors([
-                        'info' => 'standard',
-                        'warning' => 'family',
-                        'success' => 'deluxe',
-                    ]),
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'standard' => 'Standard',
+                        'family' => 'Family',
+                        'deluxe' => 'Deluxe',
+                        default => $state,
+                    }),
 
-                // 2. PRICING WITH CURRENCY
                 TextColumn::make('price')
-                    ->money('PHP') // Formats as ₱
+                    ->money('PHP', true)
                     ->sortable(),
 
-                // 3. COLOR-CODED STATUS
                 TextColumn::make('status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'available' => 'success', // Green
-                        'occupied' => 'danger',  // Red
-                        'cleaning' => 'warning', // Yellow/Orange
-                        default => 'gray',
-                    }),
+                    ->colors([
+                        'success' => 'available',
+                        'danger' => 'occupied',
+                        'warning' => 'cleaning',
+                        'secondary' => 'maintenance',
+                    ]),
 
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('updated_at')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                // Filter by status
-                SelectFilter::make('status')
-                    ->label('Status')
-                    ->options([
-                        'available' => 'Available',
-                        'occupied'  => 'Occupied',
-                        'cleaning'  => 'Cleaning',
-                    ]),
-
-                // Filter by type
-                SelectFilter::make('type')
-                    ->label('Room Type')
-                    ->options([
-                        'standard' => 'Standard',
-                        'family'   => 'Family',
-                        'deluxe'   => 'Deluxe',
-                    ]),
+                //
             ])
             ->recordActions([
                 EditAction::make(),
             ])
-            ->bulkActions([
+            ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),

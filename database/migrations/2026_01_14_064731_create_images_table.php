@@ -14,10 +14,12 @@ return new class extends Migration
         Schema::create('images', function (Blueprint $table) {
             $table->id();
             $table->string('url');
-            $table->string('type'); // main, gallery, identification
-            $table->morphs('imageable'); // This creates imageable_id and imageable_type
+            $table->enum('type', ['featured','gallery','id_verification']);
+            $table->unsignedBigInteger('imageable_id');
+            $table->string('imageable_type');
             $table->timestamps();
         });
+
     }
 
     /**

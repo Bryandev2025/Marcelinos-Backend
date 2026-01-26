@@ -11,23 +11,20 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('rooms', function (Blueprint $table) {
+        Schema::create('failed_import_rows', function (Blueprint $table): void {
             $table->id();
-            $table->string('name');
-            $table->integer('capacity');
-            $table->enum('type', ['standard','family','deluxe']);
-            $table->decimal('price', 10, 2);
-            $table->enum('status', ['available','occupied','cleaning','maintenance'])->default('available');
+            $table->json('data');
+            $table->foreignId('import_id')->constrained()->cascadeOnDelete();
+            $table->text('validation_error')->nullable();
             $table->timestamps();
         });
     }
-
 
     /**
      * Reverse the migrations.
      */
     public function down(): void
     {
-        Schema::dropIfExists('rooms');
+        Schema::dropIfExists('failed_import_rows');
     }
 };

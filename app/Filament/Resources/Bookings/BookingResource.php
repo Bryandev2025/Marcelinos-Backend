@@ -16,9 +16,11 @@ use Filament\Tables\Table;
 
 class BookingResource extends Resource
 {
-    protected static ?string $model = Booking::class;
+     protected static ?string $model = Booking::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-calendar';
+
+    protected static ?string $recordTitleAttribute = 'reference_number';
 
     public static function form(Schema $schema): Schema
     {

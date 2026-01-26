@@ -2,61 +2,29 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Database\Eloquent\Relations\MorphOne;
-use Illuminate\Support\Facades\Storage;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class Room extends Model
+class Room extends Model implements HasMedia
 {
-   protected $guarded = [];
+    use HasFactory, InteractsWithMedia;
 
-    /**
-     * Get all of the room's images.
-     */
-    public function images(): MorphMany
-        {
-            return $this->morphMany(Image::class, 'imageable');
-        }
+    protected $fillable = ['name','capacity','type','price','status'];
 
-    /**
-     * Get the room's featured main image.
-     */
-    public function mainImage(): MorphOne
-        {
-            return $this->morphOne(Image::class, 'imageable')->where('type', 'main');
-        }
+    public function bookings()
+    {
+        return $this->hasMany(Booking::class);
+    }
 
-    /**
-     * Get the room's gallery images.
-     */
-    public function gallery(): MorphMany
-        {
-            return $this->morphMany(Image::class, 'imageable')->where('type', 'gallery');
-        }
+    public function images()
+    {
+        return $this->morphMany(Image::class, 'imageable');
+    }
 
-    /**
-     * Relationship with Amenities
-     */
     public function amenities()
-        {
-            return $this->belongsToMany(Amenity::class, 'amenity_room');
-        }
-
-
-        
-        protected static function booted()
-        {
-            static::deleting(function ($room) {
-                // 1. Get all images associated with this room
-                foreach ($room->images as $image) {
-                    // 2. Delete the physical file from the storage folder
-                    Storage::disk('public')->delete($image->url);
-                    
-                    // 3. Delete the row from the images table
-                    $image->delete();
-                }
-            });
-        }
-        
+    {
+        return $this->belongsToMany(Amenity::class);
+    }
 }
