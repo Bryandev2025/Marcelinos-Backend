@@ -22,9 +22,16 @@ class Room extends Model implements HasMedia
     {
         return $this->morphMany(Image::class, 'imageable');
     }
+    public function getMainImageAttribute()
+{
+    return $this->getFirstMediaUrl('main_image');
+}
+
 
     public function amenities()
     {
         return $this->belongsToMany(Amenity::class);
     }
+
+
 }
