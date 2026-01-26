@@ -4,6 +4,9 @@ namespace App\Http\Controllers\API;
 
 use App\Models\Room;
 use App\Http\Controllers\Controller;
+use App\Models\Booking;
+use Illuminate\Auth\CreatesUserProviders;
+use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Exception;
 
@@ -14,11 +17,11 @@ class RoomController extends Controller
         try {
             /**
              * Fetch all rooms and it's related image on Image model
-             * with('mainImage','gallery','amenities') to eager load relationships
+             * with('amenities') to eager load relationships
              * fetch by order [standard, family, deluxe]
              * fetch only rooms with status 'available'
             */
-            $rooms = Room::with('mainImage', 'gallery', 'amenities')
+            $rooms = Room::with('amenities')
                 ->where('status', 'available')
                 ->orderByRaw("FIELD(type, 'standard', 'family', 'deluxe')")
                 ->get();

@@ -26,9 +26,6 @@ class GuestController extends Controller
 
             'gender'           => 'nullable|in:Male,Female,Other',
 
-            'id_type'          => 'required|string|max:50', // Passport, PhilID
-            'id_number'        => 'required|string|max:100',
-
             'is_international' => 'required|boolean',
             'country'          => 'nullable|string|max:100',
 
@@ -39,14 +36,12 @@ class GuestController extends Controller
 
             // International Address
             'city'             => 'nullable|string|max:100',
-            'state_region'     => 'nullable|string|max:100',
         ]);
 
         // Default country logic
         if (!$validated['is_international']) {
             $validated['country'] = 'Philippines';
             $validated['city'] = null;
-            $validated['state_region'] = null;
         } else {
             $validated['province'] = null;
             $validated['municipality'] = null;

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Room;
+use App\Models\Guest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
@@ -36,7 +37,7 @@ class BookingController extends Controller
     {
         try {
             $booking = Booking::with(['guest', 'room'])
-                ->where('reference_id', $reference)
+                ->where('reference_number', $reference)
                 ->first();
 
             if (!$booking) {
@@ -49,7 +50,7 @@ class BookingController extends Controller
             $issued_on = Carbon::parse($booking->created_at);
 
             return response()->json([
-                'reference_id' => $booking->reference_id,
+                'reference_number' => $booking->reference_number,
                 'check_in' => $check_in->format('M d, Y'),
                 'check_out' => $check_out->format('M d, Y'),
                 'issued_on' => $issued_on->format('M d, Y'),
@@ -63,7 +64,6 @@ class BookingController extends Controller
                 ],
                 'subtotal' => $booking->total_price,
                 'grand_total' => $booking->total_price,
-                'payment_method' => $booking->payment_method,
             ], 200);
 
         } catch (\Exception $e) {
@@ -78,13 +78,21 @@ class BookingController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'guest_id'  => 'required|exists:guests,id',
-            'reference_id' => 'required|string',
-            'room_id'   => 'required|exists:rooms,id',
-            'check_in'  => 'required|string',
-            'check_out' => 'required|string',
-        ]);
+        $validated = $request->validate(
+            [
+                'reference_number' => 'required|string',
+                'rooms'   => 'required|array|min:1',
+                'rooms.*' => ['required', 'integer', 'distinct', Rule::exists('rooms', 'id')],
+                'check_in'  => 'required|string',
+                'check_out' => 'required|string',
+                'days'      => 'required|integer|min:1',
+                'total_price' => 'required|numeric|min:0',
+            ],
+            [
+                'rooms.*.exists' => 'Selected room :input does not exist.',
+                'rooms.*.distinct' => 'Duplicate room selection is not allowed.',
+            ]
+        );
 
         try {
             $checkIn  = Carbon::createFromFormat('M d, Y', $validated['check_in'])->startOfDay();
@@ -104,25 +112,48 @@ class BookingController extends Controller
             ], 422);
         }
 
-        // Calculate nights
-        $nights = max(1, $checkOut->diffInDays($checkIn));
+        // Store Guest first
+        $guest = Guest::store($request);
 
-        $room = Room::findOrFail($validated['room_id']);
-        $totalPrice = $room->price_per_night * $nights;
+        $bookings = [];
+        $roomIds = collect($validated['rooms'])
+            ->map(function ($room) {
+                if (is_array($room)) {
+                    return $room['id'] ?? ($room[0] ?? null);
+                }
+                return $room;
+            })
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->values();
 
-        $booking = Booking::create([
-            'guest_id'    => $validated['guest_id'],
-            'reference_id' => $validated['reference_id'],
-            'room_id'     => $validated['room_id'],
-            'check_in'    => $checkIn,
-            'check_out'   => $checkOut,
-            'total_price' => $totalPrice,
-            'status'      => 'pending',
-        ]);
+        // Fail early if any provided room does not actually exist
+        $existingRoomIds = Room::whereIn('id', $roomIds)->pluck('id')->all();
+        if (count($existingRoomIds) !== $roomIds->count()) {
+            return response()->json([
+                'message' => 'One or more selected rooms do not exist',
+            ], 422);
+        }
+
+        foreach ($roomIds as $room_id) {
+            $booking = Booking::create([
+                'guest_id'     => $guest->id,
+                'reference_number' => $validated['reference_number'],
+                'room_id'      => (int) $room_id,
+                'check_in'     => $checkIn,
+                'check_out'    => $checkOut,
+                'no_of_days'   => $validated['days'],
+                'total_price'  => $validated['total_price'],
+                'status'       => 'pending',
+            ]);
+            $bookings[] = $booking;
+        }
 
         return response()->json([
-            'message' => 'Booking created successfully',
-            'data'    => $booking
+            'message' => 'Booking(s) created successfully',
+            'guest' => $guest,
+            'bookings' => $bookings,
+            'total_price' => $validated['total_price']
         ], 201);
     }
 
@@ -147,108 +178,108 @@ class BookingController extends Controller
         }
     }
 
-    public function update(Request $request, Booking $booking)
-    {
-        try {
-            $validated = $request->validate([
-                'guest_id' => [
-                    'sometimes',
-                    'required',
-                    Rule::exists('guests', 'id')
-                ],
-                'room_id' => [
-                    'sometimes',
-                    'required',
-                    Rule::exists('rooms', 'id')
-                ],
-                'check_in' => 'sometimes|required|date',
-                'check_out' => 'sometimes|required|date',
-                'status' => [
-                    'sometimes',
-                    Rule::in(['pending','confirmed','occupied','completed','cancelled'])
-                ],
-                'remarks' => 'sometimes|nullable|string|max:255'
-            ]);
+    // public function update(Request $request, Booking $booking)
+    // {
+    //     try {
+    //         $validated = $request->validate([
+    //             'guest_id' => [
+    //                 'sometimes',
+    //                 'required',
+    //                 Rule::exists('guests', 'id')
+    //             ],
+    //             'room_id' => [
+    //                 'sometimes',
+    //                 'required',
+    //                 Rule::exists('rooms', 'id')
+    //             ],
+    //             'check_in' => 'sometimes|required|date',
+    //             'check_out' => 'sometimes|required|date',
+    //             'status' => [
+    //                 'sometimes',
+    //                 Rule::in(['pending','confirmed','occupied','completed','cancelled'])
+    //             ],
+    //             'remarks' => 'sometimes|nullable|string|max:255'
+    //         ]);
 
-            /*
-            |--------------------------------------------------------------------------
-            | Validate date relationship
-            |--------------------------------------------------------------------------
-            */
-            if (
-                isset($validated['check_in']) ||
-                isset($validated['check_out'])
-            ) {
-                $checkIn  = Carbon::parse($validated['check_in'] ?? $booking->check_in);
-                $checkOut = Carbon::parse($validated['check_out'] ?? $booking->check_out);
+    //         /*
+    //         |--------------------------------------------------------------------------
+    //         | Validate date relationship
+    //         |--------------------------------------------------------------------------
+    //         */
+    //         if (
+    //             isset($validated['check_in']) ||
+    //             isset($validated['check_out'])
+    //         ) {
+    //             $checkIn  = Carbon::parse($validated['check_in'] ?? $booking->check_in);
+    //             $checkOut = Carbon::parse($validated['check_out'] ?? $booking->check_out);
 
-                if ($checkOut->lessThanOrEqualTo($checkIn)) {
-                    return response()->json([
-                        'message' => 'Check-out must be after check-in.'
-                    ], 422);
-                }
-            }
+    //             if ($checkOut->lessThanOrEqualTo($checkIn)) {
+    //                 return response()->json([
+    //                     'message' => 'Check-out must be after check-in.'
+    //                 ], 422);
+    //             }
+    //         }
 
-            /*
-            |--------------------------------------------------------------------------
-            | Handle cancellation rules
-            |--------------------------------------------------------------------------
-            */
-            if (
-                isset($validated['status']) &&
-                $validated['status'] === 'cancelled'
-            ) {
-                if (!in_array($booking->status, ['pending', 'confirmed'])) {
-                    return response()->json([
-                        'message' => 'Only pending or confirmed bookings can be cancelled.'
-                    ], 422);
-                }
-            }
+    //         /*
+    //         |--------------------------------------------------------------------------
+    //         | Handle cancellation rules
+    //         |--------------------------------------------------------------------------
+    //         */
+    //         if (
+    //             isset($validated['status']) &&
+    //             $validated['status'] === 'cancelled'
+    //         ) {
+    //             if (!in_array($booking->status, ['pending', 'confirmed'])) {
+    //                 return response()->json([
+    //                     'message' => 'Only pending or confirmed bookings can be cancelled.'
+    //                 ], 422);
+    //             }
+    //         }
 
-            /*
-            |--------------------------------------------------------------------------
-            | Recalculate price if dates or room changed
-            |--------------------------------------------------------------------------
-            */
-            if (
-                isset($validated['check_in']) ||
-                isset($validated['check_out']) ||
-                isset($validated['room_id'])
-            ) {
-                $checkIn  = Carbon::parse($validated['check_in'] ?? $booking->check_in);
-                $checkOut = Carbon::parse($validated['check_out'] ?? $booking->check_out);
+    //         /*
+    //         |--------------------------------------------------------------------------
+    //         | Recalculate price if dates or room changed
+    //         |--------------------------------------------------------------------------
+    //         */
+    //         if (
+    //             isset($validated['check_in']) ||
+    //             isset($validated['check_out']) ||
+    //             isset($validated['room_id'])
+    //         ) {
+    //             $checkIn  = Carbon::parse($validated['check_in'] ?? $booking->check_in);
+    //             $checkOut = Carbon::parse($validated['check_out'] ?? $booking->check_out);
 
-                $nights = max(1, $checkOut->diffInDays($checkIn));
+    //             $nights = max(1, $checkOut->diffInDays($checkIn));
 
-                $room = Room::findOrFail($validated['room_id'] ?? $booking->room_id);
+    //             $room = Room::findOrFail($validated['room_id'] ?? $booking->room_id);
 
-                $validated['total_price'] = $room->price_per_night * $nights;
-                $validated['num_of_days'] = $nights;
-            }
+    //             $validated['total_price'] = $room->price_per_night * $nights;
+    //             $validated['num_of_days'] = $nights;
+    //         }
 
-            /*
-            |--------------------------------------------------------------------------
-            | Persist update
-            |--------------------------------------------------------------------------
-            */
-            $booking->update($validated);
+    //         /*
+    //         |--------------------------------------------------------------------------
+    //         | Persist update
+    //         |--------------------------------------------------------------------------
+    //         */
+    //         $booking->update($validated);
 
-            return response()->json([
-                'message' => 'Booking updated successfully.',
-                'data' => $booking->load(['guest', 'room'])
-            ], 200);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $e->errors()
-            ], 422);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Error updating booking',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
+    //         return response()->json([
+    //             'message' => 'Booking updated successfully.',
+    //             'data' => $booking->load(['guest', 'room'])
+    //         ], 200);
+    //     } catch (\Illuminate\Validation\ValidationException $e) {
+    //         return response()->json([
+    //             'message' => 'Validation failed',
+    //             'errors' => $e->errors()
+    //         ], 422);
+    //     } catch (\Exception $e) {
+    //         return response()->json([
+    //             'message' => 'Error updating booking',
+    //             'error' => $e->getMessage()
+    //         ], 500);
+    //     }
+    // }
 
     public function destroy($id)
     {
