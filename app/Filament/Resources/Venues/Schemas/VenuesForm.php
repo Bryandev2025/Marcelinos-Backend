@@ -17,6 +17,8 @@ class VenuesForm
     {
         return $schema
             ->components([
+
+                // ---------------- General Info ----------------
                 Section::make('General Information')
                     ->schema([
                         TextInput::make('name')
@@ -39,6 +41,7 @@ class VenuesForm
                     ])
                     ->columns(2),
 
+                // ---------------- Amenities ----------------
                 Section::make('Amenities')
                     ->schema([
                         CheckboxList::make('amenities')
@@ -46,46 +49,76 @@ class VenuesForm
                             ->columns(3),
                     ]),
 
+                // ---------------- Media ----------------
                 Section::make('Media')
                     ->schema([
-                        // MAIN IMAGE
+
+                        // Main Featured Image
                         FileUpload::make('main_image')
                             ->label('Main Featured Image')
                             ->image()
-                            ->directory('venues/main')
                             ->disk('public')
-                            ->loadStateFromRelationshipsUsing(static function (Model $record) {
-                                return $record->mainImage?->url;
+                            ->directory('venues/main')
+                            ->maxSize(2048)
+                            ->required()
+                            ->imagePreviewHeight('150')
+                            ->dehydrated(false)
+                            ->loadStateFromRelationshipsUsing(function ($record) {
+                                $image = $record->mainImage;
+                                if (!$image) return [];
+                                return [
+                                    [
+                                        'id' => $image->id,
+                                        'url' => asset('storage/' . $image->url), 
+                                    ]
+                                ];
                             })
-                            ->saveRelationshipsUsing(static function (Model $record, $state) {
+                            ->saveRelationshipsUsing(function ($record, $state) {
                                 if (!$state) return;
-                                $record->mainImage()->updateOrCreate(
-                                    ['type' => 'main'],
-                                    ['url' => 'venues/main/' . basename($state)]
-                                );
-                            })->dehydrated(false),
 
-                        // GALLERY IMAGES
+                                $record->mainImage()->delete();
+
+                                // $state is an array of uploaded files
+                                foreach ((array)$state as $file) {
+                                    $path = str_replace(asset('storage/'), '', $file['url'] ?? $file);
+                                    $record->images()->create([
+                                        'url' => $path,
+                                        'type' => 'main',
+                                    ]);
+                                }
+                            }),
+
+                        // Gallery Images
                         FileUpload::make('gallery_images')
                             ->label('Venue Gallery')
                             ->image()
                             ->multiple()
-                            ->directory('venues/gallery')
                             ->disk('public')
-                            ->loadStateFromRelationshipsUsing(static function (Model $record) {
-                                return $record->gallery()->pluck('url')->toArray();
+                            ->directory('venues/gallery')
+                            ->maxSize(2048)
+                            ->imagePreviewHeight('150')
+                            ->dehydrated(false)
+                            ->loadStateFromRelationshipsUsing(function ($record) {
+                                return $record->gallery->map(fn($image) => [
+                                    'id' => $image->id,
+                                    'url' => asset('storage/' . $image->url),
+                                ])->toArray();
                             })
-                            ->saveRelationshipsUsing(static function (Model $record, $state) {
+                            ->saveRelationshipsUsing(function ($record, $state) {
                                 $record->gallery()->delete();
+
                                 if (!$state) return;
-                                foreach ($state as $url) {
+
+                                foreach ($state as $file) {
+                                    $path = str_replace(asset('storage/'), '', $file['url'] ?? $file);
                                     $record->images()->create([
-                                        'url' => 'venues/gallery/' . basename($url),
+                                        'url' => $path,
                                         'type' => 'gallery',
                                     ]);
                                 }
-                            })->dehydrated(false),
+                            }),
                     ]),
             ]);
     }
 }
+                    

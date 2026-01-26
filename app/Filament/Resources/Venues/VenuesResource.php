@@ -25,6 +25,12 @@ class VenuesResource extends Resource
         return VenuesForm::configure($schema);
     }
 
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder // Override to eager load mainImage
+    {
+        return parent::getEloquentQuery()
+            ->with(['mainImage', 'gallery']);
+    }
+
     public static function table(Table $table): Table
     {
         return VenuesTable::configure($table);

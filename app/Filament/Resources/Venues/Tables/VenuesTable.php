@@ -20,7 +20,9 @@ class VenuesTable
                 ImageColumn::make('mainImage.url')
                     ->label('Photo')
                     ->circular()
-                    ->defaultImageUrl(url('/images/placeholder-venue.svg')),
+                    ->getStateUsing(fn ($record) => 
+                        $record->mainImage ? asset('storage/' . $record->mainImage->url) : asset('images/placeholder-venue.svg')
+                    ),
 
                 TextColumn::make('name')
                     ->searchable()
