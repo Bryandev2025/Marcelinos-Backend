@@ -23,7 +23,7 @@ Route::put('bookings/{id}', [BookingController::class, 'update']);
 Route::delete('bookings/{id}', [BookingController::class, 'destroy']);
 Route::patch('bookings/{booking}/cancel', [BookingController::class, 'cancel']);
 
-Route::apiResource('guests', GuestController::class);
+Route::apiResource('/bookings/store', BookingController::class);
 
 Route::get('/booking-receipt/{reference}', [BookingController::class, 'showByReference']);
 
