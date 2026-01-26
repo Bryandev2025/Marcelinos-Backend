@@ -2,55 +2,56 @@
 
 namespace App\Filament\Resources\Bookings\Schemas;
 
-use Filament\Schemas\Schema;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\DateTimePicker;
+use Filament\Schemas\Schema;
+use App\Models\Guest;
+use App\Models\Room;
 
 class BookingForm
 {
     public static function configure(Schema $schema): Schema
     {
-        return $schema->components([
-            Section::make('Booking Details')
-                ->schema([
-                    // Select the Guest (Searchable by Name or Email)
-                    Select::make('guest_id')
-                        ->relationship('guest', 'last_name')
-                        ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->first_name} {$record->last_name} ({$record->email})")
-                        ->searchable()
-                        ->preload()
-                        ->required(),
+        return $schema
+            ->components([
+                Select::make('guest_id')
+                    ->label('Guest')
+                    ->options(Guest::all()->pluck('first_name', 'id'))
+                    ->searchable()
+                    ->required(),
 
-                    // Select the Room OR Venue
-                    Select::make('room_id')
-                        ->relationship('room', 'name')
-                        ->placeholder('Select a Room (Optional if Venue)')
-                        ->searchable(),
+                Select::make('room_id')
+                    ->label('Room')
+                    ->options(Room::all()->pluck('name', 'id'))
+                    ->searchable()
+                    ->required(),
 
-                    Select::make('venue_id')
-                        ->relationship('venue', 'name')
-                        ->placeholder('Select a Venue (Optional if Room)')
-                        ->searchable(),
-                ])->columns(2),
+                DateTimePicker::make('check_in')
+                    ->required(),
 
-            Section::make('Schedule & Pricing')
-                ->schema([
-                    DateTimePicker::make('check_in')->required(),
-                    DateTimePicker::make('check_out')->required(),
-                    TextInput::make('total_price')
-                        ->numeric()
-                        ->prefix('₱')
-                        ->required(),
-                    Select::make('status')
-                        ->options([
-                            'pending' => 'Pending',
-                            'occupied' => 'Occupied/Checked-in',
-                            'completed' => 'Completed',
-                            'cancelled' => 'Cancelled',
-                        ])->default('pending')->required(),
-                ])->columns(2),
-        ]);
+                DateTimePicker::make('check_out')
+                    ->required(),
+
+                TextInput::make('price')
+                    ->required()
+                    ->numeric()
+                    ->prefix('₱'),
+
+                Select::make('status')
+                    ->options([
+                        'pending' => 'Pending',
+                        'confirmed' => 'Confirmed',
+                        'occupied' => 'Occupied',
+                        'completed' => 'Completed',
+                        'cancelled' => 'Cancelled',
+                    ])
+                    ->default('pending')
+                    ->required(),
+
+                TextInput::make('reference_number')
+                    ->label('Reference Number')
+                    ->disabled()
+            ]);
     }
 }

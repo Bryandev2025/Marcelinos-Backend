@@ -4,76 +4,25 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class Guest extends Model
+class Guest extends Model implements HasMedia
 {
+    use HasFactory, InteractsWithMedia;
 
-    use HasFactory;
-
-      // Fillable fields for mass assignment
     protected $fillable = [
-        'first_name',
-        'middle_name',
-        'last_name',
-        'email',
-        'contact_num',
-        'gender',
-        'id_type',
-        'id_number',
-        'is_international',
-        'country',
-        'province',
-        'municipality',
-        'barangay',
-        'city',
-        'state_region',
-        // 'id_image_path', // uncomment if you add ID upload later
+        'first_name','middle_name','last_name','contact_num','email',
+        'gender','is_international','country','province','municipality','barangay','city','zip_code'
     ];
 
-    // Cast fields
-    protected $casts = [
-        'is_international' => 'boolean',
-    ];
-
-     /**
-     * Get the full name of the guest
-     */
-    public function getFullNameAttribute(): string
+    public function bookings()
     {
-        $middle = $this->middle_name ? " {$this->middle_name} " : " ";
-        return "{$this->first_name}{$middle}{$this->last_name}";
+        return $this->hasMany(Booking::class);
     }
 
-    /**
-     * Relationships
-     */
-
-
-    /**
-     * Scope for international guests
-     */
-    public function scopeInternational($query)
+    public function images()
     {
-        return $query->where('is_international', true);
+        return $this->morphMany(Image::class, 'imageable');
     }
-
-    /**
-     * Scope for local guests
-     */
-    public function scopeLocal($query)
-    {
-        return $query->where('is_international', false);
-    }
-
-
-        // Link to the ID photo in the images table
-        public function identification()
-        {
-            return $this->morphOne(Image::class, 'imageable')->where('type', 'identification');
-        }
-
-        public function bookings()
-        {
-            return $this->hasMany(Booking::class);
-        }
 }

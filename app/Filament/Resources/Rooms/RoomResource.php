@@ -11,27 +11,32 @@ use App\Models\Room;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Filament\Support\Icons\Heroicon;
 
 class RoomResource extends Resource
 {
     protected static ?string $model = Room::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    // Navigation icon in Filament sidebar
+    protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-home';
 
+    // The attribute to display in the title when editing/viewing a record
     protected static ?string $recordTitleAttribute = 'name';
 
+    // Form configuration
     public static function form(Schema $schema): Schema
     {
         return RoomForm::configure($schema);
     }
 
+    // Table configuration
     public static function table(Table $table): Table
     {
         return RoomsTable::configure($table);
     }
 
+    // Define relations (currently none, but you can add e.g., bookings)
     public static function getRelations(): array
     {
         return [
@@ -39,6 +44,7 @@ class RoomResource extends Resource
         ];
     }
 
+    // Define resource pages
     public static function getPages(): array
     {
         return [

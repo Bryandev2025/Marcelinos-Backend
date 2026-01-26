@@ -3,15 +3,16 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Image extends Model
 {
-    protected $fillable = ['url', 'type', 'imageable_id', 'imageable_type'];
+    use HasFactory;
 
-        // This allows the image to belong to any other model
-        public function imageable(): MorphTo
-        {
-            return $this->morphTo();
-        }
+    protected $fillable = ['url','type'];
+
+    public function imageable()
+    {
+        return $this->morphTo();
+    }
 }
