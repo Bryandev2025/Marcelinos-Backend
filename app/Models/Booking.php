@@ -10,6 +10,7 @@ class Booking extends Model
 {
     protected $fillable = [
         'guest_id',
+        'reference_id',
         'room_id',
         'venue_id',
         'check_in',
@@ -17,6 +18,8 @@ class Booking extends Model
         'total_price',
         'status',
         'payment_reference',
+        'no_of_days',
+        'payment_method',
     ];
 
     protected $casts = [
