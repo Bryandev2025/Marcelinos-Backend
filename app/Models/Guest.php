@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Guest extends Model
 {
+<<<<<<< Updated upstream
 
     use HasFactory;
 
@@ -65,6 +66,27 @@ class Guest extends Model
         return $query->where('is_international', false);
     }
 
+=======
+    protected $fillable = [
+    'first_name',
+    'middle_name',
+    'last_name',
+    'email',
+    'contact_num',
+    'gender',
+    'id_type',
+    'id_number',
+    'is_international',
+    'country',
+    'province',
+    'municipality',
+    'barangay',
+    'city',
+    'state_region',
+    ];
+
+
+>>>>>>> Stashed changes
 
         // Link to the ID photo in the images table
         public function identification()
