@@ -4,6 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
+<<<<<<< Updated upstream
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -17,6 +18,9 @@
 =======
     "content-hash": "016b5ebb3401f5dd10f3f398186073a3",
 >>>>>>> ed47248 (Fix Venues Show Main Image in the Table)
+=======
+    "content-hash": "6a308ef4c23f6e08c263bf3fa7452e7f",
+>>>>>>> Stashed changes
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
