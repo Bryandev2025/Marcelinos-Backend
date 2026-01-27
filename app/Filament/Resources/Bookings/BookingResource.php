@@ -47,4 +47,11 @@ class BookingResource extends Resource
             'edit' => EditBooking::route('/{record}/edit'),
         ];
     }
+
+    public function viewAny(User $user): bool
+    {
+        return in_array($user->role, ['admin', 'staff'], true);
+    }
+
+
 }

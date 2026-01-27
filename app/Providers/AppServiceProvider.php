@@ -7,6 +7,10 @@ use Illuminate\Support\Facades\Schema;
 
 class AppServiceProvider extends ServiceProvider
 {
+    protected $policies = [
+        Booking::class => BookingPolicy::class,
+    ];
+
     /**
      * Register any application services.
      */
