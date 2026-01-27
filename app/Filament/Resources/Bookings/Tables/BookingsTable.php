@@ -39,8 +39,13 @@ class BookingsTable
                 TextColumn::make('check_out')
                     ->dateTime()
                     ->sortable(),
+                
+                TextColumn::make('no_of_days')
+                    ->dateTime()
+                    ->sortable(),
 
-                TextColumn::make('price')
+
+                TextColumn::make('total_price')
                     ->money('PHP', true)
                     ->sortable(),
 

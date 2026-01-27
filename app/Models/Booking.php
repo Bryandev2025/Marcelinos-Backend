@@ -16,7 +16,6 @@ class Booking extends Model
         'check_out',
         'total_price',
         'status',
-        'payment_reference',
         'no_of_days',
     ];
 
@@ -25,6 +24,32 @@ class Booking extends Model
         'check_out'   => 'datetime',
         'total_price' => 'decimal:2',
     ];
+
+        protected static function booted()
+    {
+
+        static::saved(function (Booking $booking) {
+
+            if (! $booking->room) return;
+
+            // If booking is occupied -> room must be occupied
+            if ($booking->status === 'occupied') {
+                $booking->room->update(['status' => 'occupied']);
+            }
+
+            // If booking is completed or cancelled -> free the room
+            if (in_array($booking->status, ['completed', 'cancelled'])) {
+                $booking->room->update(['status' => 'available']);
+            }
+        });
+
+
+        static::creating(function ($booking) {
+            $booking->reference_number = 'MWA-' . now()->year . '-' . str_pad(rand(1,999999),6,'0',STR_PAD_LEFT);
+        });
+
+        
+    }
 
     public function guest()
     {
