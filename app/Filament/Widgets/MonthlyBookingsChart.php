@@ -76,9 +76,9 @@ class MonthlyBookingsChart extends ChartWidget
                     'label' => 'Bookings',
                     'data' => $data,
                     'backgroundColor' => $pointBackgroundColors, // color per bar
-                    'borderRadius' => 8, // rounded bars
+                    'borderRadius' => 3, // rounded bars
                     'borderSkipped' => false,
-                    'maxBarThickness' => 50,
+                    'maxBarThickness' => 20,
                 ],
             ],
 

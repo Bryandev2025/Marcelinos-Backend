@@ -23,6 +23,7 @@ class Booking extends Model
         'check_in'    => 'datetime',
         'check_out'   => 'datetime',
         'total_price' => 'decimal:2',
+        'no_of_days' => 'integer',
     ];
 
         protected static function booted()

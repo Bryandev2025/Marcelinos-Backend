@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 
 class LatestBookings extends TableWidget
 {
+    protected static ?int $sort = 2;
+    
     protected static ?string $heading = 'Latest Bookings';
 
     // Make this widget half-width (right side)
@@ -28,7 +30,7 @@ class LatestBookings extends TableWidget
                 ->label('Booking ID')
                 ->sortable(),
             
-            Tables\Columns\TextColumn::make('customer_name')
+            Tables\Columns\TextColumn::make('first_name')
                 ->label('Customer'),
 
             Tables\Columns\TextColumn::make('created_at')

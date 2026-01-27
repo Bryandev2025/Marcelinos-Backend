@@ -2,51 +2,31 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
-use Illuminate\Database\Eloquent\Relations\MorphOne;
-use Illuminate\Support\Facades\Storage;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class Venue extends Model
+class Venue extends Model implements HasMedia
 {
-    protected $table = 'venues';
-    protected $guarded = [];
+    use HasFactory, InteractsWithMedia;
 
-    // GET ALL IMAGES FOR THE VENUE
-    public function images(): MorphMany
+    protected $fillable = ['name', 'description', 'capacity', 'price'];
+
+    // General collection of images
+    public function images()
     {
         return $this->morphMany(Image::class, 'imageable');
     }
 
-    // GET THE MAIN FEATURED IMAGE FOR THE VENUE
-    public function mainImage(): MorphOne
+      public function bookings()
     {
-        return $this->morphOne(Image::class, 'imageable')->where('type', 'main');
+        return $this->hasMany(Booking::class);
     }
 
-    // GET GALLERY IMAGES FOR THE VENUE
-    public function gallery(): MorphMany
+      public function amenities()
     {
-        return $this->morphMany(Image::class, 'imageable')->where('type', 'gallery');
+        return $this->belongsToMany(Amenity::class);
     }
 
-    // RELATIONSHIP WITH AMENITIES
-    public function amenities()
-    {
-        return $this->belongsToMany(Amenity::class, 'amenity_venue');
-    }
-
-    // HANDLE DELETION OF VENUE AND ITS IMAGES
-    protected static function booted()
-    {
-        static::deleting(function ($venue) {
-            foreach ($venue->images as $image) {
-                // Delete the physical file from storage
-                Storage::disk('public')->delete($image->url);
-
-                // Delete the database record
-                $image->delete();
-            }
-        });
-    }
 }

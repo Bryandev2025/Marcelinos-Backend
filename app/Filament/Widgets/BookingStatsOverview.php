@@ -19,7 +19,7 @@ class BookingStatsOverview extends StatsOverviewWidget
                 ->icon('heroicon-o-plus-circle')
                 ->color('success'),
 
-            Stat::make('Total Revenue', Booking::sum('price'))
+            Stat::make('Total Revenue', Booking::sum('total_price'))
                 ->description('Total revenue from all bookings')
                 ->icon('heroicon-o-currency-dollar')
                 ->color('amber'),
