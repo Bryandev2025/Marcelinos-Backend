@@ -10,11 +10,11 @@ class MonthlyBookingsChart extends ChartWidget
 {
     protected ?string $heading = 'Visitors Statistics';
 
-    // Full width in dashboard
-    protected int | string | array $columnSpan = 'full';
+    // // Full width in dashboard
+    // protected int | string | array $columnSpan = 'full';
 
-    // Medium height
-    protected int | string | array $rowSpan = 2;
+    // // Medium height
+    // protected int | string | array $rowSpan = 2;
 
     protected function getData(): array
     {
@@ -75,21 +75,19 @@ class MonthlyBookingsChart extends ChartWidget
                 [
                     'label' => 'Bookings',
                     'data' => $data,
-                    'borderColor' => '#f59e0b', // amber line
-                    'backgroundColor' => 'rgba(245, 158, 11, 0.15)', // subtle gradient
-                    'fill' => true,
-                    'pointBackgroundColor' => $pointBackgroundColors,
-                    'tension' => 0.4, // smooth curve
-                    'pointRadius' => 6, // visible points
-                    'pointHoverRadius' => 8,
+                    'backgroundColor' => $pointBackgroundColors, // color per bar
+                    'borderRadius' => 8, // rounded bars
+                    'borderSkipped' => false,
+                    'maxBarThickness' => 50,
                 ],
             ],
+
         ];
     }
 
     protected function getType(): string
     {
-        return 'line';
+        return 'bar';
     }
 
     protected function getOptions(): array
