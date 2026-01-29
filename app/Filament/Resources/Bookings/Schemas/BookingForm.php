@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Bookings\Schemas;
 
 use Carbon\Carbon;
 use App\Models\Room;
+use App\Models\Venue;
 use App\Models\Guest;
 use Filament\Schemas\Schema;
 use Filament\Forms\Components\Select;
@@ -23,11 +24,22 @@ class BookingForm
                 ->searchable()
                 ->required(),
 
-            Select::make('room_id')
-                ->label('Room')
-                ->options(Room::all()->pluck('name', 'id'))
+            Select::make('rooms')
+                ->label('Rooms')
+                ->relationship('rooms', 'name')
+                ->multiple()
                 ->searchable()
+                ->preload()
                 ->required()
+                ->live()
+                ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePricing($get, $set)),
+
+            Select::make('venues')
+                ->label('Venues')
+                ->relationship('venues', 'name')
+                ->multiple()
+                ->searchable()
+                ->preload()
                 ->live()
                 ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePricing($get, $set)),
 
@@ -102,14 +114,19 @@ class BookingForm
 
     public static function calculateTotal(Get $get, Set $set): void
     {
-        $roomId = $get('room_id');
-        $days = (int) $get('no_of_days'); 
+        $roomIds = $get('rooms') ?? [];
+        $venueIds = $get('venues') ?? [];
+        $days = (int) $get('no_of_days');
 
-        if ($roomId && $days > 0) {
-            $room = Room::find($roomId);
-            if ($room && $room->price) {
-                $set('total_price', $room->price * $days);
-            }
+        $roomIds = is_array($roomIds) ? $roomIds : [$roomIds];
+        $venueIds = is_array($venueIds) ? $venueIds : [$venueIds];
+        $roomIds = array_filter($roomIds);
+        $venueIds = array_filter($venueIds);
+
+        if (($roomIds || $venueIds) && $days > 0) {
+            $roomsTotal = Room::whereIn('id', $roomIds)->sum('price');
+            $venuesTotal = Venue::whereIn('id', $venueIds)->sum('price');
+            $set('total_price', ($roomsTotal + $venuesTotal) * $days);
         } else {
             $set('total_price', 0);
         }

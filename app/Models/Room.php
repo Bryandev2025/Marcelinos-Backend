@@ -28,7 +28,20 @@ class Room extends Model implements HasMedia
 
     public function bookings()
     {
-        return $this->hasMany(Booking::class);
+        return $this->belongsToMany(Booking::class, 'booking_room')->withTimestamps();
+    }
+
+    /**
+     * Scope: only rooms not booked (by a non-cancelled booking) in the given date range.
+     * Overlap: booking.check_in < $checkOut AND booking.check_out > $checkIn
+     */
+    public function scopeAvailableBetween($query, $checkIn, $checkOut)
+    {
+        return $query->whereDoesntHave('bookings', function ($q) use ($checkIn, $checkOut) {
+            $q->where('bookings.status', '!=', 'cancelled')
+                ->where('bookings.check_in', '<', $checkOut)
+                ->where('bookings.check_out', '>', $checkIn);
+        });
     }
 
     // Removed the public function images() method because the Image model is gone.

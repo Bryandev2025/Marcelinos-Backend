@@ -23,7 +23,7 @@ class BookingController extends Controller
                 return response()->json(['message' => 'No bookings found'], 404);
             }
 
-            $bookings = Booking::with(['guest', 'room'])->get();
+            $bookings = Booking::with(['guest', 'rooms', 'venues'])->get();
             return response()->json($bookings, 200);
         } catch (\Exception $e) {
             return response()->json([
@@ -36,7 +36,7 @@ class BookingController extends Controller
     public function showByReference(string $reference)
     {
         try {
-            $booking = Booking::with(['guest', 'room'])
+            $booking = Booking::with(['guest', 'rooms', 'venues'])
                 ->where('reference_number', $reference)
                 ->first();
 
@@ -58,12 +58,17 @@ class BookingController extends Controller
                 'issued_on' => $issued_on->format('M d, Y'),
                 'nights' => $booking->no_of_days,
                 'guest_name' => $booking->guest->last_name . ' ' . $booking->guest->first_name,
-                'room' => [
-                    'number' => $booking->room->room_number,
-                    'type' => $booking->room->type,
-                    'capacity' => $booking->room->capacity,
-                    'price' => $booking->total_price,
-                ],
+                'rooms' => $booking->rooms->map(fn ($room) => [
+                    'name' => $room->name,
+                    'type' => $room->type,
+                    'capacity' => $room->capacity,
+                    'price' => $room->price,
+                ])->all(),
+                'venues' => $booking->venues->map(fn ($venue) => [
+                    'name' => $venue->name,
+                    'capacity' => $venue->capacity,
+                    'price' => $venue->price,
+                ])->all(),
                 'subtotal' => $booking->total_price,
                 'grand_total' => $booking->total_price,
             ], 200);
@@ -82,9 +87,11 @@ class BookingController extends Controller
     {
         $validated = $request->validate(
             [
-                'reference_number' => 'required|string',
+                'reference_number' => 'nullable|string', // optional; server auto-generates if not provided
                 'rooms'   => 'required|array|min:1',
                 'rooms.*' => ['required', 'integer', 'distinct', Rule::exists('rooms', 'id')],
+                'venues'  => 'nullable|array',
+                'venues.*' => ['required_with:venues', 'integer', 'distinct', Rule::exists('venues', 'id')],
                 'check_in'  => 'required|string',
                 'check_out' => 'required|string',
                 'days'      => 'required|integer|min:1',
@@ -93,6 +100,7 @@ class BookingController extends Controller
             [
                 'rooms.*.exists' => 'Selected room :input does not exist.',
                 'rooms.*.distinct' => 'Duplicate room selection is not allowed.',
+                'venues.*.exists' => 'Selected venue :input does not exist.',
             ]
         );
 
@@ -107,17 +115,16 @@ class BookingController extends Controller
         }
 
         // Logical date validation
-        if ($checkOut->lte($checkIn)) {
+        if ($checkOut->lt($checkIn)) {
             return response()->json([
                 'message' => 'Invalid date range',
-                'error'   => 'Check-out must be after check-in'
+                'error'   => 'Check-out cannot be before check-in',
             ], 422);
         }
 
         // Store Guest first
         $guest = Guest::store($request);
 
-        $bookings = [];
         $roomIds = collect($validated['rooms'])
             ->map(function ($room) {
                 if (is_array($room)) {
@@ -127,35 +134,46 @@ class BookingController extends Controller
             })
             ->filter()
             ->map(fn ($id) => (int) $id)
-            ->values();
+            ->values()
+            ->all();
+
+        $venueIds = isset($validated['venues']) ? collect($validated['venues'])
+            ->map(fn ($id) => (int) $id)
+            ->filter()
+            ->values()
+            ->all() : [];
 
         // Fail early if any provided room does not actually exist
         $existingRoomIds = Room::whereIn('id', $roomIds)->pluck('id')->all();
-        if (count($existingRoomIds) !== $roomIds->count()) {
+        if (count($existingRoomIds) !== count($roomIds)) {
             return response()->json([
                 'message' => 'One or more selected rooms do not exist',
             ], 422);
         }
 
-        foreach ($roomIds as $room_id) {
-            $booking = Booking::create([
-                'guest_id'     => $guest->id,
-                'reference_number' => $validated['reference_number'],
-                'room_id'      => (int) $room_id,
-                'check_in'     => $checkIn,
-                'check_out'    => $checkOut,
-                'no_of_days'   => $validated['days'],
-                'total_price'  => $validated['total_price'],
-                'status'       => 'pending',
-            ]);
-            $bookings[] = $booking;
+        // Single booking row; attach multiple rooms and venues
+        $booking = Booking::create([
+            'guest_id'          => $guest->id,
+            'reference_number'  => $validated['reference_number'] ?? null, // model auto-generates if null
+            'check_in'          => $checkIn,
+            'check_out'         => $checkOut,
+            'no_of_days'        => $validated['days'],
+            'total_price'       => $validated['total_price'],
+            'status'            => 'pending',
+        ]);
+
+        $booking->rooms()->attach($roomIds);
+        if (!empty($venueIds)) {
+            $booking->venues()->attach($venueIds);
         }
 
+        $booking->load(['guest', 'rooms', 'venues']);
+
         return response()->json([
-            'message' => 'Booking(s) created successfully',
-            'guest' => $guest,
-            'bookings' => $bookings,
-            'total_price' => $validated['total_price']
+            'message' => 'Booking created successfully',
+            'guest'   => $guest,
+            'booking' => $booking,
+            'total_price' => $validated['total_price'],
         ], 201);
     }
 
@@ -165,7 +183,7 @@ class BookingController extends Controller
     public function show($id)
     {
         try {
-            $booking = Booking::with(['guest', 'room'])->find($id);
+            $booking = Booking::with(['guest', 'rooms', 'venues'])->find($id);
 
             if (!$booking) {
                 return response()->json(['message' => 'Booking not found'], 404);

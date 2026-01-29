@@ -19,12 +19,24 @@ class Venue extends Model implements HasMedia
         return $this->morphMany(Image::class, 'imageable');
     }
 
-      public function bookings()
+    public function bookings()
     {
-        return $this->hasMany(Booking::class);
+        return $this->belongsToMany(Booking::class, 'booking_venue')->withTimestamps();
     }
 
-      public function amenities()
+    /**
+     * Scope: only venues not booked (by a non-cancelled booking) in the given date range.
+     */
+    public function scopeAvailableBetween($query, $checkIn, $checkOut)
+    {
+        return $query->whereDoesntHave('bookings', function ($q) use ($checkIn, $checkOut) {
+            $q->where('bookings.status', '!=', 'cancelled')
+                ->where('bookings.check_in', '<', $checkOut)
+                ->where('bookings.check_out', '>', $checkIn);
+        });
+    }
+
+    public function amenities()
     {
         return $this->belongsToMany(Amenity::class);
     }
