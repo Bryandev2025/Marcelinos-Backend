@@ -7,6 +7,7 @@ use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Exception;
 
 class User extends Authenticatable implements FilamentUser
 {
@@ -31,6 +32,22 @@ class User extends Authenticatable implements FilamentUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }   
+
+    protected static function booted()
+    {
+        static::updating(function ($user) {
+            // Check if it WAS an admin before this change
+            if ($user->getOriginal('role') === 'admin' && $user->role !== 'admin') {
+                throw new Exception("Security Breach: You cannot change the Admin role!");
+            }
+        });
+
+        static::deleting(function ($user) {
+            if ($user->getOriginal('role') === 'admin') {
+                throw new Exception("Security Breach: You cannot delete the Admin!");
+            }
+        });
     }
 
     public function canAccessPanel(\Filament\Panel $panel): bool

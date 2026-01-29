@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Spatie\MediaLibrary\HasMedia;
+use Illuminate\Database\Eloquent\Model;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Room extends Model implements HasMedia
 {
@@ -18,6 +18,7 @@ class Room extends Model implements HasMedia
         return $this->hasMany(Booking::class);
     }
 
+
     public function images()
     {
         return $this->morphMany(Image::class, 'imageable');
@@ -27,4 +28,6 @@ class Room extends Model implements HasMedia
     {
         return $this->belongsToMany(Amenity::class);
     }
+
+
 }

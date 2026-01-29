@@ -9,23 +9,48 @@ class Booking extends Model
 {
     protected $fillable = [
         'guest_id',
-        'reference_id',
+        'reference_number',
         'room_id',
         'venue_id',
         'check_in',
         'check_out',
         'total_price',
         'status',
-        'payment_reference',
         'no_of_days',
-        'payment_method',
     ];
 
     protected $casts = [
         'check_in'    => 'datetime',
         'check_out'   => 'datetime',
         'total_price' => 'decimal:2',
+        'no_of_days' => 'integer',
     ];
+
+        protected static function booted()
+    {
+
+        static::saved(function (Booking $booking) {
+
+            if (! $booking->room) return;
+
+            // If booking is occupied -> room must be occupied
+            if ($booking->status === 'occupied') {
+                $booking->room->update(['status' => 'occupied']);
+            }
+
+            // If booking is completed or cancelled -> free the room
+            if (in_array($booking->status, ['completed', 'cancelled'])) {
+                $booking->room->update(['status' => 'available']);
+            }
+        });
+
+
+        static::creating(function ($booking) {
+            $booking->reference_number = 'MWA-' . now()->year . '-' . str_pad(rand(1,999999),6,'0',STR_PAD_LEFT);
+        });
+
+        
+    }
 
     public function guest()
     {

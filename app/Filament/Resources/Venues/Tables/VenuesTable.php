@@ -3,14 +3,12 @@
 namespace App\Filament\Resources\Venues\Tables;
 
 use Filament\Tables\Table;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\ImageColumn;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Actions\EditAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Illuminate\Support\Facades\Auth;
-
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ImageColumn;
 
 class VenuesTable
 {
@@ -18,46 +16,47 @@ class VenuesTable
     {
         return $table
             ->columns([
-                // 1. MAIN IMAGE THUMBNAIL
-                ImageColumn::make('mainImage.url')
-                    ->label('Photo')
-                    ->circular()
-                    ->defaultImageUrl(url('/images/placeholder-venue.svg')),
+                // ✅ Featured Image (Uses Spatie Media Library)
+                ImageColumn::make('featured_image')
+                    ->label('Featured')
+                    ->getStateUsing(fn($record) => $record->getFirstMediaUrl('featured')),
 
                 TextColumn::make('name')
-                    ->searchable()
                     ->label('Venue Name')
-                    ->extraAttributes(['class' => 'font-bold']),
+                    ->searchable()
+                    ->sortable(),
 
                 TextColumn::make('capacity')
                     ->numeric()
-                    ->sortable()
-                    ->label('Capacity')
-                    ->alignCenter(),
+                    ->sortable(),
 
-                // 2. PRICE FORMATTED
                 TextColumn::make('price')
-                    ->money('PHP') // Displays ₱
-                    ->sortable()
-                    ->label('Price'),
+                    ->money('PHP', true)
+                    ->sortable(),
+
+                TextColumn::make('status')
+                    ->badge()
+                    ->colors([
+                        'success' => 'available',
+                        'danger' => 'booked',
+                        'secondary' => 'maintenance',
+                    ])
+                    ->formatStateUsing(fn (string $state): string => ucfirst($state)),
 
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('updated_at')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                // Optional filters (e.g., capacity or price range)
-                SelectFilter::make('capacity')
-                    ->label('Capacity')
-                    ->options([
-                        '50' => 'Up to 50',
-                        '100' => '51 - 100',
-                        '200' => '101 - 200',
-                        '500' => '201 - 500',
-                    ]),
+                // Add filters here if needed (e.g., SelectFilter for status)
             ])
-            ->recordActions([
+            ->actions([
                 EditAction::make(),
             ])
             ->bulkActions([
