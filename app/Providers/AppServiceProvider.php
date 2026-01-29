@@ -2,11 +2,23 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
+use App\Http\Responses\LoginResponse;
+use App\Http\Responses\LogoutResponse;
+use Filament\Auth\Http\Responses\Contracts\LoginResponse as LoginResponseContract;
+use Filament\Auth\Http\Responses\Contracts\LogoutResponse as LogoutResponseContract;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
+    /**
+     * Override Filament's auth responses to support a single login page.
+     */
+    public array $singletons = [
+        LoginResponseContract::class => LoginResponse::class,
+        LogoutResponseContract::class => LogoutResponse::class,
+    ];
+
     /**
      * Register any application services.
      */

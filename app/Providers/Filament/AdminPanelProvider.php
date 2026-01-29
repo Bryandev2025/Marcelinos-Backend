@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Http\Middleware\EnsureAdminUser;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Pages\Dashboard;
@@ -61,6 +62,7 @@ class AdminPanelProvider extends PanelProvider
             ->resourceEditPageRedirect('index')
             ->authMiddleware([
                 Authenticate::class,
+                EnsureAdminUser::class,
             ]);
             
     }
