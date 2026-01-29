@@ -1,99 +1,104 @@
-# Filament Laravel Policy Authorization Guide
+# 🛡️ The Complete Filament Laravel Authorization Guide
 
-## What the Docs Say (Authorization)
+Filament does not have its own "permissions system." Instead, it is designed to listen to **Laravel Model Policies**. This ensures that your security logic stays in one place, whether you are using the Filament UI, an API, or a custom controller.
 
-Filament integrates with Laravel model policies to manage resource access control. For any resource:
 
-- **`viewAny()` in the policy:**  
-  Determines if the resource appears in the navigation and is accessible at all.
-
-- **Other policy methods (`create`, `update`, `view`, `delete`, etc.):**  
-  Govern specific actions on the resource (who can create, edit, view, or delete).
-
-**Best Practice**: Always control access via the Policy. Filament prefers policies over hardcoded methods in the resource itself. Although methods like `canViewAny()` exist, policies are the documented and canonical approach.
 
 ---
 
-## Step-by-Step: Using `viewAny()` the Filament Way
+## ⚙️ Step 1: Create the Policy
+Generate a policy linked to your Model. For this example, we will use a `Booking` model.
 
-### 1. Create a Policy (Laravel Standard)
-```shell
+```bash
 php artisan make:policy BookingPolicy --model=Booking
 ```
-This command generates `app/Policies/BookingPolicy.php`.
 
 ---
 
-### 2. Implement `viewAny()` for Your Roles
+## 🔗 Step 2: Register the Policy
+Laravel usually auto-discovers policies, but for Filament, it is best practice to be explicit.
 
-If both staff _and_ admin should see the resource:
-```php
-public function viewAny(User $user): bool
-{
-    return in_array($user->role, ['admin', 'staff'], true);
-}
-```
+**For Laravel 11+:** Register in `bootstrap/app.php` or a Service Provider.
+**For Laravel 10 and below:** Register in `app/Providers/AuthServiceProvider.php`.
 
-If only admin should see the resource:
-```php
-public function viewAny(User $user): bool
-{
-    return $user->role === 'admin';
-}
-```
-
-> This method acts as the gatekeeper for the entire resource (navigation and access).
-
----
-
-### 3. Register the Policy in the AuthServiceProvider
 ```php
 protected $policies = [
-    Booking::class => BookingPolicy::class,
+    \App\Models\Booking::class => \App\Policies\BookingPolicy::class,
 ];
 ```
 
-Filament will now use `viewAny()` to control access to the resource automatically.
-
 ---
 
-## Why Use `viewAny()` in a Policy?
+## 🏗️ Step 3: Implement the Logic
+Inside `app/Policies/BookingPolicy.php`, you define who can do what.
 
-- Aligns with Laravel and Filament best practices
-- Centralizes authorization logic (Separation of Concerns)
-- Scales as you add more roles or permissions
-- Prevents accidental access via deep routing
+### A. The "Gatekeeper" (`viewAny`)
+This is the most important method. If this returns `false`, the resource **disappears** from the sidebar and the Index page becomes inaccessible.
 
----
-
-## (Optional) Control Actions Too
-
-For example, to control who can create bookings:
 ```php
-public function create(User $user): bool
+public function viewAny(User $user): bool
 {
-    return $user->role === 'admin';
+    // Only Admin and Staff can see the "Bookings" link in the sidebar
+    return $user->hasRole(['admin', 'staff']);
 }
 ```
-Filament will use this method for the Create page/button.
+
+### B. Record-Level Security (`update` & `delete`)
+Filament passes the specific **record instance** into these methods, allowing you to restrict actions based on ownership.
+
+```php
+public function update(User $user, Booking $booking): bool
+{
+    // Admins can edit anything
+    if ($user->role === 'admin') return true;
+
+    // Staff can only edit bookings they created
+    return $user->id === $booking->user_id;
+}
+```
 
 ---
 
-## Quick Test Checklist
+## 🗺️ Policy-to-UI Mapping Table
+Filament looks for these specific method names to decide what to show in the UI.
 
-- Log in as a staff user.
-- Refresh the Filament sidebar.
-- `BookingResource` will be visible if `viewAny()` returns `true`.
-- Other resources (like Revenue) will not be visible if `viewAny()` returns `false` for that role.
+| Policy Method | UI Element Affected | Route Protection |
+| :--- | :--- | :--- |
+| `viewAny($user)` | Sidebar Nav & Index Table | `/admin/bookings` |
+| `view($user, $record)` | "View" Action/Icon | `/admin/bookings/{id}` |
+| `create($user)` | "Create" Header Button | `/admin/bookings/create` |
+| `update($user, $record)` | "Edit" Action/Icon | `/admin/bookings/{id}/edit` |
+| `delete($user, $record)` | "Delete" Action/Icon | Blocked at Controller |
+| `restore($user, $record)` | "Restore" (Soft Deletes) | Blocked at Controller |
+| `forceDelete(...)` | "Force Delete" (Soft Deletes) | Blocked at Controller |
 
 ---
 
-## Recap Table
+## ⚠️ UI Visibility vs. Hard Security
+It is a common mistake to use `->visible()` for security. Here is the difference:
 
-| Filament Hook             | Where It Should Go          |
-|---------------------------|----------------------------|
-| `viewAny()`               | Laravel Policy             |
-| `create()`, `update()`, etc. | Laravel Policy         |
-| `canAccess()`             | Only for custom Pages/Widgets (not main resources) |
+### ❌ The "Weak" Way (UI Only)
+```php
+// In BookingResource.php
+Tables\Actions\DeleteAction::make()
+    ->visible(fn () => auth()->user()->isAdmin())
+```
+* **Result:** The button is hidden, but a savvy user could still hit the delete endpoint via an API tool or a crafted request.
 
-> **Docs say:** If you have a policy, make sure `viewAny()` returns true for a role to see the navigation link and have access to the resource.
+### ✅ The "Strong" Way (Policy)
+```php
+// In BookingPolicy.php
+public function delete(User $user, Booking $booking): bool
+{
+    return $user->isAdmin();
+}
+```
+* **Result:** Filament **automatically** hides the button AND the server will reject any manual attempt to delete the record.
+
+---
+
+## ✅ Final Checklist
+- [ ] Does the User model have the necessary role/permission logic?
+- [ ] Is the Policy registered?
+- [ ] Does `viewAny` return `true` for the users who need access?
+- [ ] If using Soft Deletes, did you implement `restore` and `forceDelete`?

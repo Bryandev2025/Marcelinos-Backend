@@ -9,6 +9,8 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Actions\EditAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
+use Illuminate\Support\Facades\Auth;
+
 
 class VenuesTable
 {
@@ -61,7 +63,8 @@ class VenuesTable
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
-                ]),
+                ])
+                ->visible(fn () => Auth::user() && Auth::user()->role === 'admin'),
             ]);
     }
 }
