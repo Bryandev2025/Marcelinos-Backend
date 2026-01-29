@@ -8,6 +8,7 @@ use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Auth;
 
 class RoomsTable
 {
@@ -69,7 +70,8 @@ class RoomsTable
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
-                ]),
+                ])
+                ->visible(fn () => Auth::user() && Auth::user()->role === 'admin'),
             ]);
     }
 }
