@@ -57,3 +57,48 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+---
+
+## Single Login for Multiple Filament Panels (Admin + Staff)
+
+This project uses ONE login page at `/login` for multiple Filament panels (`/admin` and `/staff`). After authenticating, users are redirected to the correct panel based on their role. Logout always returns to `/login`.
+
+### Key Changes
+- Post-login and logout behavior overridden via Filament response contracts:
+	- Login redirect by role: [app/Http/Responses/LoginResponse.php](app/Http/Responses/LoginResponse.php)
+	- Logout always to `/login`: [app/Http/Responses/LogoutResponse.php](app/Http/Responses/LogoutResponse.php)
+	- Service container bindings for Filament v3 contracts: [app/Providers/AppServiceProvider.php](app/Providers/AppServiceProvider.php)
+- Single login endpoint using Filament’s native login component:
+	- `/login` maps to the admin panel login action: [routes/web.php](routes/web.php)
+- Panels configuration:
+	- Admin panel is default and provides login, plus admin-only guard: [app/Providers/Filament/AdminPanelProvider.php](app/Providers/Filament/AdminPanelProvider.php)
+	- Staff panel has no login, only the app: [app/Providers/Filament/StaffPanelProvider.php](app/Providers/Filament/StaffPanelProvider.php)
+- Role + access rules:
+	- Panel access rules with normalized roles: [app/Models/User.php](app/Models/User.php)
+	- Middleware to keep non-admins out of admin pages (redirect to staff): [app/Http/Middleware/EnsureAdminUser.php](app/Http/Middleware/EnsureAdminUser.php)
+- Unauthenticated redirects (guests) go to `/login`:
+	- Global exception handler: [bootstrap/app.php](bootstrap/app.php)
+
+### Flow
+- Everyone signs in at `/login` (admin panel’s Filament login under the hood).
+- After login:
+	- `admin` → `/admin`
+	- others (e.g., `staff`) → `/staff`
+- Staff can authenticate via the admin login page, but `EnsureAdminUser` protects admin pages and redirects staff to `/staff`.
+- Logout from any panel → `/login`.
+
+### Quick Test
+```bash
+php artisan optimize:clear
+```
+- Visit https://marcelinos-backend.test/login
+	- Admin logs in → https://marcelinos-backend.test/admin
+	- Staff logs in → https://marcelinos-backend.test/staff
+- Logout from either panel → https://marcelinos-backend.test/login
+
+### Tweaks
+- Change role names or logic: [app/Models/User.php](app/Models/User.php)
+- Adjust post-login redirect: [app/Http/Responses/LoginResponse.php](app/Http/Responses/LoginResponse.php)
+- Adjust logout destination: [app/Http/Responses/LogoutResponse.php](app/Http/Responses/LogoutResponse.php)
+- Harden/relax admin protection: [app/Http/Middleware/EnsureAdminUser.php](app/Http/Middleware/EnsureAdminUser.php)

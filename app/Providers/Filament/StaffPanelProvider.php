@@ -26,8 +26,6 @@ class StaffPanelProvider extends PanelProvider
         return $panel
             ->id('staff')
             ->path('staff')
-            ->login()
-            ->databaseNotifications()
             ->colors([
                 'primary' => Color::Amber,
             ])

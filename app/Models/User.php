@@ -50,20 +50,18 @@ class User extends Authenticatable implements FilamentUser
         });
     }
 
-    public function canAccessPanel(\Filament\Panel $panel): bool
-{
-    if (! $this->is_active) {
-        return false; // cannot access any panel if inactive
-    }
+    public function canAccessPanel(Panel $panel): bool
+    {
+        if (! $this->is_active) {
+            return false;
+        }
 
-    if ($panel->getId() === 'admin') {
-        return $this->role === 'admin';
-    }
+        $role = strtolower(trim((string) ($this->role ?? '')));
 
-    if ($panel->getId() === 'staff') {
-        return $this->role === 'staff';
+        return match ($panel->getId()) {
+            'admin' => in_array($role, ['admin', 'staff'], true),
+            'staff' => $role === 'staff',
+            default => true,
+        };
     }
-
-    return true;
-}
 }
