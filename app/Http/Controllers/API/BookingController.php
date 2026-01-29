@@ -51,10 +51,12 @@ class BookingController extends Controller
 
             return response()->json([
                 'reference_number' => $booking->reference_number,
+                'created_at' => $booking->created_at->format('M d, Y'),
+                'booking_status' => $booking->status,
                 'check_in' => $check_in->format('M d, Y'),
                 'check_out' => $check_out->format('M d, Y'),
                 'issued_on' => $issued_on->format('M d, Y'),
-                'nights' => $check_in->diffInDays($check_out),
+                'nights' => $booking->no_of_days,
                 'guest_name' => $booking->guest->last_name . ' ' . $booking->guest->first_name,
                 'room' => [
                     'number' => $booking->room->room_number,
