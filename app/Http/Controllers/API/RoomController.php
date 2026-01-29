@@ -4,56 +4,89 @@ namespace App\Http\Controllers\API;
 
 use App\Models\Room;
 use App\Http\Controllers\Controller;
-use App\Models\Booking;
-use Illuminate\Auth\CreatesUserProviders;
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Carbon;
 use Exception;
 
 class RoomController extends Controller
 {
-    public function index()
-{
-    try {
-        /**
-         * Fetch available rooms with amenities
-         * Sorted by type (Standard, Family, Deluxe)
-         */
-        $rooms = Room::with(['amenities', 'media']) // Eager load Spatie media to avoid N+1 issues
-            ->where('status', 'available')
-            ->orderByRaw("FIELD(type, 'standard', 'family', 'deluxe')")
-            ->get();
+    /**
+     * List rooms.
+     * - is_all=true: return all rooms.
+     * - Otherwise: require check_in & check_out; return only rooms available in that date range.
+     */
+    public function index(Request $request)
+    {
+        try {
+            $isAll = filter_var($request->query('is_all', false), FILTER_VALIDATE_BOOLEAN);
 
-        // Transform the data to include media URLs for React
-        $formattedRooms = $rooms->map(function ($room) {
-            return [
-                'id' => $room->id,
-                'name' => $room->name,
-                'capacity' => $room->capacity,
-                'type' => $room->type,
-                'price' => $room->price,
-                'status' => $room->status,
-                'amenities' => $room->amenities,
-                // Get the URL for the 'featured' collection
-                'featured_image' => $room->getFirstMediaUrl('featured'),
-                // Get all URLs for the 'gallery' collection
-                'gallery' => $room->getMedia('gallery')->map(fn($media) => $media->getUrl()),
-            ];
-        });
+            $query = Room::with(['amenities', 'media'])
+                ->orderByRaw("FIELD(type, 'standard', 'family', 'deluxe')");
 
-        return response()->json([
-            'success' => true,
-            'data' => $formattedRooms
-        ], 200);
+            if (!$isAll) {
+                $request->validate([
+                    'check_in'  => 'required|string',
+                    'check_out' => 'required|string',
+                ], [
+                    'check_in.required'  => 'check_in is required when is_all is not true.',
+                    'check_out.required' => 'check_out is required when is_all is not true.',
+                ]);
 
-    } catch (Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Failed to fetch rooms',
-            'error' => $e->getMessage()
-        ], 500);
+                try {
+                    $checkIn  = Carbon::parse($request->query('check_in'))->startOfDay();
+                    $checkOut = Carbon::parse($request->query('check_out'))->startOfDay();
+                } catch (\Exception $e) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Invalid date format for check_in or check_out.',
+                    ], 422);
+                }
+
+                if ($checkOut->lt($checkIn)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'check_out cannot be before check_in.',
+                    ], 422);
+                }
+
+                $query->availableBetween($checkIn, $checkOut);
+            }
+
+            $rooms = $query->get();
+
+            $formattedRooms = $rooms->map(function ($room) {
+                return [
+                    'id' => $room->id,
+                    'name' => $room->name,
+                    'capacity' => $room->capacity,
+                    'type' => $room->type,
+                    'price' => $room->price,
+                    'status' => $room->status,
+                    'amenities' => $room->amenities,
+                    'featured_image' => $room->getFirstMediaUrl('featured'),
+                    'gallery' => $room->getMedia('gallery')->map(fn ($media) => $media->getUrl()),
+                ];
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $formattedRooms,
+            ], 200);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch rooms',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
-}
 
     public function show($id)
     {

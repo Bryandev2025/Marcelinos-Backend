@@ -27,10 +27,15 @@ class BookingsTable
                     ->searchable()
                     ->sortable(),
 
-                TextColumn::make('room.name')
-                    ->label('Room')
-                    ->searchable()
-                    ->sortable(),
+                TextColumn::make('rooms.name')
+                    ->label('Rooms')
+                    ->formatStateUsing(fn ($record) => $record->rooms->pluck('name')->join(', ') ?: '—')
+                    ->searchable(),
+
+                TextColumn::make('venues.name')
+                    ->label('Venues')
+                    ->formatStateUsing(fn ($record) => $record->venues->pluck('name')->join(', ') ?: '—')
+                    ->searchable(),
 
                 TextColumn::make('check_in')
                     ->dateTime()

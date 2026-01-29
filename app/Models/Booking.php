@@ -10,8 +10,6 @@ class Booking extends Model
     protected $fillable = [
         'guest_id',
         'reference_number',
-        'room_id',
-        'venue_id',
         'check_in',
         'check_out',
         'total_price',
@@ -30,17 +28,19 @@ class Booking extends Model
     {
 
         static::saved(function (Booking $booking) {
-
-            if (! $booking->room) return;
-
-            // If booking is occupied -> room must be occupied
-            if ($booking->status === 'occupied') {
-                $booking->room->update(['status' => 'occupied']);
+            $rooms = $booking->rooms;
+            if ($rooms->isEmpty()) {
+                return;
             }
 
-            // If booking is completed or cancelled -> free the room
+            // If booking is occupied -> all rooms must be occupied
+            if ($booking->status === 'occupied') {
+                $rooms->each->update(['status' => 'occupied']);
+            }
+
+            // If booking is completed or cancelled -> free all rooms
             if (in_array($booking->status, ['completed', 'cancelled'])) {
-                $booking->room->update(['status' => 'available']);
+                $rooms->each->update(['status' => 'available']);
             }
         });
 
@@ -57,14 +57,14 @@ class Booking extends Model
         return $this->belongsTo(Guest::class);
     }
 
-    public function room()
+    public function rooms()
     {
-        return $this->belongsTo(Room::class);
+        return $this->belongsToMany(Room::class, 'booking_room')->withTimestamps();
     }
 
-    public function venue()
+    public function venues()
     {
-        return $this->belongsTo(Venue::class);
+        return $this->belongsToMany(Venue::class, 'booking_venue')->withTimestamps();
     }
 
     // Optional but recommended
