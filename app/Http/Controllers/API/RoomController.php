@@ -21,7 +21,7 @@ class RoomController extends Controller
              * fetch by order [standard, family, deluxe]
              * fetch only rooms with status 'available'
             */
-            $rooms = Room::with('ImagesRoom')
+            $rooms = Room::with('images', 'amenities')
                 ->where('status', 'available')
                 ->get();
             return response()->json($rooms, 200);
