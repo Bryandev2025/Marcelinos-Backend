@@ -3,14 +3,16 @@
 namespace App\Filament\Resources\Bookings\Tables;
 
 use App\Filament\Exports\BookingExporter;
-use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
-use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ExportAction;
 use Filament\Tables\Columns\BadgeColumn;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Storage;
 
 class BookingsTable
 {
@@ -18,6 +20,15 @@ class BookingsTable
     {
         return $table
             ->columns([
+                ImageColumn::make('qr_code')
+                    ->label('QR')
+                    ->disk('public')
+                    ->height(60)
+                    ->width(60)
+                    ->square()
+                    ->url(fn ($record) => $record->qr_code ? Storage::disk('public')->url($record->qr_code) : null, true)
+                    ->toggleable(),
+
                 TextColumn::make('reference_number')
                     ->searchable()
                     ->sortable(),
@@ -46,7 +57,7 @@ class BookingsTable
                     ->sortable(),
                 
                 TextColumn::make('no_of_days')
-                    ->dateTime()
+                    ->numeric()
                     ->sortable(),
 
 
@@ -75,8 +86,16 @@ class BookingsTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                SelectFilter::make('status')
+                    ->options([
+                        'pending' => 'Pending',
+                        'confirmed' => 'Confirmed',
+                        'occupied' => 'Occupied',
+                        'completed' => 'Completed',
+                        'cancelled' => 'Cancelled',
+                    ]),
             ])
+            ->defaultSort('created_at', 'desc')
             ->headerActions([
                 ExportAction::make()
                     ->label('Export Bookings')
@@ -84,6 +103,7 @@ class BookingsTable
             ])
             ->recordActions([
                 EditAction::make(),
+                DeleteAction::make(),
             ]);
             // ->toolbarActions([
             //     BulkActionGroup::make([

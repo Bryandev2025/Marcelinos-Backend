@@ -4,12 +4,18 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class Booking extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'guest_id',
         'reference_number',
+        'qr_code',
         'check_in',
         'check_out',
         'total_price',
@@ -21,36 +27,67 @@ class Booking extends Model
         'check_in'    => 'datetime',
         'check_out'   => 'datetime',
         'total_price' => 'decimal:2',
-        'no_of_days' => 'integer',
+        'no_of_days'  => 'integer',
     ];
 
-        protected static function booted()
+    protected static function booted()
     {
+        /**
+         * Generate reference number before create
+         */
+        static::creating(function ($booking) {
+            $booking->reference_number =
+                'MWA-' . now()->year . '-' . str_pad(rand(1, 999999), 6, '0', STR_PAD_LEFT);
+        });
 
+        /**
+         * Generate QR code AFTER booking is created
+         */
+        static::created(function (Booking $booking) {
+
+            $qrData = json_encode([
+                'booking_id' => $booking->id,
+                'reference'  => $booking->reference_number,
+                'guest_id'   => $booking->guest_id,
+            ]);
+
+            $path = 'qr/bookings/' . Str::uuid() . '.svg';
+
+            Storage::disk('public')->put(
+                $path,
+                QrCode::size(300)->generate($qrData)
+            );
+
+            // Prevent infinite event loop
+            $booking->updateQuietly([
+                'qr_code' => $path,
+            ]);
+        });
+
+        /**
+         * Existing room status logic (UNCHANGED)
+         */
         static::saved(function (Booking $booking) {
             $rooms = $booking->rooms;
+
             if ($rooms->isEmpty()) {
                 return;
             }
 
-            // If booking is occupied -> all rooms must be occupied
-            if ($booking->status === 'occupied') {
+            if ($booking->status === self::STATUS_OCCUPIED) {
                 $rooms->each->update(['status' => 'occupied']);
             }
 
-            // If booking is completed or cancelled -> free all rooms
-            if (in_array($booking->status, ['completed', 'cancelled'])) {
+            if (in_array($booking->status, [
+                self::STATUS_COMPLETED,
+                self::STATUS_CANCELLED
+            ])) {
                 $rooms->each->update(['status' => 'available']);
             }
         });
-
-
-        static::creating(function ($booking) {
-            $booking->reference_number = 'MWA-' . now()->year . '-' . str_pad(rand(1,999999),6,'0',STR_PAD_LEFT);
-        });
-
-        
     }
+
+    /* ================= RELATIONSHIPS ================= */
 
     public function guest()
     {
@@ -67,7 +104,8 @@ class Booking extends Model
         return $this->belongsToMany(Venue::class, 'booking_venue')->withTimestamps();
     }
 
-    // Optional but recommended
+    /* ================= STATUSES ================= */
+
     const STATUS_PENDING    = 'pending';
     const STATUS_CONFIRMED  = 'confirmed';
     const STATUS_OCCUPIED   = 'occupied';

@@ -12,6 +12,11 @@ class BookingExporter extends Exporter
 {
     protected static ?string $model = Booking::class;
 
+    public function getJobConnection(): ?string
+    {
+        return 'sync';
+    }
+
     public static function getColumns(): array
     {
         return [
@@ -19,15 +24,24 @@ class BookingExporter extends Exporter
                 ->label('ID'),
             ExportColumn::make('guest.first_name')->label('Guest First Name'),
             ExportColumn::make('guest.last_name')->label('Guest Last Name'),
-            ExportColumn::make('rooms')->label('Rooms')->stateUsing(fn (Booking $record) => $record->rooms->pluck('name')->join(', ')),
-            ExportColumn::make('venues')->label('Venues')->stateUsing(fn (Booking $record) => $record->venues->pluck('name')->join(', ')),
-            ExportColumn::make('check_in'),
-            ExportColumn::make('check_out'),
-            ExportColumn::make('total_price'),
+            ExportColumn::make('rooms')
+                ->label('Rooms')
+                ->formatStateUsing(fn (Booking $record) => $record->rooms->pluck('name')->join(', ')),
+            ExportColumn::make('venues')
+                ->label('Venues')
+                ->formatStateUsing(fn (Booking $record) => $record->venues->pluck('name')->join(', ')),
+            ExportColumn::make('check_in')
+                ->formatStateUsing(fn ($state) => optional($state)?->toDateTimeString() ?? $state),
+            ExportColumn::make('check_out')
+                ->formatStateUsing(fn ($state) => optional($state)?->toDateTimeString() ?? $state),
+            ExportColumn::make('total_price')
+                ->formatStateUsing(fn ($state) => number_format((float) $state, 2, '.', '')),
             ExportColumn::make('reference_number'),
             ExportColumn::make('status'),
-            ExportColumn::make('created_at'),
-            ExportColumn::make('updated_at'),
+            ExportColumn::make('created_at')
+                ->formatStateUsing(fn ($state) => optional($state)?->toDateTimeString() ?? $state),
+            ExportColumn::make('updated_at')
+                ->formatStateUsing(fn ($state) => optional($state)?->toDateTimeString() ?? $state),
         ];
     }
 

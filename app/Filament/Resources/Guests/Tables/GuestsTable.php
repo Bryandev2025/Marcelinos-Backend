@@ -7,7 +7,6 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Table;
 
 class GuestsTable
@@ -16,11 +15,6 @@ class GuestsTable
     {
         return $table
             ->columns([
-                // ✅ ID Verification Image
-                ImageColumn::make('id_verification')
-                    ->label('ID Verification')
-                    ->getStateUsing(fn($record) => $record->getFirstMediaUrl('id_verification')),
-
                 TextColumn::make('first_name')->searchable(),
                 TextColumn::make('middle_name')->searchable(),
                 TextColumn::make('last_name')->searchable(),

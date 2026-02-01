@@ -9,6 +9,7 @@ use App\Filament\Resources\Bookings\Schemas\BookingForm;
 use App\Filament\Resources\Bookings\Tables\BookingsTable;
 use App\Models\Booking;
 use BackedEnum;
+use Illuminate\Database\Eloquent\Builder;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -30,6 +31,12 @@ class BookingResource extends Resource
     public static function table(Table $table): Table
     {
         return BookingsTable::configure($table);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with(['guest', 'rooms', 'venues']);
     }
 
     public static function getRelations(): array

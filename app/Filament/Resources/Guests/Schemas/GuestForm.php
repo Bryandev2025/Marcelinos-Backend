@@ -6,7 +6,6 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
-use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 
 class GuestForm
 {
@@ -27,11 +26,6 @@ class GuestForm
                 TextInput::make('barangay'),
                 TextInput::make('city'),
                 TextInput::make('zip_code'),
-                SpatieMediaLibraryFileUpload::make('id_verification')
-                    ->collection('id_verification')
-                    ->label('ID Verification')
-                    ->image()
-                    ->required(),
             ]);
     }
 }

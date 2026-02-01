@@ -6,7 +6,7 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\ImageColumn;
+use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
 
@@ -17,9 +17,10 @@ class RoomsTable
         return $table
             ->columns([
                 // ✅ Featured Image
-                ImageColumn::make('featured_image')
+                SpatieMediaLibraryImageColumn::make('featured_image')
                     ->label('Featured')
-                    ->getStateUsing(fn($record) => $record->getFirstMediaUrl('featured')),
+                    ->circular()
+                    ->collection('featured'),
 
                 TextColumn::make('name')
                     ->searchable()
