@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use App\Models\Room;
 use App\Models\Venue;
 use App\Models\Guest;
+use App\Models\Booking;
 use Filament\Schemas\Schema;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -32,6 +33,13 @@ class BookingForm
                 ->preload()
                 ->required()
                 ->live()
+                ->rules([
+                    fn (Get $get, ?Booking $record) => function (string $attribute, $value, $fail) use ($get, $record): void {
+                        if (self::hasRoomConflicts($value, $get('check_in'), $get('check_out'), $record)) {
+                            $fail('One or more selected rooms are not available for the chosen dates.');
+                        }
+                    },
+                ])
                 ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePricing($get, $set)),
 
             Select::make('venues')
@@ -41,6 +49,13 @@ class BookingForm
                 ->searchable()
                 ->preload()
                 ->live()
+                ->rules([
+                    fn (Get $get, ?Booking $record) => function (string $attribute, $value, $fail) use ($get, $record): void {
+                        if (self::hasVenueConflicts($value, $get('check_in'), $get('check_out'), $record)) {
+                            $fail('One or more selected venues are not available for the chosen dates.');
+                        }
+                    },
+                ])
                 ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePricing($get, $set)),
 
             DateTimePicker::make('check_in')
@@ -54,6 +69,25 @@ class BookingForm
                 ->native(false)
                 ->live()
                 ->after(fn (Get $get) => $get('check_in'))
+                ->rules([
+                    fn (Get $get) => function (string $attribute, $value, $fail) use ($get): void {
+                        $checkIn = $get('check_in');
+                        if (! $checkIn || ! $value) {
+                            return;
+                        }
+
+                        try {
+                            $start = Carbon::parse($checkIn);
+                            $end = Carbon::parse($value);
+                        } catch (\Exception $e) {
+                            return;
+                        }
+
+                        if ($end->lessThanOrEqualTo($start)) {
+                            $fail('Check-out must be after check-in.');
+                        }
+                    },
+                ])
                 ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePricing($get, $set)),
 
             TextInput::make('no_of_days')
@@ -130,5 +164,63 @@ class BookingForm
         } else {
             $set('total_price', 0);
         }
+    }
+
+    private static function hasRoomConflicts($roomIds, $checkIn, $checkOut, ?Booking $record): bool
+    {
+        $roomIds = is_array($roomIds) ? $roomIds : [$roomIds];
+        $roomIds = array_filter($roomIds);
+
+        if (empty($roomIds) || ! $checkIn || ! $checkOut) {
+            return false;
+        }
+
+        try {
+            $start = Carbon::parse($checkIn);
+            $end = Carbon::parse($checkOut);
+        } catch (\Exception $e) {
+            return false;
+        }
+
+        if ($end->lessThanOrEqualTo($start)) {
+            return false;
+        }
+
+        return Booking::query()
+            ->when($record, fn ($query) => $query->where('id', '!=', $record->id))
+            ->whereNotIn('status', [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED])
+            ->where('check_in', '<', $end)
+            ->where('check_out', '>', $start)
+            ->whereHas('rooms', fn ($query) => $query->whereIn('rooms.id', $roomIds))
+            ->exists();
+    }
+
+    private static function hasVenueConflicts($venueIds, $checkIn, $checkOut, ?Booking $record): bool
+    {
+        $venueIds = is_array($venueIds) ? $venueIds : [$venueIds];
+        $venueIds = array_filter($venueIds);
+
+        if (empty($venueIds) || ! $checkIn || ! $checkOut) {
+            return false;
+        }
+
+        try {
+            $start = Carbon::parse($checkIn);
+            $end = Carbon::parse($checkOut);
+        } catch (\Exception $e) {
+            return false;
+        }
+
+        if ($end->lessThanOrEqualTo($start)) {
+            return false;
+        }
+
+        return Booking::query()
+            ->when($record, fn ($query) => $query->where('id', '!=', $record->id))
+            ->whereNotIn('status', [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED])
+            ->where('check_in', '<', $end)
+            ->where('check_out', '>', $start)
+            ->whereHas('venues', fn ($query) => $query->whereIn('venues.id', $venueIds))
+            ->exists();
     }
 }
