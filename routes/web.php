@@ -3,9 +3,7 @@
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::redirect('/', '/login');
 
 if ($adminPanel = Filament::getPanel('admin')) {
     $loginMiddleware = array_merge($adminPanel->getMiddleware(), ['guest']);
