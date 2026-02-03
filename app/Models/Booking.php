@@ -31,7 +31,6 @@ class Booking extends Model
     ];
 
     protected static function booted()
-    protected static function booted()
     {
         /**
          * Generate reference number before create
