@@ -21,41 +21,43 @@ class ListBookings extends ListRecords
             Action::make('scanQr')
                 ->label('Scan QR')
                 ->icon('heroicon-o-qr-code')
+                ->modalSubmitAction(false)
                 ->form([
                     QrCodeInput::make('qr_payload')
                         ->label('Scan booking QR')
-                        ->required(),
+                        ->required()
+                        ->live()
+                        ->afterStateUpdated(function (?string $state, $livewire): void {
+                            $payload = $state;
+
+                            if (!$payload) {
+                                Notification::make()
+                                    ->title('No QR code data found.')
+                                    ->danger()
+                                    ->send();
+                                return;
+                            }
+
+                            $decoded = json_decode($payload, true);
+                            $reference = is_array($decoded) ? ($decoded['reference'] ?? null) : null;
+                            $reference = $reference ?: trim($payload);
+
+                            $booking = Booking::query()
+                                ->where('reference_number', $reference)
+                                ->first();
+
+                            if (!$booking) {
+                                Notification::make()
+                                    ->title('Booking not found.')
+                                    ->danger()
+                                    ->send();
+                                return;
+                            }
+
+                            $livewire->redirect(BookingResource::getUrl('view', ['record' => $booking]));
+                        }),
                 ])
-                ->action(function (array $data) {
-                    $payload = $data['qr_payload'] ?? null;
-
-                    if (!$payload) {
-                        Notification::make()
-                            ->title('No QR code data found.')
-                            ->danger()
-                            ->send();
-                        return;
-                    }
-
-                    $decoded = json_decode($payload, true);
-                    $bookingId = is_array($decoded) ? ($decoded['booking_id'] ?? null) : null;
-                    $reference = is_array($decoded) ? ($decoded['reference'] ?? null) : null;
-
-                    $booking = Booking::query()
-                        ->when($bookingId, fn ($query) => $query->whereKey($bookingId))
-                        ->when(!$bookingId && $reference, fn ($query) => $query->where('reference_number', $reference))
-                        ->first();
-
-                    if (!$booking) {
-                        Notification::make()
-                            ->title('Booking not found.')
-                            ->danger()
-                            ->send();
-                        return;
-                    }
-
-                    return redirect(BookingResource::getUrl('edit', ['record' => $booking]));
-                }),
+                ->action(fn () => null),
         ];
     }
 }

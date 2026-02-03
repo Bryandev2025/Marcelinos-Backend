@@ -8,6 +8,7 @@ use App\Models\Room;
 use App\Models\Guest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
 class BookingController extends Controller
@@ -77,6 +78,34 @@ class BookingController extends Controller
             return response()->json([
                 'message' => 'Failed to load receipt',
                 'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Display a booking by reference number (frontend QR lookup)
+     */
+    public function showByReferenceNumber(string $reference)
+    {
+        try {
+            $booking = Booking::with(['guest', 'rooms', 'venues'])
+                ->where('reference_number', $reference)
+                ->first();
+
+            if (!$booking) {
+                return response()->json(['message' => 'Booking not found'], 404);
+            }
+
+            return response()->json([
+                'booking' => $booking,
+                'qr_code_url' => $booking->qr_code
+                    ? Storage::disk('public')->url($booking->qr_code)
+                    : null,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error retrieving booking',
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
