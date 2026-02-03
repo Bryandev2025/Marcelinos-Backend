@@ -99,7 +99,7 @@ class Guest extends Model implements HasMedia
             'first_name'       => 'required|string|max:100',
             'middle_name'      => 'nullable|string|max:100',
             'last_name'        => 'required|string|max:100',
-            'email'            => 'required|email|unique:guests,email',
+            'email'            => 'required|email',
             'contact_num'      => 'required|string|max:20',
             'gender'           => 'nullable|in:Male,Female,Other',
             'is_international' => 'required|boolean',
