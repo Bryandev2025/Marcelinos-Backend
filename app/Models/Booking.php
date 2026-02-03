@@ -104,6 +104,11 @@ class Booking extends Model
         return $this->belongsToMany(Venue::class, 'booking_venue')->withTimestamps();
     }
 
+    public function reviews()
+    {
+        return $this->hasMany(Review::class);
+    }
+
     /* ================= STATUSES ================= */
 
     const STATUS_PENDING    = 'pending';

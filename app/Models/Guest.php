@@ -74,6 +74,11 @@ class Guest extends Model implements HasMedia
         return $this->hasMany(Booking::class);
     }
 
+    public function reviews()
+    {
+        return $this->hasMany(Review::class);
+    }
+
     public static function store($request)
     {
         $validated = $request->validate([
