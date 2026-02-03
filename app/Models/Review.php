@@ -4,10 +4,32 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\Room;
+use App\Models\Venue;
 
 class Review extends Model
 {
     use HasFactory;
+
+    /* ================= RATING ================= */
+    public static function ratingOptions(): array
+    {
+        return [
+            1 => '1',
+            2 => '2',
+            3 => '3',
+            4 => '4',
+            5 => '5',
+        ];
+    }
+
+    public static function reviewableTypeOptions(): array
+    {
+        return [
+            Room::class => 'Room',
+            Venue::class => 'Venue',
+        ];
+    }
 
     protected $fillable = [
         'guest_id',

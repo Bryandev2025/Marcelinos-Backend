@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Reviews\Tables;
 
+use App\Models\Review;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -19,7 +20,8 @@ class ReviewsTable
             ->columns([
                 TextColumn::make('guest.full_name')
                     ->label('Guest')
-                    ->searchable(),
+                    ->formatStateUsing(fn ($record) => $record->guest?->full_name ?? '—')
+                    ->searchable(['guest.first_name', 'guest.middle_name', 'guest.last_name']),
 
                 TextColumn::make('reviewable.name')
                     ->label('Target')
@@ -68,13 +70,7 @@ class ReviewsTable
                     ->falseLabel('Pending'),
 
                 SelectFilter::make('rating')
-                    ->options([
-                        1 => '1',
-                        2 => '2',
-                        3 => '3',
-                        4 => '4',
-                        5 => '5',
-                    ]),
+                    ->options(Review::ratingOptions()),
             ])
             ->recordActions([
                 EditAction::make(),

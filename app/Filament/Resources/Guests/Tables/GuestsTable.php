@@ -2,11 +2,14 @@
 
 namespace App\Filament\Resources\Guests\Tables;
 
+use App\Models\Guest;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
 class GuestsTable
@@ -15,9 +18,11 @@ class GuestsTable
     {
         return $table
             ->columns([
-                TextColumn::make('first_name')->searchable(),
-                TextColumn::make('middle_name')->searchable(),
-                TextColumn::make('last_name')->searchable(),
+                TextColumn::make('full_name')
+                    ->label('Name')
+                    ->formatStateUsing(fn ($record) => $record->full_name)
+                    ->searchable(['first_name', 'middle_name', 'last_name'])
+                    ->sortable(),
                 TextColumn::make('contact_num')->searchable(),
                 TextColumn::make('email')
                     ->label('Email address')
@@ -27,22 +32,35 @@ class GuestsTable
                 TextColumn::make('gender')
                     ->badge()
                     ->colors([
-                        'primary' => 'male',
-                        'warning' => 'female',
-                        'secondary' => 'other',
-                    ]),
+                        'primary' => Guest::GENDER_MALE,
+                        'warning' => Guest::GENDER_FEMALE,
+                        'secondary' => Guest::GENDER_OTHER,
+                    ])
+                    ->formatStateUsing(fn (string $state): string => Guest::genderOptions()[$state] ?? ucfirst($state)),
 
                 // ✅ International Guest Icon
                 IconColumn::make('is_international')
                     ->boolean()
                     ->label('International'),
 
-                TextColumn::make('country')->searchable(),
-                TextColumn::make('province')->searchable(),
-                TextColumn::make('municipality')->searchable(),
-                TextColumn::make('barangay')->searchable(),
-                TextColumn::make('city')->searchable(),
-                TextColumn::make('zip_code')->searchable(),
+                TextColumn::make('country')
+                    ->searchable()
+                    ->toggleable(),
+                TextColumn::make('city')
+                    ->searchable()
+                    ->toggleable(),
+                TextColumn::make('province')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('municipality')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('barangay')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('zip_code')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -55,7 +73,12 @@ class GuestsTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                SelectFilter::make('gender')
+                    ->options(Guest::genderOptions()),
+                TernaryFilter::make('is_international')
+                    ->label('International')
+                    ->trueLabel('International')
+                    ->falseLabel('Local'),
             ])
             ->recordActions([
                 EditAction::make(),

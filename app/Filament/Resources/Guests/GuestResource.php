@@ -20,7 +20,7 @@ class GuestResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-users';
 
-    protected static ?string $recordTitleAttribute = 'first_name';
+    protected static ?string $recordTitleAttribute = 'full_name';
 
     // Form configuration
     public static function form(Schema $schema): Schema

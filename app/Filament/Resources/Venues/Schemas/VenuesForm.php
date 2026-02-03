@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Venues\Schemas;
 
+use App\Models\Venue;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
@@ -28,12 +29,8 @@ class VenuesForm
                     ->prefix('₱'),
 
                 Select::make('status')
-                    ->options([
-                        'available' => 'Available',
-                        'booked' => 'Booked',
-                        'maintenance' => 'Maintenance',
-                    ])
-                    ->default('available')
+                    ->options(Venue::statusOptions())
+                    ->default(Venue::STATUS_AVAILABLE)
                     ->required(),
 
                 SpatieMediaLibraryFileUpload::make('featured_image')
@@ -47,6 +44,11 @@ class VenuesForm
                     ->multiple()
                     ->label('Gallery Images')
                     ->image(),
+                Select::make('amenities')
+                    ->relationship('amenities', 'name')
+                    ->multiple()
+                    ->preload()
+                    ->searchable(),
             ]);
     }
 }

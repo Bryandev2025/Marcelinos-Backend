@@ -2,13 +2,14 @@
 
 namespace App\Filament\Resources\Venues\Tables;
 
+use App\Models\Venue;
 use Filament\Tables\Table;
 use Filament\Actions\EditAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Illuminate\Support\Facades\Auth;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\ImageColumn;
+use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
 
 class VenuesTable
 {
@@ -17,9 +18,10 @@ class VenuesTable
         return $table
             ->columns([
                 // ✅ Featured Image (Uses Spatie Media Library)
-                ImageColumn::make('featured_image')
+                SpatieMediaLibraryImageColumn::make('featured_image')
                     ->label('Featured')
-                    ->getStateUsing(fn($record) => $record->getFirstMediaUrl('featured')),
+                    ->collection('featured')
+                    ->circular(),
 
                 TextColumn::make('name')
                     ->label('Venue Name')
@@ -36,12 +38,8 @@ class VenuesTable
 
                 TextColumn::make('status')
                     ->badge()
-                    ->colors([
-                        'success' => 'available',
-                        'danger' => 'booked',
-                        'secondary' => 'maintenance',
-                    ])
-                    ->formatStateUsing(fn (string $state): string => ucfirst($state)),
+                    ->colors(Venue::statusColors())
+                    ->formatStateUsing(fn (string $state): string => Venue::statusOptions()[$state] ?? ucfirst($state)),
 
                 TextColumn::make('created_at')
                     ->dateTime()

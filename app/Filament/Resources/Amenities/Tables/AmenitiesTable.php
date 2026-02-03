@@ -1,47 +1,32 @@
 <?php
 
-namespace App\Filament\Resources\Rooms\Tables;
+namespace App\Filament\Resources\Amenities\Tables;
 
-use App\Models\Room;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Auth;
 
-class RoomsTable
+class AmenitiesTable
 {
     public static function configure(Table $table): Table
     {
         return $table
             ->columns([
-                // ✅ Featured Image
-                SpatieMediaLibraryImageColumn::make('featured_image')
-                    ->label('Featured')
-                    ->circular()
-                    ->collection('featured'),
-
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
 
-                TextColumn::make('capacity')
+                TextColumn::make('rooms_count')
+                    ->label('Rooms')
                     ->numeric()
                     ->sortable(),
 
-                TextColumn::make('type')
-                    ->badge()
-                    ->formatStateUsing(fn (string $state): string => Room::typeOptions()[$state] ?? $state),
-
-                TextColumn::make('price')
-                    ->money('PHP', true)
+                TextColumn::make('venues_count')
+                    ->label('Venues')
+                    ->numeric()
                     ->sortable(),
-
-                TextColumn::make('status')
-                    ->badge()
-                    ->colors(Room::statusColors()),
 
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -53,17 +38,14 @@ class RoomsTable
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->filters([
-                //
-            ])
+            ->defaultSort('name')
             ->recordActions([
                 EditAction::make(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
-                ])
-                ->visible(fn () => Auth::user() && Auth::user()->role === 'admin'),
+                ]),
             ]);
     }
 }

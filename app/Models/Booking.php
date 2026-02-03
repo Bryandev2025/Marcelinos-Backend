@@ -117,4 +117,26 @@ class Booking extends Model
     const STATUS_COMPLETED  = 'completed';
     const STATUS_CANCELLED  = 'cancelled';
     const STATUS_RESCHEDULE = 'reschedule';
+
+    public static function statusOptions(): array
+    {
+        return [
+            self::STATUS_PENDING => 'Pending',
+            self::STATUS_CONFIRMED => 'Confirmed',
+            self::STATUS_OCCUPIED => 'Occupied',
+            self::STATUS_COMPLETED => 'Completed',
+            self::STATUS_CANCELLED => 'Cancelled',
+        ];
+    }
+
+    public static function statusColors(): array
+    {
+        return [
+            'primary' => self::STATUS_PENDING,
+            'success' => self::STATUS_CONFIRMED,
+            'warning' => self::STATUS_OCCUPIED,
+            'secondary' => self::STATUS_COMPLETED,
+            'danger' => self::STATUS_CANCELLED,
+        ];
+    }
 }
