@@ -23,6 +23,22 @@ class GuestResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'full_name';
 
+    public static function getGloballySearchableAttributes(): array
+    {
+        return [
+            'first_name',
+            'middle_name',
+            'last_name',
+            'email',
+            'contact_num',
+        ];
+    }
+
+    public static function getGlobalSearchResultTitle($record): string
+    {
+        return $record->full_name;
+    }
+
     // Form configuration
     public static function form(Schema $schema): Schema
     {
