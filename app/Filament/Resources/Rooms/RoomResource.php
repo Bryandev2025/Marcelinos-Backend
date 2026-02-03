@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Rooms;
 
+use App\Filament\Resources\Rooms\RelationManagers\ReviewsRelationManager;
 use App\Filament\Resources\Rooms\Pages\CreateRoom;
 use App\Filament\Resources\Rooms\Pages\EditRoom;
 use App\Filament\Resources\Rooms\Pages\ListRooms;
@@ -40,7 +41,7 @@ class RoomResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            ReviewsRelationManager::class,
         ];
     }
 
