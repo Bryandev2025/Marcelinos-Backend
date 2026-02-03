@@ -24,7 +24,8 @@ class Booking extends Model
         'no_of_days' => 'integer',
     ];
 
-        protected static function booted()
+
+    protected static function booted()
     {
 
         static::saved(function (Booking $booking) {
