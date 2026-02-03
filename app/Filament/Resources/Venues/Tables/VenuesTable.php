@@ -7,6 +7,7 @@ use Filament\Tables\Table;
 use Filament\Actions\EditAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\ViewAction;
 use Illuminate\Support\Facades\Auth;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
@@ -16,6 +17,8 @@ class VenuesTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->recordAction('view')
+            ->recordUrl(fn ($record) => \App\Filament\Resources\Venues\VenuesResource::getUrl('view', ['record' => $record]))
             ->columns([
                 // ✅ Featured Image (Uses Spatie Media Library)
                 SpatieMediaLibraryImageColumn::make('featured_image')
@@ -55,6 +58,7 @@ class VenuesTable
                 // Add filters here if needed (e.g., SelectFilter for status)
             ])
             ->actions([
+                ViewAction::make(),
                 EditAction::make(),
             ])
             ->bulkActions([

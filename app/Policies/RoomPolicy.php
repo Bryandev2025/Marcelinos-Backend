@@ -21,7 +21,7 @@ class RoomPolicy
      */
     public function view(User $user, Room $room): bool
     {
-        return false;
+        return in_array($user->role, ['admin', 'staff'], true);
     }
 
     /**

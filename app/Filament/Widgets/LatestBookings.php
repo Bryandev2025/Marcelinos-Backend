@@ -20,7 +20,7 @@ class LatestBookings extends TableWidget
     // Corrected method signature
     protected function getTableQuery(): Builder|Relation|null
     {
-        return Booking::query()->latest(); // show newest bookings first
+        return Booking::query()->with('guest')->latest();
     }
 
     protected function getTableColumns(): array
@@ -30,20 +30,17 @@ class LatestBookings extends TableWidget
                 ->label('Booking ID')
                 ->sortable(),
             
-            Tables\Columns\TextColumn::make('first_name')
-                ->label('Customer'),
+            Tables\Columns\TextColumn::make('guest.full_name')
+                ->label('Customer')
+                ->formatStateUsing(fn ($record) => $record->guest?->full_name ?? '—'),
 
             Tables\Columns\TextColumn::make('created_at')
                 ->label('Date')
                 ->dateTime('M d, Y H:i'),
 
-            Tables\Columns\BadgeColumn::make('status') // nicer with color
+            Tables\Columns\BadgeColumn::make('status')
                 ->label('Status')
-                ->colors([
-                    'success' => 'confirmed',
-                    'warning' => 'pending',
-                    'danger' => 'canceled',
-                ]),
+                ->colors(Booking::statusColors()),
         ];
     }
 }

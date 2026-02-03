@@ -6,6 +6,7 @@ use App\Filament\Exports\BookingExporter;
 use App\Models\Booking;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Actions\ExportAction;
 use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\ImageColumn;
@@ -19,6 +20,7 @@ class BookingsTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->recordAction('view')
             ->columns([
                 ImageColumn::make('qr_code')
                     ->label('QR')
@@ -91,6 +93,7 @@ class BookingsTable
                     ->exporter(BookingExporter::class),
             ])
             ->recordActions([
+                ViewAction::make(),
                 EditAction::make(),
                 DeleteAction::make(),
             ]);

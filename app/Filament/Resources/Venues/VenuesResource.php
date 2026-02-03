@@ -6,6 +6,7 @@ use App\Filament\Resources\Venues\RelationManagers\ReviewsRelationManager;
 use App\Filament\Resources\Venues\Pages\CreateVenues;
 use App\Filament\Resources\Venues\Pages\EditVenues;
 use App\Filament\Resources\Venues\Pages\ListVenues;
+use App\Filament\Resources\Venues\Pages\ViewVenues;
 use App\Filament\Resources\Venues\Schemas\VenuesForm;
 use App\Filament\Resources\Venues\Tables\VenuesTable;
 use App\Models\Venue;
@@ -44,6 +45,7 @@ class VenuesResource extends Resource
             'index' => ListVenues::route('/'),
             'create' => CreateVenues::route('/create'),
             'edit' => EditVenues::route('/{record}/edit'),
+            'view' => ViewVenues::route('/{record}'),
         ];
     }
 }

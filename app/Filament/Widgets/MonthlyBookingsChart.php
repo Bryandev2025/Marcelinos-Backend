@@ -8,65 +8,29 @@ use Carbon\Carbon;
 
 class MonthlyBookingsChart extends ChartWidget
 {
-    protected ?string $heading = 'Visitors Statistics';
+    protected ?string $heading = 'Bookings Trend';
 
-    // // Full width in dashboard
-    // protected int | string | array $columnSpan = 'full';
+    protected int | string | array $columnSpan = 2;
 
-    // // Medium height
-    // protected int | string | array $rowSpan = 2;
+    protected int | string | array $rowSpan = 2;
 
     protected function getData(): array
     {
         $labels = [];
         $data = [];
-        $pointBackgroundColors = [];
-        $previous = null;
 
-        $currentMonth = now()->month;
-        $currentYear = now()->year;
+        $start = now()->startOfMonth()->subMonths(11);
+        $end = now()->startOfMonth();
 
-        for ($month = $currentMonth; $month <= 12; $month++) {
-            $date = Carbon::create($currentYear, $month, 1);
+        $period = new \DatePeriod($start, new \DateInterval('P1M'), $end->copy()->addMonth());
+
+        foreach ($period as $date) {
             $labels[] = $date->format('M Y');
-
-            // Count bookings for this month
-            $count = Booking::whereYear('created_at', $currentYear)
-                            ->whereMonth('created_at', $month)
-                            ->count();
-            $data[] = $count;
-
-            // Color points based on increase/decrease
-            if ($previous === null) {
-                $pointBackgroundColors[] = '#f59e0b'; // amber
-            } elseif ($count > $previous) {
-                $pointBackgroundColors[] = '#22c55e'; // green = increase
-            } elseif ($count < $previous) {
-                $pointBackgroundColors[] = '#ef4444'; // red = decrease
-            } else {
-                $pointBackgroundColors[] = '#f59e0b'; // same = amber
-            }
-
-            $previous = $count;
-        }
-
-        // Dummy data if no bookings
-        if (max($data) === 0) {
-            $data = [5, 8, 6, 12, 10, 15, 9, 20, 18, 25, 22, 30];
-            $pointBackgroundColors = [];
-            $previous = null;
-            foreach ($data as $count) {
-                if ($previous === null) {
-                    $pointBackgroundColors[] = '#f59e0b';
-                } elseif ($count > $previous) {
-                    $pointBackgroundColors[] = '#22c55e';
-                } elseif ($count < $previous) {
-                    $pointBackgroundColors[] = '#ef4444';
-                } else {
-                    $pointBackgroundColors[] = '#f59e0b';
-                }
-                $previous = $count;
-            }
+            $year = (int) $date->format('Y');
+            $month = (int) $date->format('m');
+            $data[] = Booking::whereYear('created_at', $year)
+                ->whereMonth('created_at', $month)
+                ->count();
         }
 
         return [
@@ -75,10 +39,12 @@ class MonthlyBookingsChart extends ChartWidget
                 [
                     'label' => 'Bookings',
                     'data' => $data,
-                    'backgroundColor' => $pointBackgroundColors, // color per bar
-                    'borderRadius' => 3, // rounded bars
+                    'backgroundColor' => 'rgba(59, 130, 246, 0.5)',
+                    'borderColor' => 'rgba(59, 130, 246, 1)',
+                    'borderWidth' => 1,
+                    'borderRadius' => 6,
                     'borderSkipped' => false,
-                    'maxBarThickness' => 20,
+                    'maxBarThickness' => 28,
                 ],
             ],
 
@@ -94,7 +60,7 @@ class MonthlyBookingsChart extends ChartWidget
     {
         $dataset = $this->getData()['datasets'][0]['data'];
         $maxValue = max($dataset) ?: 10;
-        $yMax = ceil($maxValue / 5) * 5; // round up to nearest multiple of 5
+        $yMax = ceil($maxValue / 5) * 5;
 
         return [
             'responsive' => true,
@@ -102,11 +68,14 @@ class MonthlyBookingsChart extends ChartWidget
             'plugins' => [
                 'tooltip' => [
                     'callbacks' => [
-                        'label' => fn($context) => $context['raw'],
+                        'label' => fn($context) => 'Bookings: '.$context['raw'],
                     ],
                 ],
                 'legend' => [
-                    'display' => false, // hide legend for cleaner look
+                    'display' => true,
+                    'labels' => [
+                        'boxWidth' => 10,
+                    ],
                 ],
             ],
             'scales' => [
