@@ -21,7 +21,8 @@ class BookingForm
         return $schema->components([
             Select::make('guest_id')
                 ->label('Guest')
-                ->options(Guest::all()->pluck('first_name', 'id'))
+                ->relationship('guest', 'first_name')
+                ->getOptionLabelFromRecordUsing(fn (Guest $record) => $record->full_name)
                 ->searchable()
                 ->required(),
 
@@ -98,19 +99,15 @@ class BookingForm
                 ->dehydrated(),
 
             TextInput::make('total_price')
-                ->required()
+                ->default(0)
+                ->readOnly()
+                ->dehydrated()
                 ->numeric()
                 ->prefix('₱'),
 
             Select::make('status')
-                ->options([
-                    'pending' => 'Pending',
-                    'confirmed' => 'Confirmed',
-                    'occupied' => 'Occupied',
-                    'completed' => 'Completed',
-                    'cancelled' => 'Cancelled',
-                ])
-                ->default('pending')
+                ->options(Booking::statusOptions())
+                ->default(Booking::STATUS_PENDING)
                 ->required(),
 
             TextInput::make('reference_number')

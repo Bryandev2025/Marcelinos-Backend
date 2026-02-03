@@ -15,4 +15,9 @@ class Amenity extends Model
     {
         return $this->belongsToMany(Room::class);
     }
+
+    public function venues()
+    {
+        return $this->belongsToMany(Venue::class);
+    }
 }

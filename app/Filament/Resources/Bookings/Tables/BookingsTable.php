@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\Bookings\Tables;
 
 use App\Filament\Exports\BookingExporter;
-use Filament\Actions\CreateAction;
+use App\Models\Booking;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ExportAction;
@@ -35,7 +35,8 @@ class BookingsTable
 
                 TextColumn::make('guest.first_name')
                     ->label('Guest')
-                    ->searchable()
+                    ->formatStateUsing(fn ($record) => $record->guest?->full_name ?? '—')
+                    ->searchable(['guest.first_name', 'guest.middle_name', 'guest.last_name', 'guest.email'])
                     ->sortable(),
 
                 TextColumn::make('rooms.name')
@@ -66,13 +67,7 @@ class BookingsTable
                     ->sortable(),
 
                 BadgeColumn::make('status')
-                    ->colors([
-                        'primary' => 'pending',
-                        'success' => 'confirmed',
-                        'warning' => 'occupied',
-                        'secondary' => 'completed',
-                        'danger' => 'cancelled',
-                    ])
+                    ->colors(Booking::statusColors())
                     ->sortable(),
 
                 TextColumn::make('created_at')
@@ -87,13 +82,7 @@ class BookingsTable
             ])
             ->filters([
                 SelectFilter::make('status')
-                    ->options([
-                        'pending' => 'Pending',
-                        'confirmed' => 'Confirmed',
-                        'occupied' => 'Occupied',
-                        'completed' => 'Completed',
-                        'cancelled' => 'Cancelled',
-                    ]),
+                    ->options(Booking::statusOptions()),
             ])
             ->defaultSort('created_at', 'desc')
             ->headerActions([

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Rooms\Schemas;
 
+use App\Models\Room;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
@@ -16,12 +17,12 @@ class RoomForm
                 TextInput::make('name')->required(),
                 TextInput::make('capacity')->required()->numeric(),
                 Select::make('type')
-                    ->options(['standard'=>'Standard','family'=>'Family','deluxe'=>'Deluxe'])
+                    ->options(Room::typeOptions())
                     ->required(),
                 TextInput::make('price')->required()->numeric()->prefix('₱'),
                 Select::make('status')
-                    ->options(['available'=>'Available','occupied'=>'Occupied','cleaning'=>'Cleaning','maintenance'=>'Maintenance'])
-                    ->default('available')
+                    ->options(Room::statusOptions())
+                    ->default(Room::STATUS_AVAILABLE)
                     ->required(),
                 SpatieMediaLibraryFileUpload::make('featured_image')
                     ->collection('featured')
@@ -33,6 +34,11 @@ class RoomForm
                     ->multiple()
                     ->label('Gallery Images')
                     ->image(),
+                Select::make('amenities')
+                    ->relationship('amenities', 'name')
+                    ->multiple()
+                    ->preload()
+                    ->searchable(),
             ]);
     }
 }

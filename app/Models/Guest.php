@@ -11,6 +11,20 @@ class Guest extends Model implements HasMedia
 {
     use HasFactory, InteractsWithMedia;
 
+    /* ================= GENDER ================= */
+    const GENDER_MALE = 'male';
+    const GENDER_FEMALE = 'female';
+    const GENDER_OTHER = 'other';
+
+    public static function genderOptions(): array
+    {
+        return [
+            self::GENDER_MALE => 'Male',
+            self::GENDER_FEMALE => 'Female',
+            self::GENDER_OTHER => 'Other',
+        ];
+    }
+
     protected $fillable = [
         'first_name',
         'middle_name',

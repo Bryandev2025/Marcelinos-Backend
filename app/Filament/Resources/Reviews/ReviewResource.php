@@ -35,7 +35,11 @@ class ReviewResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['guest', 'booking', 'reviewable']);
+            ->with([
+                'guest:id,first_name,middle_name,last_name',
+                'booking:id,reference_number',
+                'reviewable',
+            ]);
     }
 
     public static function getRelations(): array

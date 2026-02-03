@@ -2,8 +2,8 @@
 
 namespace App\Filament\Resources\Reviews\Schemas;
 
-use App\Models\Booking;
 use App\Models\Guest;
+use App\Models\Review;
 use App\Models\Room;
 use App\Models\Venue;
 use Filament\Forms\Components\DateTimePicker;
@@ -23,17 +23,14 @@ class ReviewForm
             ->components([
                 Select::make('guest_id')
                     ->label('Guest')
-                    ->options(fn () => Guest::query()
-                        ->select('id', 'first_name', 'middle_name', 'last_name')
-                        ->get()
-                        ->mapWithKeys(fn (Guest $guest) => [$guest->id => $guest->full_name])
-                        ->all())
+                    ->relationship('guest', 'first_name')
+                    ->getOptionLabelFromRecordUsing(fn (Guest $record) => $record->full_name)
                     ->searchable()
                     ->required(),
 
                 Select::make('booking_id')
                     ->label('Booking')
-                    ->options(fn () => Booking::query()->pluck('reference_number', 'id')->all())
+                    ->relationship('booking', 'reference_number')
                     ->searchable()
                     ->nullable(),
 
@@ -50,10 +47,7 @@ class ReviewForm
 
                 Select::make('reviewable_type')
                     ->label('Review Type')
-                    ->options([
-                        Room::class => 'Room',
-                        Venue::class => 'Venue',
-                    ])
+                    ->options(Review::reviewableTypeOptions())
                     ->searchable()
                     ->live()
                     ->afterStateUpdated(fn (Set $set) => $set('reviewable_id', null))
@@ -70,18 +64,11 @@ class ReviewForm
                         };
                     })
                     ->searchable()
-                    ->preload()
                     ->required(fn (Get $get) => ! $get('is_site_review'))
                     ->visible(fn (Get $get) => ! $get('is_site_review')),
 
                 Select::make('rating')
-                    ->options([
-                        1 => '1',
-                        2 => '2',
-                        3 => '3',
-                        4 => '4',
-                        5 => '5',
-                    ])
+                    ->options(Review::ratingOptions())
                     ->required(),
 
                 TextInput::make('title')

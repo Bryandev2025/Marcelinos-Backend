@@ -11,7 +11,41 @@ class Venue extends Model implements HasMedia
 {
     use HasFactory, InteractsWithMedia;
 
-    protected $fillable = ['name', 'description', 'capacity', 'price'];
+    protected $fillable = ['name', 'description', 'capacity', 'price', 'status'];
+
+    /* ================= STATUSES ================= */
+    const STATUS_AVAILABLE = 'available';
+    const STATUS_BOOKED = 'booked';
+    const STATUS_MAINTENANCE = 'maintenance';
+
+    public static function statusOptions(): array
+    {
+        return [
+            self::STATUS_AVAILABLE => 'Available',
+            self::STATUS_BOOKED => 'Booked',
+            self::STATUS_MAINTENANCE => 'Maintenance',
+        ];
+    }
+
+    public static function statusColors(): array
+    {
+        return [
+            'success' => self::STATUS_AVAILABLE,
+            'danger' => self::STATUS_BOOKED,
+            'secondary' => self::STATUS_MAINTENANCE,
+        ];
+    }
+
+    /**
+     * Define Media Collections
+     */
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('featured')
+            ->singleFile();
+
+        $this->addMediaCollection('gallery');
+    }
 
     // General collection of images
     public function images()
@@ -30,7 +64,7 @@ class Venue extends Model implements HasMedia
     public function scopeAvailableBetween($query, $checkIn, $checkOut)
     {
         return $query->whereDoesntHave('bookings', function ($q) use ($checkIn, $checkOut) {
-            $q->where('bookings.status', '!=', 'cancelled')
+            $q->where('bookings.status', '!=', Booking::STATUS_CANCELLED)
                 ->where('bookings.check_in', '<', $checkOut)
                 ->where('bookings.check_out', '>', $checkIn);
         });

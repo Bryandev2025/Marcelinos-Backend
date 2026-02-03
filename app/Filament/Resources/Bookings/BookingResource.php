@@ -13,7 +13,6 @@ use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 
 class BookingResource extends Resource
@@ -37,7 +36,11 @@ class BookingResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['guest', 'rooms', 'venues']);
+            ->with([
+                'guest:id,first_name,middle_name,last_name,email',
+                'rooms:id,name',
+                'venues:id,name',
+            ]);
     }
 
     public static function getRelations(): array
@@ -55,11 +58,5 @@ class BookingResource extends Resource
             'edit' => EditBooking::route('/{record}/edit'),
         ];
     }
-
-    public function viewAny(User $user): bool
-    {
-        return in_array($user->role, ['admin', 'staff'], true);
-    }
-
 
 }
