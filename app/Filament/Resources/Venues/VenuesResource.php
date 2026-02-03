@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Venues;
 
+use App\Filament\Resources\Venues\RelationManagers\ReviewsRelationManager;
 use App\Filament\Resources\Venues\Pages\CreateVenues;
 use App\Filament\Resources\Venues\Pages\EditVenues;
 use App\Filament\Resources\Venues\Pages\ListVenues;
@@ -33,7 +34,7 @@ class VenuesResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            ReviewsRelationManager::class,
         ];
     }
 

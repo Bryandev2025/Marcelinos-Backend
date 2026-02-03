@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Guests;
 
+use App\Filament\Resources\Guests\RelationManagers\ReviewsRelationManager;
 use App\Filament\Resources\Guests\Pages\CreateGuest;
 use App\Filament\Resources\Guests\Pages\EditGuest;
 use App\Filament\Resources\Guests\Pages\ListGuests;
@@ -37,7 +38,7 @@ class GuestResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            ReviewsRelationManager::class,
         ];
     }
 
