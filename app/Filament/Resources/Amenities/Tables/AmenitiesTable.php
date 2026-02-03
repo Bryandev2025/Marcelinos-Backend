@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Amenities\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -13,6 +14,8 @@ class AmenitiesTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->recordAction('view')
+            ->recordUrl(fn ($record) => \App\Filament\Resources\Amenities\AmenityResource::getUrl('view', ['record' => $record]))
             ->columns([
                 TextColumn::make('name')
                     ->searchable()
@@ -40,6 +43,7 @@ class AmenitiesTable
             ])
             ->defaultSort('name')
             ->recordActions([
+                ViewAction::make(),
                 EditAction::make(),
             ])
             ->toolbarActions([

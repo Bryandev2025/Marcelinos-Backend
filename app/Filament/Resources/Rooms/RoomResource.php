@@ -6,6 +6,7 @@ use App\Filament\Resources\Rooms\RelationManagers\ReviewsRelationManager;
 use App\Filament\Resources\Rooms\Pages\CreateRoom;
 use App\Filament\Resources\Rooms\Pages\EditRoom;
 use App\Filament\Resources\Rooms\Pages\ListRooms;
+use App\Filament\Resources\Rooms\Pages\ViewRoom;
 use App\Filament\Resources\Rooms\Schemas\RoomForm;
 use App\Filament\Resources\Rooms\Tables\RoomsTable;
 use App\Models\Room;
@@ -51,6 +52,7 @@ class RoomResource extends Resource
             'index' => ListRooms::route('/'),
             'create' => CreateRoom::route('/create'),
             'edit' => EditRoom::route('/{record}/edit'),
+            'view' => ViewRoom::route('/{record}'),
         ];
     }
 }

@@ -21,7 +21,7 @@ class BookingPolicy
      */
     public function view(User $user, Booking $booking): bool
     {
-        return false;
+        return in_array($user->role, ['admin', 'staff'], true);
     }
 
     /**

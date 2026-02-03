@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Reviews;
 use App\Filament\Resources\Reviews\Pages\CreateReview;
 use App\Filament\Resources\Reviews\Pages\EditReview;
 use App\Filament\Resources\Reviews\Pages\ListReviews;
+use App\Filament\Resources\Reviews\Pages\ViewReview;
 use App\Filament\Resources\Reviews\Schemas\ReviewForm;
 use App\Filament\Resources\Reviews\Tables\ReviewsTable;
 use App\Models\Review;
@@ -55,6 +56,7 @@ class ReviewResource extends Resource
             'index' => ListReviews::route('/'),
             'create' => CreateReview::route('/create'),
             'edit' => EditReview::route('/{record}/edit'),
+            'view' => ViewReview::route('/{record}'),
         ];
     }
 }

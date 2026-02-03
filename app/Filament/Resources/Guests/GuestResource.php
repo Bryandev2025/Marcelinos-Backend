@@ -6,6 +6,7 @@ use App\Filament\Resources\Guests\RelationManagers\ReviewsRelationManager;
 use App\Filament\Resources\Guests\Pages\CreateGuest;
 use App\Filament\Resources\Guests\Pages\EditGuest;
 use App\Filament\Resources\Guests\Pages\ListGuests;
+use App\Filament\Resources\Guests\Pages\ViewGuest;
 use App\Filament\Resources\Guests\Tables\GuestsTable;
 use App\Filament\Resources\Guests\Schemas\GuestForm;
 use App\Models\Guest;
@@ -49,6 +50,7 @@ class GuestResource extends Resource
             'index' => ListGuests::route('/'),
             'create' => CreateGuest::route('/create'),
             'edit' => EditGuest::route('/{record}/edit'),
+            'view' => ViewGuest::route('/{record}'),
         ];
     }
 }

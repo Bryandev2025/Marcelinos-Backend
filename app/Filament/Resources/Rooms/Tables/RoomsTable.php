@@ -6,6 +6,7 @@ use App\Models\Room;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
 use Filament\Tables\Table;
@@ -16,6 +17,8 @@ class RoomsTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->recordAction('view')
+            ->recordUrl(fn ($record) => \App\Filament\Resources\Rooms\RoomResource::getUrl('view', ['record' => $record]))
             ->columns([
                 // ✅ Featured Image
                 SpatieMediaLibraryImageColumn::make('featured_image')
@@ -57,6 +60,7 @@ class RoomsTable
                 //
             ])
             ->recordActions([
+                ViewAction::make(),
                 EditAction::make(),
             ])
             ->toolbarActions([

@@ -6,6 +6,7 @@ use App\Models\Review;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -17,6 +18,8 @@ class ReviewsTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->recordAction('view')
+            ->recordUrl(fn ($record) => \App\Filament\Resources\Reviews\ReviewResource::getUrl('view', ['record' => $record]))
             ->columns([
                 TextColumn::make('guest.full_name')
                     ->label('Guest')
@@ -73,6 +76,7 @@ class ReviewsTable
                     ->options(Review::ratingOptions()),
             ])
             ->recordActions([
+                ViewAction::make(),
                 EditAction::make(),
             ])
             ->toolbarActions([

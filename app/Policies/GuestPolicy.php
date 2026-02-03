@@ -13,7 +13,7 @@ class GuestPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->role === 'admin';
+        return in_array($user->role, ['admin', 'staff'], true);
     }
 
     /**
@@ -21,7 +21,7 @@ class GuestPolicy
      */
     public function view(User $user, Guest $guest): bool
     {
-        return false;
+        return in_array($user->role, ['admin', 'staff'], true);
     }
 
     /**
