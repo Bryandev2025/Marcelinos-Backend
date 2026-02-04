@@ -62,8 +62,8 @@ class VenueController extends Controller
                     'capacity' => $venue->capacity,
                     'price' => $venue->price,
                     'amenities' => $venue->amenities,
-                    'featured_image' => $venue->getFirstMediaUrl('featured'),
-                    'gallery' => $venue->getMedia('gallery')->map(fn ($media) => $media->getUrl()),
+                    'featured_image' => $venue->featured_image_url,
+                    'gallery' => $venue->gallery_urls,
                 ];
             });
 
@@ -106,8 +106,8 @@ class VenueController extends Controller
                 'capacity' => $venue->capacity,
                 'price' => $venue->price,
                 'amenities' => $venue->amenities,
-                'featured_image' => $venue->getFirstMediaUrl('featured'),
-                'gallery' => $venue->getMedia('gallery')->map(fn ($media) => $media->getUrl()),
+                'featured_image' => $venue->featured_image_url,
+                'gallery' => $venue->gallery_urls,
             ];
 
             return response()->json([

@@ -6,10 +6,16 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Venue extends Model implements HasMedia
 {
     use HasFactory, InteractsWithMedia;
+
+    protected $appends = [
+        'featured_image_url',
+        'gallery_urls',
+    ];
 
     protected $fillable = ['name', 'description', 'capacity', 'price', 'status'];
 
@@ -45,6 +51,32 @@ class Venue extends Model implements HasMedia
             ->singleFile();
 
         $this->addMediaCollection('gallery');
+    }
+
+    public function getFeaturedImageUrlAttribute(): ?string
+    {
+        $media = $this->getFirstMedia('featured');
+
+        return $media ? $this->resolveMediaUrl($media) : null;
+    }
+
+    public function getGalleryUrlsAttribute(): array
+    {
+        return $this->getMedia('gallery')
+            ->map(fn (Media $media) => $this->resolveMediaUrl($media))
+            ->values()
+            ->all();
+    }
+
+    private function resolveMediaUrl(Media $media): string
+    {
+        $lifetime = (int) config('media-library.temporary_url_default_lifetime', 5);
+
+        if ($media->disk === 's3') {
+            return $media->getTemporaryUrl(now()->addMinutes($lifetime));
+        }
+
+        return $media->getUrl();
     }
 
     // General collection of images

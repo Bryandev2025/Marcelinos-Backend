@@ -12,6 +12,11 @@ class Room extends Model implements HasMedia
 {
     use HasFactory, InteractsWithMedia;
 
+    protected $appends = [
+        'featured_image_url',
+        'gallery_urls',
+    ];
+
     protected $fillable = ['name', 'capacity', 'type', 'price', 'status'];
 
     /* ================= TYPES ================= */
@@ -64,6 +69,32 @@ class Room extends Model implements HasMedia
             ->singleFile(); // Ensures only one featured image exists
 
         $this->addMediaCollection('gallery'); // Allows multiple images
+    }
+
+    public function getFeaturedImageUrlAttribute(): ?string
+    {
+        $media = $this->getFirstMedia('featured');
+
+        return $media ? $this->resolveMediaUrl($media) : null;
+    }
+
+    public function getGalleryUrlsAttribute(): array
+    {
+        return $this->getMedia('gallery')
+            ->map(fn (Media $media) => $this->resolveMediaUrl($media))
+            ->values()
+            ->all();
+    }
+
+    private function resolveMediaUrl(Media $media): string
+    {
+        $lifetime = (int) config('media-library.temporary_url_default_lifetime', 5);
+
+        if ($media->disk === 's3') {
+            return $media->getTemporaryUrl(now()->addMinutes($lifetime));
+        }
+
+        return $media->getUrl();
     }
 
     public function bookings()
