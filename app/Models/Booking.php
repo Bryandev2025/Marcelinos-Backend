@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\BookingCreated;
 
 class Booking extends Model
 {
@@ -62,6 +64,16 @@ class Booking extends Model
             $booking->updateQuietly([
                 'qr_code' => $path,
             ]);
+
+            try {
+                $booking->loadMissing('guest');
+
+                if ($booking->guest && $booking->guest->email) {
+                    Mail::to($booking->guest->email)->send(new BookingCreated($booking));
+                }
+            } catch (\Throwable $e) {
+                // Avoid blocking booking creation if email fails
+            }
         });
 
         /**
