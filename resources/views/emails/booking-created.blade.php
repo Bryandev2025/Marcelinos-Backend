@@ -5,19 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Booking Received</title>
 </head>
-<body style="margin:0; padding:0; background-color:#f5f7fb; font-family:Arial, Helvetica, sans-serif; color:#1f2937;">
+<body style="margin:0; padding:0; background-color:#ffffff; font-family:Arial, Helvetica, sans-serif; color:#1f2937;">
     <div style="display:none; max-height:0; overflow:hidden; opacity:0;">
         Your booking has been received. Reference: {{ $booking->reference_number }}
     </div>
 
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#f5f7fb; padding:24px 0;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#ffffff; padding:24px 0;">
         <tr>
             <td align="center">
-                <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="width:600px; max-width:600px; background-color:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 6px 24px rgba(16, 24, 40, 0.08);">
+                <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="width:600px; max-width:600px; background-color:#ffffff; border-radius:12px; overflow:hidden; border:1px solid #e5e7eb;">
                     <tr>
-                        <td style="background:linear-gradient(90deg,#0f766e,#14b8a6); padding:28px 32px; color:#ffffff;">
-                            <h1 style="margin:0; font-size:20px; font-weight:700;">Marcelino’s Booking Confirmation</h1>
-                            <p style="margin:6px 0 0; font-size:14px; opacity:0.95;">We’ve received your reservation</p>
+                        <td style="padding:22px 32px; border-bottom:1px solid #e5e7eb;">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                                <tr>
+                                    <td style="vertical-align:middle;">
+                                        <img src="{{ rtrim(config('app.url'), '/') }}/logo.webp" alt="Marcelino's" width="120" style="display:block; height:auto;" />
+                                    </td>
+                                    <td style="vertical-align:middle; text-align:right; color:#111827;">
+                                        <div style="font-size:16px; font-weight:700;">Booking Confirmation</div>
+                                        <div style="font-size:12.5px; color:#6b7280;">Reference {{ $booking->reference_number }}</div>
+                                    </td>
+                                </tr>
+                            </table>
                         </td>
                     </tr>
 
@@ -34,12 +43,12 @@
                         <td style="padding:0 32px 16px;">
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #e5e7eb; border-radius:10px;">
                                 <tr>
-                                    <td style="padding:16px 18px; background-color:#f9fafb; border-bottom:1px solid #e5e7eb;">
+                                    <td style="padding:14px 18px; background-color:#f9fafb; border-bottom:1px solid #e5e7eb;">
                                         <strong style="font-size:14px; color:#111827;">Booking Details</strong>
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td style="padding:16px 18px;">
+                                    <td style="padding:14px 18px;">
                                         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:14px; color:#374151;">
                                             <tr>
                                                 <td style="padding:6px 0; width:38%; color:#6b7280;">Reference</td>
@@ -77,7 +86,7 @@
                     </tr>
 
                     <tr>
-                        <td style="background-color:#f3f4f6; padding:18px 32px; font-size:12.5px; color:#6b7280;">
+                        <td style="padding:18px 32px; font-size:12.5px; color:#6b7280; border-top:1px solid #e5e7eb;">
                             <div style="font-weight:600; color:#374151;">Marcelino’s Team</div>
                             <div>Thank you for choosing us.</div>
                         </td>
