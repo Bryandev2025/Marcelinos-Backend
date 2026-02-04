@@ -170,7 +170,8 @@ class BookingsTable
             ->headerActions([
                 ExportAction::make()
                     ->label('Export Bookings')
-                    ->exporter(BookingExporter::class),
+                    ->exporter(BookingExporter::class)
+                    // ->query(fn (Builder $query) => self::applyFilters($query, request()->all()))
             ])
             ->recordActions([
                 ViewAction::make(),
@@ -213,4 +214,28 @@ class BookingsTable
 
         return [$start, $end];
     }
+
+    public static function applyFilters(Builder $query, array $data): Builder
+    {
+        // Status filter
+        if (!empty($data['status'])) {
+            $query->where('status', $data['status']);
+        }
+
+        // Date range filter (reusing your resolveDateRange method)
+        [$start, $end] = self::resolveDateRange($data);
+
+        if ($start && $end && $end->lessThan($start)) {
+            [$start, $end] = [$end, $start];
+        }
+
+        $start = $start?->startOfDay();
+        $end = $end?->endOfDay();
+
+        return $query
+            ->when($start && $end, fn (Builder $q) => $q->where('check_in', '<', $end)->where('check_out', '>', $start))
+            ->when($start && ! $end, fn (Builder $q) => $q->where('check_out', '>', $start))
+            ->when($end && ! $start, fn (Builder $q) => $q->where('check_in', '<', $end));
+    }
+
 }
