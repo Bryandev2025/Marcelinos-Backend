@@ -92,7 +92,8 @@ return [
      * Here you can specify which path generator should be used for the given class.
      */
     'custom_path_generators' => [
-        // Model::class => PathGenerator::class
+        App\Models\Room::class => App\MediaLibrary\PathGenerators\ModelTypePathGenerator::class,
+        App\Models\Venue::class => App\MediaLibrary\PathGenerators\ModelTypePathGenerator::class,
         // or
         // 'model_morph_alias' => PathGenerator::class
     ],

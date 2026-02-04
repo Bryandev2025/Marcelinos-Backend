@@ -54,10 +54,14 @@ return [
             'region' => env('AWS_DEFAULT_REGION'),
             'bucket' => env('AWS_BUCKET'),
             'url' => env('AWS_URL'),
-            'visibility' => 'public',
             'endpoint' => env('AWS_ENDPOINT'),
             'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
-            'throw' => false,
+            'http' => [
+                'connect_timeout' => env('AWS_CONNECT_TIMEOUT', 5),
+                'timeout' => env('AWS_TIMEOUT', 10),
+                'verify' => env('AWS_HTTP_VERIFY', true),
+            ],
+            'throw' => true,
             'report' => false,
         ],
 
