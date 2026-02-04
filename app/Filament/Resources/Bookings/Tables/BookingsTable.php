@@ -11,6 +11,9 @@ use Filament\Actions\ViewAction;
 use Filament\Actions\ExportAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\ToggleButtons;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -43,7 +46,15 @@ class BookingsTable
                 TextColumn::make('guest.first_name')
                     ->label('Guest')
                     ->formatStateUsing(fn ($record) => $record->guest?->full_name ?? '—')
-                    ->searchable(['guest.first_name', 'guest.middle_name', 'guest.last_name', 'guest.email'])
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        return $query->whereHas('guest', function (Builder $guestQuery) use ($search): void {
+                            $guestQuery
+                                ->where('first_name', 'like', "%{$search}%")
+                                ->orWhere('middle_name', 'like', "%{$search}%")
+                                ->orWhere('last_name', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%");
+                        });
+                    })
                     ->sortable(),
 
                 TextColumn::make('rooms.name')
@@ -93,18 +104,7 @@ class BookingsTable
                 Filter::make('booking_dates')
                     ->label('Filter by Dates')
                     ->form([
-                        Select::make('mode')
-                            ->label('Date type')
-                            ->helperText('Choose which booking date to filter by.')
-                            ->options([
-                                'stay_overlap' => 'Stay dates (any overlap)',
-                                'check_in' => 'Arrival date (check-in)',
-                                'check_out' => 'Departure date (check-out)',
-                                'created_at' => 'Booking created date',
-                            ])
-                            ->default('stay_overlap')
-                            ->native(false),
-                        Select::make('preset')
+                        ToggleButtons::make('preset')
                             ->label('Quick dates')
                             ->options([
                                 'today' => 'Today',
@@ -113,16 +113,25 @@ class BookingsTable
                                 'this_month' => 'This month',
                                 'last_month' => 'Last month',
                                 'last_30' => 'Last 30 days',
+                                'last_year' => 'Last year',
+                                'last_2_years' => 'Last 2 years',
                                 'this_year' => 'This year',
                             ])
-                            ->placeholder('Choose dates below')
-                            ->native(false),
+                            ->inline()
+                            ->visible(fn (Get $get) => ! (bool) $get('use_custom')),
+                        Toggle::make('use_custom')
+                            ->label('Use custom dates')
+                            ->helperText('Turn this on to pick your own From/To dates.')
+                            ->default(false)
+                            ->live(),
                         DatePicker::make('start')
                             ->label('From')
-                            ->native(false),
+                            ->native(false)
+                            ->visible(fn (Get $get) => (bool) $get('use_custom')),
                         DatePicker::make('end')
                             ->label('To')
-                            ->native(false),
+                            ->native(false)
+                            ->visible(fn (Get $get) => (bool) $get('use_custom')),
                     ])
                     ->query(function (Builder $query, array $data): Builder {
                         [$start, $end] = self::resolveDateRange($data);
@@ -137,25 +146,12 @@ class BookingsTable
 
                         $start = $start?->startOfDay();
                         $end = $end?->endOfDay();
-                        $mode = $data['mode'] ?? 'stay_overlap';
-
-                        return match ($mode) {
-                            'check_in' => $query
-                                ->when($start, fn (Builder $q) => $q->where('check_in', '>=', $start))
-                                ->when($end, fn (Builder $q) => $q->where('check_in', '<=', $end)),
-                            'check_out' => $query
-                                ->when($start, fn (Builder $q) => $q->where('check_out', '>=', $start))
-                                ->when($end, fn (Builder $q) => $q->where('check_out', '<=', $end)),
-                            'created_at' => $query
-                                ->when($start, fn (Builder $q) => $q->where('created_at', '>=', $start))
-                                ->when($end, fn (Builder $q) => $q->where('created_at', '<=', $end)),
-                            default => $query
-                                ->when($start && $end, fn (Builder $q) => $q
-                                    ->where('check_in', '<', $end)
-                                    ->where('check_out', '>', $start))
-                                ->when($start && ! $end, fn (Builder $q) => $q->where('check_out', '>', $start))
-                                ->when($end && ! $start, fn (Builder $q) => $q->where('check_in', '<', $end)),
-                        };
+                        return $query
+                            ->when($start && $end, fn (Builder $q) => $q
+                                ->where('check_in', '<', $end)
+                                ->where('check_out', '>', $start))
+                            ->when($start && ! $end, fn (Builder $q) => $q->where('check_out', '>', $start))
+                            ->when($end && ! $start, fn (Builder $q) => $q->where('check_in', '<', $end));
                     })
                     ->indicateUsing(function (array $data): array {
                         [$start, $end] = self::resolveDateRange($data);
@@ -164,17 +160,10 @@ class BookingsTable
                             return [];
                         }
 
-                        $modeLabel = [
-                            'stay_overlap' => 'Stay dates overlap',
-                            'check_in' => 'Arrived during',
-                            'check_out' => 'Left during',
-                            'created_at' => 'Booked during',
-                        ][$data['mode'] ?? 'stay_overlap'] ?? 'Stay dates overlap';
-
                         $startText = $start?->toDateString() ?? 'Any';
                         $endText = $end?->toDateString() ?? 'Any';
 
-                        return ["{$modeLabel}: {$startText} → {$endText}"];
+                        return ["Dates: {$startText} → {$endText}"];
                     }),
             ])
             ->defaultSort('created_at', 'desc')
@@ -197,7 +186,8 @@ class BookingsTable
 
     private static function resolveDateRange(array $data): array
     {
-        $preset = $data['preset'] ?? null;
+        $useCustom = (bool) ($data['use_custom'] ?? false);
+        $preset = $useCustom ? null : ($data['preset'] ?? null);
 
         if ($preset) {
             return match ($preset) {
@@ -207,15 +197,17 @@ class BookingsTable
                 'this_month' => [now()->startOfMonth(), now()->endOfMonth()],
                 'last_month' => [now()->subMonthNoOverflow()->startOfMonth(), now()->subMonthNoOverflow()->endOfMonth()],
                 'last_30' => [now()->subDays(30)->startOfDay(), now()->endOfDay()],
+                'last_year' => [now()->subYear()->startOfYear(), now()->subYear()->endOfYear()],
+                'last_2_years' => [now()->subYears(2)->startOfYear(), now()->subYear()->endOfYear()],
                 'this_year' => [now()->startOfYear(), now()->endOfYear()],
                 default => [null, null],
             };
         }
 
-        $start = isset($data['start']) && $data['start']
+        $start = $useCustom && isset($data['start']) && $data['start']
             ? Carbon::parse($data['start'])
             : null;
-        $end = isset($data['end']) && $data['end']
+        $end = $useCustom && isset($data['end']) && $data['end']
             ? Carbon::parse($data['end'])
             : null;
 
