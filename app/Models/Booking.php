@@ -115,6 +115,7 @@ class Booking extends Model
     const STATUS_CONFIRMED  = 'confirmed';
     const STATUS_OCCUPIED   = 'occupied';
     const STATUS_COMPLETED  = 'completed';
+    const STATUS_PAID       = 'paid';
     const STATUS_CANCELLED  = 'cancelled';
     const STATUS_RESCHEDULE = 'reschedule';
 
@@ -124,6 +125,7 @@ class Booking extends Model
             self::STATUS_PENDING => 'Pending',
             self::STATUS_CONFIRMED => 'Confirmed',
             self::STATUS_OCCUPIED => 'Occupied',
+            self::STATUS_PAID => 'Paid',
             self::STATUS_COMPLETED => 'Completed',
             self::STATUS_CANCELLED => 'Cancelled',
         ];
@@ -136,6 +138,7 @@ class Booking extends Model
             'success' => self::STATUS_CONFIRMED,
             'warning' => self::STATUS_OCCUPIED,
             'secondary' => self::STATUS_COMPLETED,
+            'info' => self::STATUS_PAID,
             'danger' => self::STATUS_CANCELLED,
         ];
     }
