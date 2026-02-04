@@ -64,8 +64,8 @@ class RoomController extends Controller
                     'price' => $room->price,
                     'status' => $room->status,
                     'amenities' => $room->amenities,
-                    'featured_image' => $room->getFirstMediaUrl('featured'),
-                    'gallery' => $room->getMedia('gallery')->map(fn ($media) => $media->getUrl()),
+                    'featured_image' => $room->featured_image_url,
+                    'gallery' => $room->gallery_urls,
                 ];
             });
 
@@ -91,11 +91,21 @@ class RoomController extends Controller
     public function show($id)
     {
         try {
-            $room = Room::findOrFail($id);
+            $room = Room::with(['amenities', 'media'])->findOrFail($id);
 
             return response()->json([
                 'success' => true,
-                'data' => $room
+                'data' => [
+                    'id' => $room->id,
+                    'name' => $room->name,
+                    'capacity' => $room->capacity,
+                    'type' => $room->type,
+                    'price' => $room->price,
+                    'status' => $room->status,
+                    'amenities' => $room->amenities,
+                    'featured_image' => $room->featured_image_url,
+                    'gallery' => $room->gallery_urls,
+                ]
             ], 200);
 
         } catch (ModelNotFoundException $e) {
