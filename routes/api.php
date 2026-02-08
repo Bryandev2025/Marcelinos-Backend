@@ -3,12 +3,11 @@
 use App\Http\Controllers\API\BookingController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-// use Illuminate\App\Http\Controllers\VenueController;
-// use Illuminate\App\Http\Controllers\API\RoomController;
 use App\Http\Controllers\API\GuestController;
-
 use App\Http\Controllers\API\RoomController;
 use App\Http\Controllers\API\VenueController;
+use App\Http\Controllers\API\BlockedDateController;
+
 
 
 
@@ -37,3 +36,6 @@ Route::get('/rooms/{id}', [RoomController::class, 'show']);
 //Venue
 Route::get('/venues', [VenueController::class, 'index']);
 Route::get('/venues/{id}', [VenueController::class, 'show']);
+
+//Blocked Dates
+Route::get('/blocked-dates', [BlockedDateController::class, 'index']);
