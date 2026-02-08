@@ -20,6 +20,8 @@ class ReviewResource extends Resource
     protected static ?string $model = Review::class;
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-star';
+    protected static string|\UnitEnum|null $navigationGroup = 'Operations';
+    protected static ?string $navigationLabel = 'Reviews';
 
     protected static ?string $recordTitleAttribute = 'title';
 

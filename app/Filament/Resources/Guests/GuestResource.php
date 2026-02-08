@@ -20,6 +20,8 @@ class GuestResource extends Resource
     protected static ?string $model = Guest::class;
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-users';
+    protected static string|\UnitEnum|null $navigationGroup = 'People';
+    protected static ?string $navigationLabel = 'Guests';
 
     protected static ?string $recordTitleAttribute = 'full_name';
 
