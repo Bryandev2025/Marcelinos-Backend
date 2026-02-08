@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Room;
+use App\Models\Venue;
 use App\Models\Guest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -178,6 +179,47 @@ class BookingController extends Controller
             return response()->json([
                 'message' => 'One or more selected rooms do not exist',
             ], 422);
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Prevent booking conflict: no double-booking within date range
+        |--------------------------------------------------------------------------
+        */
+        $availableRoomIds = Room::whereIn('id', $roomIds)
+            ->availableBetween($checkIn, $checkOut)
+            ->pluck('id')
+            ->all();
+        $conflictingRoomIds = array_values(array_diff($roomIds, $availableRoomIds));
+
+        if (!empty($conflictingRoomIds)) {
+            $conflictingRooms = Room::whereIn('id', $conflictingRoomIds)->get(['id', 'name']);
+            return response()->json([
+                'message' => 'Booking conflict: one or more rooms are already booked for the selected dates.',
+                'error'   => 'date_range_conflict',
+                'conflicts' => [
+                    'rooms' => $conflictingRooms->map(fn ($r) => ['id' => $r->id, 'name' => $r->name])->values()->all(),
+                ],
+            ], 422);
+        }
+
+        if (!empty($venueIds)) {
+            $availableVenueIds = Venue::whereIn('id', $venueIds)
+                ->availableBetween($checkIn, $checkOut)
+                ->pluck('id')
+                ->all();
+            $conflictingVenueIds = array_values(array_diff($venueIds, $availableVenueIds));
+
+            if (!empty($conflictingVenueIds)) {
+                $conflictingVenues = Venue::whereIn('id', $conflictingVenueIds)->get(['id', 'name']);
+                return response()->json([
+                    'message' => 'Booking conflict: one or more venues are already booked for the selected dates.',
+                    'error'   => 'date_range_conflict',
+                    'conflicts' => [
+                        'venues' => $conflictingVenues->map(fn ($v) => ['id' => $v->id, 'name' => $v->name])->values()->all(),
+                    ],
+                ], 422);
+            }
         }
 
         // Single booking row; attach multiple rooms and venues

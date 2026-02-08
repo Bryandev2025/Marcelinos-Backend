@@ -17,10 +17,13 @@ class BookingObserver
     {
         $recipient = auth()->user();
 
-        Notification::make()
-        ->title('Saved successfully')
-        ->sendToDatabase($recipient);
+        if ($recipient === null) {
+            return;
+        }
 
+        Notification::make()
+            ->title('Saved successfully')
+            ->sendToDatabase($recipient);
     }
 
     /**
