@@ -1,12 +1,13 @@
 <?php
 
 use App\Http\Controllers\API\BookingController;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\API\ReviewController;
 use App\Http\Controllers\API\GuestController;
 use App\Http\Controllers\API\RoomController;
 use App\Http\Controllers\API\VenueController;
 use App\Http\Controllers\API\BlockedDateController;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
 
 
 
@@ -22,6 +23,7 @@ Route::put('bookings/{id}', [BookingController::class, 'update']);
 Route::delete('bookings/{id}', [BookingController::class, 'destroy']);
 Route::patch('bookings/{booking}/cancel', [BookingController::class, 'cancel']);
 Route::get('bookings/reference/{reference}', [BookingController::class, 'showByReferenceNumber']);
+Route::post('bookings/reference/{reference}/review', [ReviewController::class, 'storeByBookingReference']);
 
 Route::apiResource('/bookings/store', BookingController::class);
 
