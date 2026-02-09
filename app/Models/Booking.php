@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\BookingCreated;
 
-#[ObservedBy([BookingObserver::class])]
+
 class Booking extends Model
 {
     use HasFactory;
