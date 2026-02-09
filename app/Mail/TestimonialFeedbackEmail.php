@@ -25,7 +25,7 @@ class TestimonialFeedbackEmail extends Mailable
         $this->feedbackUrl = URL::temporarySignedRoute(
             'testimonial.feedback.redirect',
             now()->addDays(14),
-            ['booking' => $booking->id]
+            ['reference' => $booking->reference_number]
         );
     }
 
