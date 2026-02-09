@@ -14,8 +14,7 @@ class LatestBookings extends TableWidget
     
     protected static ?string $heading = 'Latest Bookings';
 
-    // Make this widget half-width (right side)
-    protected int | string | array $columnSpan = 1;
+    protected int | string | array $columnSpan = 'full';
 
     // Corrected method signature
     protected function getTableQuery(): Builder|Relation|null

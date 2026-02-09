@@ -13,7 +13,7 @@ class BlockedDateController extends Controller
      */
     public function index()
     {
-        $blockedDates = BlockedDate::pluck('date'); // returns array of dates
+        $blockedDates = BlockedDate::select('date', 'reason')->get(); 
 
         return response()->json([
             'blocked_dates' => $blockedDates
