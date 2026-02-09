@@ -9,7 +9,13 @@ use Filament\Auth\Http\Responses\Contracts\LogoutResponse as LogoutResponseContr
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use App\Models\Booking;
+use App\Models\BlockedDate;
+use App\Models\Room;
+use App\Models\Venue;
+use App\Observers\BlockedDateObserver;
 use App\Observers\BookingObserver;
+use App\Observers\RoomObserver;
+use App\Observers\VenueObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -44,5 +50,8 @@ class AppServiceProvider extends ServiceProvider
     {
         Schema::defaultStringLength(191);
         Booking::observe(BookingObserver::class);
+        Room::observe(RoomObserver::class);
+        Venue::observe(VenueObserver::class);
+        BlockedDate::observe(BlockedDateObserver::class);
     }
 }
