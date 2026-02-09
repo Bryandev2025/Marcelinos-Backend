@@ -136,6 +136,21 @@ class Booking extends Model
     const STATUS_CANCELLED  = 'cancelled';
     const STATUS_RESCHEDULE = 'reschedule';
 
+    /**
+     * Statuses that block room/venue availability (booking is active or in progress).
+     * Completed and cancelled do not block.
+     */
+    public static function statusesThatBlockAvailability(): array
+    {
+        return [
+            self::STATUS_PENDING,
+            self::STATUS_CONFIRMED,
+            self::STATUS_OCCUPIED,
+            self::STATUS_PAID,
+            self::STATUS_RESCHEDULE,
+        ];
+    }
+
     public static function statusOptions(): array
     {
         return [

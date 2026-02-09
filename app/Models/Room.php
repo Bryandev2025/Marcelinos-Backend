@@ -103,13 +103,14 @@ class Room extends Model implements HasMedia
     }
 
     /**
-     * Scope: only rooms not booked (by a non-cancelled booking) in the given date range.
+     * Scope: only rooms not booked by an active booking in the given date range.
+     * Completed and cancelled bookings do not block availability.
      * Overlap: booking.check_in < $checkOut AND booking.check_out > $checkIn
      */
     public function scopeAvailableBetween($query, $checkIn, $checkOut)
     {
         return $query->whereDoesntHave('bookings', function ($q) use ($checkIn, $checkOut) {
-            $q->where('bookings.status', '!=', Booking::STATUS_CANCELLED)
+            $q->whereIn('bookings.status', Booking::statusesThatBlockAvailability())
                 ->where('bookings.check_in', '<', $checkOut)
                 ->where('bookings.check_out', '>', $checkIn);
         });
