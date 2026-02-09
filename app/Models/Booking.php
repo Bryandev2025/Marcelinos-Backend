@@ -26,6 +26,7 @@ class Booking extends Model
         'total_price',
         'status',
         'no_of_days',
+        'testimonial_feedback_sent_at',
     ];
 
     protected $casts = [
@@ -33,6 +34,7 @@ class Booking extends Model
         'check_out'   => 'datetime',
         'total_price' => 'decimal:2',
         'no_of_days'  => 'integer',
+        'testimonial_feedback_sent_at' => 'datetime',
     ];
 
     protected static function booted()

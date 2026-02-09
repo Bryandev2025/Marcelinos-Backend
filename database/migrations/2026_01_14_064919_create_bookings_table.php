@@ -21,7 +21,7 @@ return new class extends Migration
              $table->string('qr_code')->nullable();
             $table->decimal('total_price', 10, 2);
             $table->string('reference_number')->unique();
-            $table->enum('status', ['pending','confirmed','occupied', 'complete', 'checked_in','checked_out','paid','cancelled'])->default('pending');
+            $table->enum('status', ['pending','confirmed','occupied', 'completed', 'checked_in','checked_out','paid','cancelled'])->default('pending');
             $table->timestamps();
         });
 
