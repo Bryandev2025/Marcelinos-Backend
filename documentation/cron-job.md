@@ -2,101 +2,168 @@
 
 This document describes the scheduled tasks configured in `routes/console.php` using **Laravel Scheduler**.
 
-These scheduled tasks automatically update booking statuses based on the **current date** and **booking state**, following business rules.
+These tasks automatically update booking statuses based on the **current date** and **booking state**. They use **Artisan commands** and the **Booking model**, so model events run (e.g. room status is set to `occupied` or `available`).
 
-Laravel documentation reference:  
-https://laravel.com/docs/11.x/scheduling#scheduling-artisan-commands
+**Laravel reference:** [Task Scheduling](https://laravel.com/docs/11.x/scheduling#scheduling-artisan-commands)
+
+---
+
+## Timezone
+
+All scheduled times use **Asia/Manila (UTC+8)**.
+
+- Application default: `config('app.timezone')` is `Asia/Manila` (overridable via `APP_TIMEZONE` in `.env`).
+- Each scheduled task is explicitly set to `->timezone('Asia/Manila')`.
 
 ---
 
 ## Overview
 
-The application uses **Laravel's task scheduling** feature to automate booking status updates.  
-A single system cron job triggers Laravel’s scheduler, which then runs the defined tasks at specific times.
+The application uses **Laravel's task scheduling**. A single system cron job runs every minute and triggers `php artisan schedule:run`; Laravel then runs the defined tasks at the correct times.
 
-All scheduled tasks are defined in:
+**Definition:** `routes/console.php`
 
-routes/console.php
+**Commands:** `app/Console/Commands/`
 
+- `CompleteCheckoutBookings.php` → `bookings:complete-checkouts`
+- `ActivateCheckinBookings.php` → `bookings:activate-checkins`
+- `CancelPendingBookings.php` → `bookings:cancel-pending`
 
 ---
 
 ## Scheduled Tasks
 
-### 1️⃣ Complete Checked-Out Bookings (10:00 AM)
+### 1. Complete checked-out bookings
 
-**Schedule:**  
-- Runs daily at **10:00 AM**
+| Item    | Value                    |
+|--------|---------------------------|
+| Command| `bookings:complete-checkouts` |
+| Schedule | Daily at **10:00** (Asia/Manila) |
 
-**Logic:**  
-- Checks the current date
-- Finds bookings where:
-  - `check_out = today`
-  - `status = occupied`
-- Updates status to:
-  - `complete`
+**Logic:**
 
-**Purpose:**  
-Automatically marks bookings as completed after guests have checked out.
+- Date used: today (Asia/Manila), or `--date=Y-m-d` when run manually.
+- Selects bookings where:
+  - `check_out` date = that date  
+  - `status` = `occupied`
+- Sets `status` to `complete`.
 
----
-
-### 2️⃣ Occupy Checked-In Bookings (12:00 PM)
-
-**Schedule:**  
-- Runs daily at **12:00 PM**
-
-**Logic:**  
-- Checks the current date
-- Finds bookings where:
-  - `check_in = today`
-  - `status = paid`
-- Updates status to:
-  - `occupied`
-
-**Purpose:**  
-Automatically updates paid bookings to occupied on the check-in date.
+**Purpose:** Mark stays as completed after check-out and free the related rooms (via the Booking model’s `saved` event).
 
 ---
 
-### 3️⃣ Cancel Pending Bookings (12:00 PM)
+### 2. Activate check-in bookings (paid → occupied)
 
-**Schedule:**  
-- Runs daily at **12:00 PM**
+| Item    | Value                    |
+|--------|---------------------------|
+| Command| `bookings:activate-checkins` |
+| Schedule | Daily at **12:00** (Asia/Manila) |
 
-**Logic:**  
-- Checks the current date
-- Finds bookings where:
-  - `check_in = today`
-  - `status = pending`
-- Updates status to:
-  - `cancelled`
+**Logic:**
 
-**Purpose:**  
-Automatically cancels bookings that were not confirmed (paid) by the check-in date.
+- Date used: today (Asia/Manila), or `--date=Y-m-d` when run manually.
+- Selects bookings where:
+  - `check_in` date = that date  
+  - `status` = `paid`
+- Sets `status` to `occupied`.
+
+**Purpose:** Mark paid bookings as occupied on check-in day and set related rooms to `occupied`.
 
 ---
 
-## Scheduler Configuration
+### 3. Cancel pending bookings (no-show)
 
-Laravel’s scheduler requires **one cron entry** on the server.
+| Item    | Value                    |
+|--------|---------------------------|
+| Command| `bookings:cancel-pending` |
+| Schedule | Daily at **12:00** (Asia/Manila) |
 
-### System Cron Job (Production)
+**Logic:**
 
-Add the following to the server’s crontab:
+- Date used: today (Asia/Manila), or `--date=Y-m-d` when run manually.
+- Selects bookings where:
+  - `check_in` date = that date  
+  - `status` = `pending`
+- Sets `status` to `cancelled`.
+
+**Purpose:** Cancel bookings that were not paid by check-in date.
+
+---
+
+## Server setup (cron)
+
+Only **one** cron entry is needed. Laravel runs all scheduled tasks from it.
+
+### Crontab (Linux / production)
 
 ```bash
 * * * * * cd /path/to/your/project && php artisan schedule:run >> /dev/null 2>&1
+```
 
-⚠️ Only one cron job is required, regardless of the number of scheduled tasks.
+Replace `/path/to/your/project` with the application root (e.g. `/var/www/be-marcelinos`).
 
+### Windows (Task Scheduler)
 
-Testing the Scheduler
-View Registered Scheduled Tasks
-php artisan schedule:list
+Run every minute:
 
-Run Scheduled Tasks Manually
+```text
 php artisan schedule:run
+```
 
-These commands are useful for local development and debugging.
+Use the full path to `php.exe` and set the working directory to the project root.
 
+---
+
+## Testing and debugging
+
+### List scheduled tasks
+
+```bash
+php artisan schedule:list
+```
+
+Shows each task and its next run time (in Asia/Manila).
+
+### Run the scheduler once (all due tasks)
+
+```bash
+php artisan schedule:run
+```
+
+### Run a single command (manual)
+
+Useful for testing or backfills.
+
+```bash
+# Use “today” (Asia/Manila)
+php artisan bookings:complete-checkouts
+php artisan bookings:activate-checkins
+php artisan bookings:cancel-pending
+
+# Use a specific date (Y-m-d)
+php artisan bookings:complete-checkouts --date=2025-02-09
+php artisan bookings:activate-checkins --date=2025-02-09
+php artisan bookings:cancel-pending --date=2025-02-09
+```
+
+### List booking-related commands
+
+```bash
+php artisan list bookings
+```
+
+---
+
+## Optional: timezone in .env
+
+Default is **Asia/Manila**. To make it explicit or override per environment, add to `.env`:
+
+```env
+APP_TIMEZONE=Asia/Manila
+```
+
+Example override (e.g. for tests):
+
+```env
+APP_TIMEZONE=UTC
+```
