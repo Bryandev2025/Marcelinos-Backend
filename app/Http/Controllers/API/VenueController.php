@@ -4,13 +4,16 @@ namespace App\Http\Controllers\API;
 
 use App\Models\Venue;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\API\Concerns\CachesApiResponses;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Carbon;
 use Exception;
 
 class VenueController extends Controller
 {
+    use CachesApiResponses;
     /**
      * List venues.
      * - is_all=true: return all venues.
@@ -67,10 +70,12 @@ class VenueController extends Controller
                 ];
             });
 
-            return response()->json([
-                'success' => true,
-                'data' => $formattedVenues,
-            ], 200);
+            $payload = ['success' => true, 'data' => $formattedVenues];
+            $isAll = filter_var($request->query('is_all', false), FILTER_VALIDATE_BOOLEAN);
+            $cacheKey = $isAll ? 'api.venues.list.all' : null;
+            $ttl = $isAll ? 300 : 0;
+
+            return $this->rememberJson($cacheKey, fn () => response()->json($payload, 200), $ttl);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'success' => false,
@@ -87,44 +92,34 @@ class VenueController extends Controller
     }
 
     /**
-     * Display the specified resource.
-     *
-     * @param int $id
-     * @return \Illuminate\Http\JsonResponse
-     * @throws \Exception
-     * @throws \Illuminate\Database\Eloquent\ModelNotFoundException
-    */
-    public function show($id)
+     * Display the specified resource (cached for performance).
+     */
+    public function show($id): JsonResponse
     {
-        try {
-            $venue = Venue::with(['amenities', 'media'])->findOrFail($id);
-
-            $data = [
-                'id' => $venue->id,
-                'name' => $venue->name,
-                'description' => $venue->description,
-                'capacity' => $venue->capacity,
-                'price' => $venue->price,
-                'amenities' => $venue->amenities,
-                'featured_image' => $venue->featured_image_url,
-                'gallery' => $venue->gallery_urls,
-            ];
-
-            return response()->json([
-                'success' => true,
-                'data' => $data
-            ], 200);
-        } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Venue not found'
-            ], 404);
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch the venue',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        $cacheKey = "api.venues.show.{$id}";
+        return $this->rememberJson($cacheKey, function () use ($id) {
+            try {
+                $venue = Venue::with(['amenities', 'media'])->findOrFail($id);
+                $data = [
+                    'id' => $venue->id,
+                    'name' => $venue->name,
+                    'description' => $venue->description,
+                    'capacity' => $venue->capacity,
+                    'price' => $venue->price,
+                    'amenities' => $venue->amenities,
+                    'featured_image' => $venue->featured_image_url,
+                    'gallery' => $venue->gallery_urls,
+                ];
+                return response()->json(['success' => true, 'data' => $data], 200);
+            } catch (ModelNotFoundException $e) {
+                return response()->json(['success' => false, 'message' => 'Venue not found'], 404);
+            } catch (Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to fetch the venue',
+                    'error' => $e->getMessage(),
+                ], 500);
+            }
+        });
     }
 }

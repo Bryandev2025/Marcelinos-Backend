@@ -4,13 +4,16 @@ namespace App\Http\Controllers\API;
 
 use App\Models\Room;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\API\Concerns\CachesApiResponses;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Carbon;
 use Exception;
 
 class RoomController extends Controller
 {
+    use CachesApiResponses;
     /**
      * List rooms.
      * - is_all=true: return all rooms.
@@ -69,10 +72,12 @@ class RoomController extends Controller
                 ];
             });
 
-            return response()->json([
-                'success' => true,
-                'data' => $formattedRooms,
-            ], 200);
+            $payload = ['success' => true, 'data' => $formattedRooms];
+            $isAll = filter_var($request->query('is_all', false), FILTER_VALIDATE_BOOLEAN);
+            $cacheKey = $isAll ? 'api.rooms.list.all' : null;
+            $ttl = $isAll ? 300 : 0;
+
+            return $this->rememberJson($cacheKey, fn () => response()->json($payload, 200), $ttl);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'success' => false,
@@ -88,38 +93,38 @@ class RoomController extends Controller
         }
     }
 
-    public function show($id)
+    public function show($id): JsonResponse
     {
-        try {
-            $room = Room::with(['amenities', 'media'])->findOrFail($id);
-
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'id' => $room->id,
-                    'name' => $room->name,
-                    'capacity' => $room->capacity,
-                    'type' => $room->type,
-                    'price' => $room->price,
-                    'status' => $room->status,
-                    'amenities' => $room->amenities,
-                    'featured_image' => $room->featured_image_url,
-                    'gallery' => $room->gallery_urls,
-                ]
-            ], 200);
-
-        } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Room not found'
-            ], 404);
-
-        } catch (Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch the room',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        $cacheKey = "api.rooms.show.{$id}";
+        return $this->rememberJson($cacheKey, function () use ($id) {
+            try {
+                $room = Room::with(['amenities', 'media'])->findOrFail($id);
+                return response()->json([
+                    'success' => true,
+                    'data' => [
+                        'id' => $room->id,
+                        'name' => $room->name,
+                        'capacity' => $room->capacity,
+                        'type' => $room->type,
+                        'price' => $room->price,
+                        'status' => $room->status,
+                        'amenities' => $room->amenities,
+                        'featured_image' => $room->featured_image_url,
+                        'gallery' => $room->gallery_urls,
+                    ],
+                ], 200);
+            } catch (ModelNotFoundException $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Room not found',
+                ], 404);
+            } catch (Exception $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to fetch the room',
+                    'error' => $e->getMessage(),
+                ], 500);
+            }
+        });
     }
 }
