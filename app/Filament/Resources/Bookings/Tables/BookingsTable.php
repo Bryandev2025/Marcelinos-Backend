@@ -179,70 +179,121 @@ class BookingsTable
                         ExportFormat::Xlsx,
                         ExportFormat::Csv,
                     ])
-                    ->fileName(function ($livewire, $format) {
-                        $filters = $livewire->tableFilters ?? [];
-                        $date = $filters['booking_dates'] ?? [];
-                        [$start, $end] = BookingsTable::resolveDateRange($date);
-                        $status = strtoupper($filters['status']['value'] ?? 'ALL');
+->fileName(function ($livewire, $format) {
+    $filters = $livewire->tableFilters ?? [];
 
-                        $extension = $format === ExportFormat::Csv ? 'csv' : 'xlsx';
-                        $period = '';
+    $date = $filters['booking_dates'] ?? [];
+    [$start, $end] = BookingsTable::resolveDateRange($date);
 
-                        if (!empty($date['preset'])) {
-                            switch ($date['preset']) {
-                                case 'today':
-                                    $period = now()->format('F d Y') . ' DAILY BOOKING REPORT';
-                                    break;
+    $useCustom = (bool) ($date['use_custom'] ?? false);
 
-                                case 'this_month':
-                                    $period = now()->format('F') . " ALL BOOKINGS " . now()->year . " REPORT";
-                                    break;
+    // ✅ Get selected status
+    $status = strtoupper($filters['status']['value'] ?? 'ALL');
 
-                                case 'next_7':
-                                    $period = 'NEXT 7 DAYS ' . $start->format('F d Y') . ' TO ' . $end->format('F d Y') . ' BOOKINGS REPORT';
-                                    break;
+    $extension = $format === ExportFormat::Csv ? 'csv' : 'xlsx';
+    $period = '';
 
-                                case 'next_30':
-                                    $period = 'NEXT 30 DAYS ' . $start->format('F d Y') . ' TO ' . $end->format('F d Y') . ' BOOKINGS REPORT';
-                                    break;
+    /**
+     * ✅ CUSTOM DATE (with STATUS)
+     */
+    if ($useCustom && ($start || $end)) {
+        if ($start && $end) {
+            $period =
+                $start->format('F d Y')
+                . ' TO '
+                . $end->format('F d Y')
+                . ' BOOKINGS REPORT '
+                . $status;
+        } elseif ($start) {
+            $period =
+                'FROM '
+                . $start->format('F d Y')
+                . ' BOOKINGS REPORT '
+                . $status;
+        } elseif ($end) {
+            $period =
+                'UP TO '
+                . $end->format('F d Y')
+                . ' BOOKINGS REPORT '
+                . $status;
+        }
 
-                                case 'last_30':
-                                    $period = 'LAST 30 DAYS ' . $start->format('F d Y') . ' TO ' . $end->format('F d Y') . ' BOOKINGS REPORT';
-                                    break;
+    /**
+     * ✅ PRESETS (unchanged, NO status added)
+     */
+    } elseif (!empty($date['preset'])) {
+        switch ($date['preset']) {
+            case 'today':
+                $period = now()->format('F d Y') . ' DAILY BOOKING REPORT';
+                break;
 
-                                case 'last_year':
-                                    $period = now()->subYear()->year . ' ALL BOOKINGS REPORT';
-                                    break;
+            case 'this_month':
+                $period = now()->format('F') . ' ALL BOOKINGS ' . now()->year . ' REPORT';
+                break;
 
-                                case 'last_2_years':
-                                    $period = (now()->subYears(2)->year) . '-' . (now()->subYear()->year) . ' ALL BOOKINGS REPORT';
-                                    break;
+            case 'next_7':
+                $period = 'NEXT 7 DAYS '
+                    . $start->format('F d Y')
+                    . ' TO '
+                    . $end->format('F d Y')
+                    . ' BOOKINGS REPORT';
+                break;
 
-                                case 'this_year':
-                                    $period = now()->year . ' ALL BOOKINGS REPORT';
-                                    break;
+            case 'next_30':
+                $period = 'NEXT 30 DAYS '
+                    . $start->format('F d Y')
+                    . ' TO '
+                    . $end->format('F d Y')
+                    . ' BOOKINGS REPORT';
+                break;
 
-                                default:
-                                    $period = 'ALL BOOKINGS';
-                            }
-                        } elseif ($start || $end) {
-                            // Custom date range
-                            if ($start && $end) {
-                                $period = $start->format('F d Y') . ' TO ' . $end->format('F d Y') . ' BOOKINGS REPORT';
-                            } elseif ($start) {
-                                $period = 'FROM ' . $start->format('F d Y') . ' BOOKINGS REPORT';
-                            } elseif ($end) {
-                                $period = 'UP TO ' . $end->format('F d Y') . ' BOOKINGS REPORT';
-                            }
-                        } else {
-                            // No filter at all: All bookings
-                            $earliest = Booking::orderBy('check_in', 'asc')->first()?->check_in ?? now();
-                            $latest = Booking::orderBy('check_out', 'desc')->first()?->check_out ?? now();
-                            $period = 'ALL BOOKINGS ' . Carbon::parse($earliest)->format('F d Y') . ' TO ' . Carbon::parse($latest)->format('F d Y') . ' REPORT';
-                        }
+            case 'last_30':
+                $period = 'LAST 30 DAYS '
+                    . $start->format('F d Y')
+                    . ' TO '
+                    . $end->format('F d Y')
+                    . ' BOOKINGS REPORT';
+                break;
 
-                        return $period . '.' . $extension;
-                    }),
+            case 'last_year':
+                $period = now()->subYear()->year . ' ALL BOOKINGS REPORT';
+                break;
+
+            case 'last_2_years':
+                $period =
+                    now()->subYears(2)->year
+                    . '-'
+                    . now()->subYear()->year
+                    . ' ALL BOOKINGS REPORT';
+                break;
+
+            case 'this_year':
+                $period = now()->year . ' ALL BOOKINGS REPORT';
+                break;
+
+            default:
+                $period = 'ALL BOOKINGS';
+        }
+
+    /**
+     * ✅ NO FILTER AT ALL
+     */
+    } else {
+        $earliest = Booking::orderBy('check_in', 'asc')->first()?->check_in ?? now();
+        $latest = Booking::orderBy('check_out', 'desc')->first()?->check_out ?? now();
+
+        $period =
+            'ALL BOOKINGS '
+            . Carbon::parse($earliest)->format('F d Y')
+            . ' TO '
+            . Carbon::parse($latest)->format('F d Y')
+            . ' REPORT';
+    }
+
+    return $period . '.' . $extension;
+}),
+
+
             ])
             ->recordActions([
                 ViewAction::make(),
