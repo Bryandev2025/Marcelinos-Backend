@@ -2,8 +2,6 @@
 
 namespace App\Models;
 
-use App\Observers\BookingObserver;
-use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
@@ -11,7 +9,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\BookingCreated;
-
 
 class Booking extends Model
 {
