@@ -9,6 +9,7 @@ use App\Filament\Resources\BlockedDates\Schemas\BlockedDateForm;
 use App\Filament\Resources\BlockedDates\Tables\BlockedDatesTable;
 use App\Models\BlockedDate;
 use BackedEnum;
+use UnitEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -20,7 +21,9 @@ class BlockedDateResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static ?string $recordTitleAttribute = 'recordTitleAttribute';
+    protected static UnitEnum|string|null $navigationGroup = 'Operations';
+
+    protected static ?string $recordTitleAttribute = 'date';
 
     public static function form(Schema $schema): Schema
     {
@@ -34,9 +37,7 @@ class BlockedDateResource extends Resource
 
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
     public static function getPages(): array
