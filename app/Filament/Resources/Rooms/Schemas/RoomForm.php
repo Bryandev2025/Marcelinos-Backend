@@ -20,10 +20,7 @@ class RoomForm
                     ->options(Room::typeOptions())
                     ->required(),
                 TextInput::make('price')->required()->numeric()->prefix('₱'),
-                Select::make('status')
-                    ->options(Room::statusOptions())
-                    ->default(Room::STATUS_AVAILABLE)
-                    ->required(),
+                // Removed status field - availability determined by bookings, maintenance can be handled via bookings or separate logic
                 SpatieMediaLibraryFileUpload::make('featured_image')
                     ->collection('featured')
                     ->label('Featured Image')

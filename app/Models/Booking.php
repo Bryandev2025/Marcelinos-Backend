@@ -79,26 +79,26 @@ class Booking extends Model
         });
 
         /**
-         * Existing room status logic (UNCHANGED)
+         * Existing room status logic (REMOVED - redundant)
          */
-        static::saved(function (Booking $booking) {
-            $rooms = $booking->rooms;
+        // static::saved(function (Booking $booking) {
+        //     $rooms = $booking->rooms;
 
-            if ($rooms->isEmpty()) {
-                return;
-            }
+        //     if ($rooms->isEmpty()) {
+        //         return;
+        //     }
 
-            if ($booking->status === self::STATUS_OCCUPIED) {
-                $rooms->each->update(['status' => 'occupied']);
-            }
+        //     if ($booking->status === self::STATUS_OCCUPIED) {
+        //         $rooms->each->update(['status' => 'occupied']);
+        //     }
 
-            if (in_array($booking->status, [
-                self::STATUS_COMPLETED,
-                self::STATUS_CANCELLED
-            ])) {
-                $rooms->each->update(['status' => 'available']);
-            }
-        });
+        //     if (in_array($booking->status, [
+        //         self::STATUS_COMPLETED,
+        //         self::STATUS_CANCELLED
+        //     ])) {
+        //         $rooms->each->update(['status' => 'available']);
+        //     }
+        // });
     }
 
     /* ================= RELATIONSHIPS ================= */

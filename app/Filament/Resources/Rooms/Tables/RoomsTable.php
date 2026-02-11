@@ -42,10 +42,7 @@ class RoomsTable
                     ->money('PHP', true)
                     ->sortable(),
 
-                TextColumn::make('status')
-                    ->badge()
-                    ->colors(Room::statusColors()),
-
+                // Removed status column - availability determined by bookings
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

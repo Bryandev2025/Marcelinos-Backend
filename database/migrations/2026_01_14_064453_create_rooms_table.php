@@ -17,7 +17,7 @@ return new class extends Migration
             $table->integer('capacity');
             $table->enum('type', ['standard','family','deluxe']);
             $table->decimal('price', 10, 2);
-            $table->enum('status', ['available','occupied','cleaning','maintenance'])->default('available');
+            $table->enum('status', ['available','maintenance'])->default('available');
             $table->timestamps();
         });
     }

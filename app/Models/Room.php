@@ -17,7 +17,7 @@ class Room extends Model implements HasMedia
         'gallery_urls',
     ];
 
-    protected $fillable = ['name', 'capacity', 'type', 'price', 'status'];
+    protected $fillable = ['name', 'capacity', 'type', 'price'];
 
     /* ================= TYPES ================= */
     const TYPE_STANDARD = 'standard';
@@ -30,32 +30,6 @@ class Room extends Model implements HasMedia
             self::TYPE_STANDARD => 'Standard',
             self::TYPE_FAMILY => 'Family',
             self::TYPE_DELUXE => 'Deluxe',
-        ];
-    }
-
-    /* ================= STATUSES ================= */
-    const STATUS_AVAILABLE = 'available';
-    const STATUS_OCCUPIED = 'occupied';
-    const STATUS_CLEANING = 'cleaning';
-    const STATUS_MAINTENANCE = 'maintenance';
-
-    public static function statusOptions(): array
-    {
-        return [
-            self::STATUS_AVAILABLE => 'Available',
-            self::STATUS_OCCUPIED => 'Occupied',
-            self::STATUS_CLEANING => 'Cleaning',
-            self::STATUS_MAINTENANCE => 'Maintenance',
-        ];
-    }
-
-    public static function statusColors(): array
-    {
-        return [
-            'success' => self::STATUS_AVAILABLE,
-            'danger' => self::STATUS_OCCUPIED,
-            'warning' => self::STATUS_CLEANING,
-            'secondary' => self::STATUS_MAINTENANCE,
         ];
     }
 

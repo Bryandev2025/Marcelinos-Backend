@@ -65,7 +65,7 @@ class RoomController extends Controller
                     'capacity' => $room->capacity,
                     'type' => $room->type,
                     'price' => $room->price,
-                    'status' => $room->status,
+                    // Removed status - availability determined by bookings
                     'amenities' => $room->amenities,
                     'featured_image' => $room->featured_image_url,
                     'gallery' => $room->gallery_urls,
@@ -107,7 +107,7 @@ class RoomController extends Controller
                         'capacity' => $room->capacity,
                         'type' => $room->type,
                         'price' => $room->price,
-                        'status' => $room->status,
+                        // Removed status - availability determined by bookings
                         'amenities' => $room->amenities,
                         'featured_image' => $room->featured_image_url,
                         'gallery' => $room->gallery_urls,

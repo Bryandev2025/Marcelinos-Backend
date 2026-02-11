@@ -14,7 +14,6 @@ Manage guest bookings across rooms and venues, including availability checks, pr
 - Automatic behavior:
 	- Generates `reference_number` on create.
 	- Generates QR code after create and stores it on `public` disk.
-	- Updates room status on booking status transitions.
 
 ## Migrations
 - Bookings table creation.
