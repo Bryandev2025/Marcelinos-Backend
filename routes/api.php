@@ -3,6 +3,7 @@
 use App\Http\Controllers\API\BookingController;
 use App\Http\Controllers\API\BlockedDateController;
 use App\Http\Controllers\API\ContactController;
+use App\Http\Controllers\API\GalleryController;
 use App\Http\Controllers\API\ReviewController;
 use App\Http\Controllers\API\GuestController;
 use App\Http\Controllers\API\RoomController;
@@ -45,3 +46,7 @@ Route::get('/blocked-dates', [BlockedDateController::class, 'index']);
 
 // Contact form (public)
 Route::post('/contact', [ContactController::class, 'store']);
+
+// Gallery
+Route::get('/galleries', [GalleryController::class, 'index']);
+Route::get('/galleries/{id}', [GalleryController::class, 'show']);
