@@ -11,9 +11,6 @@ class BlockedDateController extends Controller
 {
     use CachesApiResponses;
 
-    /** Cache TTL for blocked dates list (10 min). */
-    protected static int $defaultCacheTtl = 600;
-
     /**
      * Return all blocked dates as JSON (cached for performance).
      */

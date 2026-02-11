@@ -3,14 +3,18 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Models\ContactUs;
+use App\Models\User;
+use App\Notifications\NewContactInquiry;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Notification;
 
 class ContactController extends Controller
 {
     /**
      * Store a contact form submission.
-     * Validates input and returns success. Extend later to store in DB or send email.
+     * Validates input, stores in database, and notifies administrators.
      */
     public function store(Request $request): JsonResponse
     {
@@ -28,7 +32,13 @@ class ContactController extends Controller
             'message.required'  => 'Message is required.',
         ]);
 
-        // TODO: persist to database or queue email (e.g. Mail::to(config('mail.contact'))->queue(new ContactReceived($validated)));
+        // Store the inquiry
+        $contact = ContactUs::create($validated);
+
+        // Notify all admin users
+        $admins = User::where('role', 'admin')->get();
+        Notification::send($admins, new NewContactInquiry($contact));
+
         return response()->json([
             'success' => true,
             'message' => 'Thank you for your message. We will get back to you soon.',
