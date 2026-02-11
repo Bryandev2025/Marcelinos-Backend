@@ -11,9 +11,9 @@ Manage room inventory, pricing, availability, and amenities across admin and API
 	- `Room` ↔ `Amenity` (many-to-many via `amenity_room`)
 	- `Room` → `Review` (morphMany)
 - Centralized options:
-	- Room types.
+	- Room types and statuses, including badge colors.
 - Availability scope:
-	- `availableBetween($checkIn, $checkOut)` excludes rooms overlapping non-cancelled bookings.
+	- `availableBetween($checkIn, $checkOut)` excludes rooms overlapping non-cancelled bookings AND rooms in maintenance.
 
 ## Migrations
 - Rooms table creation.
