@@ -21,6 +21,10 @@ class ContactUsResource extends Resource
 
     protected static ?string $navigationLabel = 'Contact Us';
 
+    protected static string|\UnitEnum|null $navigationGroup = 'Management';
+
+    protected static ?int $navigationSort = 1;
+
     protected static ?string $modelLabel = 'Contact Inquiry';
 
     protected static ?string $pluralModelLabel = 'Contact Inquiries';
