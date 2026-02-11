@@ -21,20 +21,6 @@ class BlockedDateResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static UnitEnum|string|null $navigationGroup = 'Operations';
-
-    protected static ?string $recordTitleAttribute = 'date';
-
-    public static function form(Schema $schema): Schema
-    {
-        return BlockedDateForm::configure($schema);
-    }
-
-    public static function table(Table $table): Table
-    {
-        return BlockedDatesTable::configure($table);
-    }
-
     public static function getRelations(): array
     {
         return [];
