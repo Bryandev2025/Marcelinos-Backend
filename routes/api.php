@@ -22,7 +22,7 @@ Route::post('bookings', [BookingController::class, 'store']);
 Route::get('bookings/{id}', [BookingController::class, 'show']);
 Route::put('bookings/{id}', [BookingController::class, 'update']);
 Route::delete('bookings/{id}', [BookingController::class, 'destroy']);
-Route::patch('bookings/{booking}/cancel', [BookingController::class, 'cancel']);
+Route::patch('bookings/{reference}/cancel', [BookingController::class, 'cancel']);
 Route::get('bookings/reference/{reference}', [BookingController::class, 'showByReferenceNumber']);
 Route::post('bookings/reference/{reference}/review', [ReviewController::class, 'storeByBookingReference']);
 

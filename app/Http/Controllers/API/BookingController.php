@@ -397,29 +397,35 @@ class BookingController extends Controller
         }
     }
 
-    public function cancel(Request $request, Booking $booking)
+        public function cancel(string $reference)
     {
-        try {
-            if (!in_array($booking->status, ['pending', 'confirmed'])) {
-                return response()->json([
-                    'message' => 'Booking cannot be cancelled in its current state.'
-                ], 422);
-            }
+        $booking = Booking::where('reference_number', $reference)->first();
 
-            $booking->update([
-                'status' => 'cancelled',
-                'remarks' => $request->remarks
-            ]);
-
+        if (!$booking) {
             return response()->json([
-                'message' => 'Booking cancelled successfully.',
-                'booking' => $booking
-            ], 200);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Error cancelling booking',
-                'error' => $e->getMessage()
-            ], 500);
+                'message' => 'Booking not found',
+            ], 404);
         }
+
+        // Prevent invalid cancellations
+        if (in_array($booking->status, [
+            'cancelled',
+            'completed',
+            'checked_out',
+            'occupied',
+        ])) {
+            return response()->json([
+                'message' => 'This booking can no longer be cancelled.',
+            ], 422);
+        }
+
+        $booking->update([
+            'status' => 'cancelled',
+        ]);
+
+        return response()->json([
+            'message' => 'Booking cancelled successfully.',
+            'booking' => $booking,
+        ]);
     }
 }
