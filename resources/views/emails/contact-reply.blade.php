@@ -1,24 +1,63 @@
 <x-mail::message>
-# Reply to Your Inquiry
+{{-- Header with Logo/Branding --}}
+@component('mail::header', ['url' => config('app.url')])
+# Marcelinos
+@endcomponent
 
-Hello **{{ $contact->full_name }}**,
+{{-- Greeting --}}
+<x-mail::panel>
+## Hello {{ $contact->full_name }},
 
-Thank you for contacting us regarding: **{{ $contact->subject }}**
+Thank you for reaching out to **Marcelinos**. We appreciate you taking the time to contact us regarding your inquiry.
+</x-mail::panel>
 
-## Your Original Message:
-{{ $contact->message }}
+{{-- Original Inquiry Summary --}}
+<x-mail::panel>
+### Your Original Inquiry
+**Subject:** {{ $contact->subject }}
 
-## Our Response:
+**Date Submitted:** {{ $contact->created_at->format('F j, Y \a\t g:i A') }}
+
+**Your Message:**
+> {{ $contact->message }}
+</x-mail::panel>
+
+{{-- Our Response --}}
+<x-mail::panel>
+### Our Response
 
 {{ $replyMessage }}
+</x-mail::panel>
 
+{{-- Additional Information --}}
+<x-mail::panel>
 @if($contact->phone)
-If you need to discuss this further, you can reach us at our contact number.
+**Your Contact Information:**
+- **Phone:** {{ $contact->phone }}
+- **Email:** {{ $contact->email }}
 @endif
 
-Best regards,  
-**Marcelinos Team**
+If you have any additional questions or need further assistance, please don't hesitate to reply to this email or contact us directly.
+</x-mail::panel>
 
----
-*This is an automated response to your inquiry submitted on {{ $contact->created_at->format('M j, Y \a\t g:i A') }}*
+{{-- Call to Action --}}
+<x-mail::button :url="config('app.url') . '/contact'" color="primary">
+Visit Our Website
+</x-mail::button>
+
+<x-mail::panel>
+### Get in Touch
+- **Website:** [{{ config('app.url') }}]({{ config('app.url') }})
+- **Email:** info@marcelinos.com
+- **Phone:** +1 (555) 123-4567
+
+*Follow us on social media for updates and special offers!*
+</x-mail::panel>
+
+{{-- Footer --}}
+<x-mail::footer>
+© {{ date('Y') }} Marcelinos. All rights reserved.
+
+*This email was sent in response to your inquiry. If you did not submit this inquiry, please ignore this message.*
+</x-mail::footer>
 </x-mail::message>
