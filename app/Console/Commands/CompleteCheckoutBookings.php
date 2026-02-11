@@ -21,11 +21,11 @@ class CompleteCheckoutBookings extends Command
      *
      * @var string
      */
-    protected $description = 'Mark bookings with check-out date today and status occupied as complete (frees rooms)';
+    protected $description = 'Mark bookings with check-out date today and status occupied as complete';
 
     /**
      * Execute the console command.
-     * Uses Eloquent so Booking model events run and room status is updated.
+     * Uses Eloquent so Booking model events run.
      */
     public function handle(): int
     {

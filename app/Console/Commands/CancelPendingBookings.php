@@ -25,7 +25,7 @@ class CancelPendingBookings extends Command
 
     /**
      * Execute the console command.
-     * Uses Eloquent so Booking model events run and room status is freed if applicable.
+     * Uses Eloquent so Booking model events run.
      */
     public function handle(): int
     {

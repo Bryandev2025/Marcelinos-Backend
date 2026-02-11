@@ -35,16 +35,12 @@ class Room extends Model implements HasMedia
 
     /* ================= STATUSES ================= */
     const STATUS_AVAILABLE = 'available';
-    const STATUS_OCCUPIED = 'occupied';
-    const STATUS_CLEANING = 'cleaning';
     const STATUS_MAINTENANCE = 'maintenance';
 
     public static function statusOptions(): array
     {
         return [
             self::STATUS_AVAILABLE => 'Available',
-            self::STATUS_OCCUPIED => 'Occupied',
-            self::STATUS_CLEANING => 'Cleaning',
             self::STATUS_MAINTENANCE => 'Maintenance',
         ];
     }
@@ -53,8 +49,6 @@ class Room extends Model implements HasMedia
     {
         return [
             'success' => self::STATUS_AVAILABLE,
-            'danger' => self::STATUS_OCCUPIED,
-            'warning' => self::STATUS_CLEANING,
             'secondary' => self::STATUS_MAINTENANCE,
         ];
     }
@@ -103,16 +97,17 @@ class Room extends Model implements HasMedia
     }
 
     /**
-     * Scope: only rooms not booked (by a non-cancelled booking) in the given date range.
+     * Scope: only rooms not booked (by a non-cancelled booking) in the given date range AND not in maintenance.
      * Overlap: booking.check_in < $checkOut AND booking.check_out > $checkIn
      */
     public function scopeAvailableBetween($query, $checkIn, $checkOut)
     {
-        return $query->whereDoesntHave('bookings', function ($q) use ($checkIn, $checkOut) {
-            $q->where('bookings.status', '!=', Booking::STATUS_CANCELLED)
-                ->where('bookings.check_in', '<', $checkOut)
-                ->where('bookings.check_out', '>', $checkIn);
-        });
+        return $query->where('status', '!=', self::STATUS_MAINTENANCE)
+            ->whereDoesntHave('bookings', function ($q) use ($checkIn, $checkOut) {
+                $q->where('bookings.status', '!=', Booking::STATUS_CANCELLED)
+                    ->where('bookings.check_in', '<', $checkOut)
+                    ->where('bookings.check_out', '>', $checkIn);
+            });
     }
 
     // Removed the public function images() method because the Image model is gone.

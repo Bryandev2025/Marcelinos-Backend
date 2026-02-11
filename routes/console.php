@@ -13,7 +13,7 @@ Artisan::command('inspire', function () {
 | Booking status scheduled tasks
 |--------------------------------------------------------------------------
 | All times are in Asia/Manila (UTC+8).
-| Commands use the Booking model so model events run (e.g. room status updates).
+// Commands use the Booking model so model events run.
 |
 | Cron entry required on the server (run every minute):
 |   * * * * * cd /path-to-your-project && php artisan schedule:run >> /dev/null 2>&1

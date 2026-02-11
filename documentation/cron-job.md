@@ -2,7 +2,7 @@
 
 This document describes the scheduled tasks configured in `routes/console.php` using **Laravel Scheduler**.
 
-These tasks automatically update booking statuses based on the **current date** and **booking state**. They use **Artisan commands** and the **Booking model**, so model events run (e.g. room status is set to `occupied` or `available`).
+These tasks automatically update booking statuses based on the **current date** and **booking state**. They use **Artisan commands** and the **Booking model**.
 
 **Laravel reference:** [Task Scheduling](https://laravel.com/docs/11.x/scheduling#scheduling-artisan-commands)
 
@@ -67,7 +67,7 @@ The application uses **Laravel's task scheduling**. A single system cron job run
   - `status` = `paid`
 - Sets `status` to `occupied`.
 
-**Purpose:** Mark paid bookings as occupied on check-in day and set related rooms to `occupied`.
+**Purpose:** Mark paid bookings as occupied on check-in day.
 
 ---
 
