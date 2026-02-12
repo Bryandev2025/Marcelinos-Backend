@@ -19,30 +19,44 @@ class GalleryController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $cacheKey = 'api.galleries.list';
-        return $this->rememberJson($cacheKey, function () {
-            try {
-                $galleries = Gallery::with('media')->get();
+        try {
+            $isAll = filter_var($request->query('is_all', false), FILTER_VALIDATE_BOOLEAN);
 
-                $formattedGalleries = $galleries->map(function ($gallery) {
-                    return [
-                        'id' => $gallery->id,
-                        'image' => $gallery->image_url,
-                    ];
-                });
+            $query = Gallery::with('media');
 
-                return response()->json([
-                    'success' => true,
-                    'data' => $formattedGalleries,
-                ], 200);
-            } catch (Exception $e) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to fetch gallery images',
-                    'error' => $e->getMessage(),
-                ], 500);
-            }
-        }, 300); // Cache for 5 minutes
+            // Optionally, add more filters here if needed
+
+            $galleries = $query->get();
+
+            $formattedGalleries = $galleries->map(function ($gallery) {
+                return [
+                    'id' => $gallery->id,
+                    'image' => $gallery->image_url,
+                ];
+            });
+
+            $payload = [
+                'success' => true,
+                'data' => $formattedGalleries,
+            ];
+
+            $cacheKey = $isAll ? 'api.galleries.list.all' : 'api.galleries.list';
+            $ttl = $isAll ? 300 : 0;
+
+            return $this->rememberJson($cacheKey, fn () => response()->json($payload, 200), $ttl);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch gallery images',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**
