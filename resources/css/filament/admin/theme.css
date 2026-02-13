@@ -1,0 +1,16 @@
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+@source '../../../../app/Filament/**/*';
+@source '../../../../resources/views/filament/**/*';
+
+
+
+/* Hide scrollbar for the sidebar navigation specifically */
+.fi-sidebar-nav {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;     /* Firefox */
+}
+
+.fi-sidebar-nav::-webkit-scrollbar {
+    display: none;             /* Chrome, Safari, and Opera */
+}
