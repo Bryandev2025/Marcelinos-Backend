@@ -40,11 +40,6 @@ class GuestController extends Controller
         // Default country logic
         if (!$validated['is_international']) {
             $validated['country'] = 'Philippines';
-            $validated['region'] = null;
-        } else {
-            $validated['province'] = null;
-            $validated['municipality'] = null;
-            $validated['barangay'] = null;
         }
 
         $guest = Guest::create($validated);
