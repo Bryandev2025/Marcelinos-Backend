@@ -21,6 +21,7 @@ return new class extends Migration
             $table->enum('gender', ['male','female','other']);
             $table->boolean('is_international')->default(false);
             $table->string('country')->default('Philippines');
+            $table->string('region')->nullable();
             $table->string('province')->nullable();
             $table->string('municipality')->nullable();
             $table->string('barangay')->nullable();
