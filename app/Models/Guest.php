@@ -35,10 +35,11 @@ class Guest extends Model implements HasMedia
 
         'is_international',
         'country',
+        'region',
         'province',
         'municipality',
         'barangay',
-        'city',
+
     ];
 
     // Cast fields
@@ -104,21 +105,11 @@ class Guest extends Model implements HasMedia
             'gender'           => 'nullable|in:Male,Female,Other',
             'is_international' => 'required|boolean',
             'country'          => 'nullable|string|max:100',
+            'region'           => 'nullable|string|max:100',
             'province'         => 'nullable|string|max:100',
             'municipality'     => 'nullable|string|max:100',
             'barangay'         => 'nullable|string|max:100',
-            'city'             => 'nullable|string|max:100',
         ]);
-
-        // Default country logic
-        if (!$validated['is_international']) {
-            $validated['country'] = 'Philippines';
-            $validated['city'] = null;
-        } else {
-            $validated['province'] = null;
-            $validated['municipality'] = null;
-            $validated['barangay'] = null;
-        }
 
         return self::create($validated);
     }
