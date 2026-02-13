@@ -15,6 +15,15 @@ use Filament\Tables\Table;
 
 class ContactUsResource extends Resource
 {
+    /**
+     * Show a badge in the navigation if there are new contact requests.
+     */
+    public static function getNavigationBadge(): ?string
+    {
+        // Count only 'new' status, matching the table and migration
+        $count = ContactUs::where('status', 'new')->count();
+        return $count > 0 ? (string) $count : null;
+    }
     protected static ?string $model = ContactUs::class;
 
     protected static string|BackedEnum|null $navigationIcon = \Filament\Support\Icons\Heroicon::OutlinedChatBubbleLeftRight;
