@@ -45,6 +45,8 @@ class GuestForm
                     ->default('Philippines')
                     ->required(fn (Get $get) => (bool) $get('is_international'))
                     ->visible(fn (Get $get) => (bool) $get('is_international')),
+                    TextInput::make('region')
+                        ->visible(fn (Get $get) => ! $get('is_international')),
                 TextInput::make('province')
                     ->visible(fn (Get $get) => ! $get('is_international')),
                 TextInput::make('municipality')

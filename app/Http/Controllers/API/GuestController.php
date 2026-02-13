@@ -30,18 +30,17 @@ class GuestController extends Controller
             'country'          => 'nullable|string|max:100',
 
             // PH Address
+            'region'           => 'nullable|string|max:100',
             'province'         => 'nullable|string|max:100',
             'municipality'     => 'nullable|string|max:100',
             'barangay'         => 'nullable|string|max:100',
 
-            // International Address
-            'city'             => 'nullable|string|max:100',
         ]);
 
         // Default country logic
         if (!$validated['is_international']) {
             $validated['country'] = 'Philippines';
-            $validated['city'] = null;
+            $validated['region'] = null;
         } else {
             $validated['province'] = null;
             $validated['municipality'] = null;
