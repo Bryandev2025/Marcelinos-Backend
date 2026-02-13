@@ -38,7 +38,7 @@ class Guest extends Model implements HasMedia
         'province',
         'municipality',
         'barangay',
-        'city',
+
     ];
 
     // Cast fields
@@ -107,13 +107,12 @@ class Guest extends Model implements HasMedia
             'province'         => 'nullable|string|max:100',
             'municipality'     => 'nullable|string|max:100',
             'barangay'         => 'nullable|string|max:100',
-            'city'             => 'nullable|string|max:100',
         ]);
 
         // Default country logic
         if (!$validated['is_international']) {
             $validated['country'] = 'Philippines';
-            $validated['city'] = null;
+
         } else {
             $validated['province'] = null;
             $validated['municipality'] = null;

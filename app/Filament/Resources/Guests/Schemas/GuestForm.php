@@ -37,8 +37,6 @@ class GuestForm
                             $set('province', null);
                             $set('municipality', null);
                             $set('barangay', null);
-                            $set('city', null);
-                            $set('zip_code', null);
                         } else {
                             $set('country', 'Philippines');
                         }
@@ -52,10 +50,6 @@ class GuestForm
                 TextInput::make('municipality')
                     ->visible(fn (Get $get) => ! $get('is_international')),
                 TextInput::make('barangay')
-                    ->visible(fn (Get $get) => ! $get('is_international')),
-                TextInput::make('city')
-                    ->visible(fn (Get $get) => ! $get('is_international')),
-                TextInput::make('zip_code')
                     ->visible(fn (Get $get) => ! $get('is_international')),
             ]);
     }
