@@ -16,9 +16,10 @@ class BlockedDateController extends Controller
      */
     public function index(): JsonResponse
     {
-        return $this->rememberJson('api.blocked-dates', function () {
-            $blockedDates = BlockedDate::pluck('date');
-            return response()->json(['blocked_dates' => $blockedDates]);
-        });
+        $blockedDates = BlockedDate::select('date', 'reason')->get(); 
+
+        return response()->json([
+            'blocked_dates' => $blockedDates
+        ]);
     }
 }

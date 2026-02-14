@@ -8,11 +8,12 @@ use Carbon\Carbon;
 
 class MonthlyBookingsChart extends ChartWidget
 {
-    protected ?string $heading = 'Bookings Trend';
+    protected ?string $heading = 'Booking Trends - Last 12 Months';
 
     protected int | string | array $columnSpan = 2;
-
     protected int | string | array $rowSpan = 2;
+    protected static ?string $minHeight = '200px';
+
 
     protected function getData(): array
     {
