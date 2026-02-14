@@ -50,3 +50,5 @@ Route::post('/contact', [ContactController::class, 'store']);
 // Gallery
 Route::get('/galleries', [GalleryController::class, 'index']);
 Route::get('/galleries/{id}', [GalleryController::class, 'show']);
+
+Route::get('/reviews', [ReviewController::class, 'index']);

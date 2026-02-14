@@ -5,12 +5,54 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Review;
+use App\Models\Guest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
 class ReviewController extends Controller
 {
+
+    public function index(): JsonResponse
+    {
+        try {
+        $reviews = Review::with('guest')
+            ->where('is_site_review', true)
+            ->where('is_approved', true)
+            ->latest('reviewed_at')
+            ->get()
+            ->map(function ($review) {
+                return [
+                    'guest_name' => $review->guest 
+                        ? $review->guest->first_name . ' ' . $review->guest->last_name 
+                        : null,                    
+                    'rating'     => $review->rating,
+                    'title'      => $review->title,
+                    'comment'    => $review->comment,
+                    'date'       => optional($review->reviewed_at)->toDateString(),
+                ];
+            });
+
+        if ($reviews->isEmpty()) {
+            return response()->json([
+                'message' => 'No data available',
+                'reviews' => []
+            ], 200);
+        }
+
+        return response()->json([
+            'reviews' => $reviews
+        ], 200);
+
+    } catch (\Exception $e) {
+
+        Log::error('Error fetching site reviews: ' . $e->getMessage());
+
+        return response()->json([
+            'message' => 'Something went wrong.'
+        ], 500);
+    }
+    }
     /**
      * Store a testimonial/site review for a completed booking (by reference number).
      * Used by the client testimonial form linked from the post-stay email.
