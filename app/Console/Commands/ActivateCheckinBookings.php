@@ -25,7 +25,7 @@ class ActivateCheckinBookings extends Command
 
     /**
      * Execute the console command.
-     * Uses Eloquent so Booking model events run and room status is set to occupied.
+     * Uses Eloquent so Booking model events run.
      */
     public function handle(): int
     {

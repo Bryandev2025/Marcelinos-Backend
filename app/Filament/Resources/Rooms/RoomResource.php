@@ -22,6 +22,7 @@ class RoomResource extends Resource
     // Navigation icon in Filament sidebar
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-home';
     protected static string|\UnitEnum|null $navigationGroup = 'Properties';
+    protected static ?int $navigationSort = 2;
     protected static ?string $navigationLabel = 'Rooms';
 
     // The attribute to display in the title when editing/viewing a record

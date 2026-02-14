@@ -35,16 +35,12 @@ class Room extends Model implements HasMedia
 
     /* ================= STATUSES ================= */
     const STATUS_AVAILABLE = 'available';
-    const STATUS_OCCUPIED = 'occupied';
-    const STATUS_CLEANING = 'cleaning';
     const STATUS_MAINTENANCE = 'maintenance';
 
     public static function statusOptions(): array
     {
         return [
             self::STATUS_AVAILABLE => 'Available',
-            self::STATUS_OCCUPIED => 'Occupied',
-            self::STATUS_CLEANING => 'Cleaning',
             self::STATUS_MAINTENANCE => 'Maintenance',
         ];
     }
@@ -53,8 +49,6 @@ class Room extends Model implements HasMedia
     {
         return [
             'success' => self::STATUS_AVAILABLE,
-            'danger' => self::STATUS_OCCUPIED,
-            'warning' => self::STATUS_CLEANING,
             'secondary' => self::STATUS_MAINTENANCE,
         ];
     }
@@ -71,30 +65,42 @@ class Room extends Model implements HasMedia
         $this->addMediaCollection('gallery'); // Allows multiple images
     }
 
+    /**
+     * Card-sized conversion for list/card views: smaller file, faster load.
+     */
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('card')
+            ->width(600)
+            ->optimize()
+            ->nonQueued();
+    }
+
     public function getFeaturedImageUrlAttribute(): ?string
     {
         $media = $this->getFirstMedia('featured');
 
-        return $media ? $this->resolveMediaUrl($media) : null;
+        return $media ? $this->resolveMediaUrl($media, 'card') : null;
     }
 
     public function getGalleryUrlsAttribute(): array
     {
         return $this->getMedia('gallery')
-            ->map(fn (Media $media) => $this->resolveMediaUrl($media))
+            ->map(fn (Media $media) => $this->resolveMediaUrl($media, 'card'))
             ->values()
             ->all();
     }
 
-    private function resolveMediaUrl(Media $media): string
+    private function resolveMediaUrl(Media $media, string $conversion = 'card'): string
     {
-        $lifetime = (int) config('media-library.temporary_url_default_lifetime', 5);
+        $useConversion = $media->hasGeneratedConversion($conversion) ? $conversion : '';
+        $lifetime = (int) config('media-library.temporary_url_default_lifetime', 60);
 
         if ($media->disk === 's3') {
-            return $media->getTemporaryUrl(now()->addMinutes($lifetime));
+            return $media->getTemporaryUrl(now()->addMinutes($lifetime), $useConversion);
         }
 
-        return $media->getUrl();
+        return $media->getUrl($useConversion);
     }
 
     public function bookings()
@@ -103,16 +109,17 @@ class Room extends Model implements HasMedia
     }
 
     /**
-     * Scope: only rooms not booked (by a non-cancelled booking) in the given date range.
+     * Scope: only rooms not booked (by a non-cancelled booking) in the given date range AND not in maintenance.
      * Overlap: booking.check_in < $checkOut AND booking.check_out > $checkIn
      */
     public function scopeAvailableBetween($query, $checkIn, $checkOut)
     {
-        return $query->whereDoesntHave('bookings', function ($q) use ($checkIn, $checkOut) {
-            $q->where('bookings.status', '!=', Booking::STATUS_CANCELLED)
-                ->where('bookings.check_in', '<', $checkOut)
-                ->where('bookings.check_out', '>', $checkIn);
-        });
+        return $query->where('status', '!=', self::STATUS_MAINTENANCE)
+            ->whereDoesntHave('bookings', function ($q) use ($checkIn, $checkOut) {
+                $q->where('bookings.status', '!=', Booking::STATUS_CANCELLED)
+                    ->where('bookings.check_in', '<', $checkOut)
+                    ->where('bookings.check_out', '>', $checkIn);
+            });
     }
 
     // Removed the public function images() method because the Image model is gone.

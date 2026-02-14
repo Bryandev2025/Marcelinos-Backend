@@ -21,6 +21,7 @@ class AmenityResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-sparkles';
     protected static string|\UnitEnum|null $navigationGroup = 'Properties';
+    protected static ?int $navigationSort = 3;
     protected static ?string $navigationLabel = 'Amenities';
 
     protected static ?string $recordTitleAttribute = 'name';

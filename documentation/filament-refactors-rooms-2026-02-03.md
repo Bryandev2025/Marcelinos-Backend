@@ -13,7 +13,7 @@ Manage room inventory, pricing, availability, and amenities across admin and API
 - Centralized options:
 	- Room types and statuses, including badge colors.
 - Availability scope:
-	- `availableBetween($checkIn, $checkOut)` excludes rooms overlapping non-cancelled bookings.
+	- `availableBetween($checkIn, $checkOut)` excludes rooms overlapping non-cancelled bookings AND rooms in maintenance.
 
 ## Migrations
 - Rooms table creation.

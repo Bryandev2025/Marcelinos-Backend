@@ -2,59 +2,34 @@
 
 namespace App\Observers;
 
-use App\Models\Booking;
-use App\Models\User;
-use Illuminate\Support\Facades\Auth;
-use App\Notifications\BookingCreatedNotification;
 use Filament\Notifications\Notification;
+use App\Models\User;
+use App\Models\Booking;
+use Illuminate\Support\Facades\Log;
 
 class BookingObserver
 {
-    /**
-     * Handle the Booking "created" event.
-     */
     public function created(Booking $booking): void
     {
-        $recipient = auth()->user();
+        Log::info('BookingObserver triggered for booking: ' . $booking->id . ' with reference: ' . $booking->reference_number);
 
-        if ($recipient === null) {
-            return;
+        $users = User::whereIn('role', ['admin', 'staff'])
+            ->where('is_active', true)
+            ->get();
+
+        Log::info('Users found for notification: ' . $users->count());
+
+        if ($users->isNotEmpty()) {
+            Log::info('Sending notification to users');
+            foreach ($users as $user) {
+                Notification::make()
+                    ->title('New Booking Created')
+                    ->body("Booking {$booking->reference_number} was created.")
+                    ->icon('heroicon-o-calendar-days')
+                    ->color('success')
+                    ->sendToDatabase($user);
+            }
         }
-
-        Notification::make()
-            ->title('Saved successfully')
-            ->sendToDatabase($recipient);
-    }
-
-    /**
-     * Handle the Booking "updated" event.
-     */
-    public function updated(Booking $booking): void
-    {
-        //
-    }
-
-    /**
-     * Handle the Booking "deleted" event.
-     */
-    public function deleted(Booking $booking): void
-    {
-        //
-    }
-
-    /**
-     * Handle the Booking "restored" event.
-     */
-    public function restored(Booking $booking): void
-    {
-        //
-    }
-
-    /**
-     * Handle the Booking "force deleted" event.
-     */
-    public function forceDeleted(Booking $booking): void
-    {
-        //
     }
 }
+

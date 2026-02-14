@@ -49,9 +49,9 @@ class GuestsTable
                 TextColumn::make('country')
                     ->searchable()
                     ->toggleable(),
-                TextColumn::make('city')
+                TextColumn::make('re')
                     ->searchable()
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('province')
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -61,9 +61,7 @@ class GuestsTable
                 TextColumn::make('barangay')
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('zip_code')
-                    ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+
 
                 TextColumn::make('created_at')
                     ->dateTime()

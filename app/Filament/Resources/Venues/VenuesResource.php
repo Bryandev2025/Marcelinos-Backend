@@ -22,6 +22,7 @@ class VenuesResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
     protected static string|\UnitEnum|null $navigationGroup = 'Properties';
+    protected static ?int $navigationSort = 1;
     protected static ?string $navigationLabel = 'Venues';
 
     public static function form(Schema $schema): Schema

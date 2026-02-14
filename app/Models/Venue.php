@@ -53,30 +53,42 @@ class Venue extends Model implements HasMedia
         $this->addMediaCollection('gallery');
     }
 
+    /**
+     * Card-sized conversion for list/card views: smaller file, faster load.
+     */
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('card')
+            ->width(600)
+            ->optimize()
+            ->nonQueued();
+    }
+
     public function getFeaturedImageUrlAttribute(): ?string
     {
         $media = $this->getFirstMedia('featured');
 
-        return $media ? $this->resolveMediaUrl($media) : null;
+        return $media ? $this->resolveMediaUrl($media, 'card') : null;
     }
 
     public function getGalleryUrlsAttribute(): array
     {
         return $this->getMedia('gallery')
-            ->map(fn (Media $media) => $this->resolveMediaUrl($media))
+            ->map(fn (Media $media) => $this->resolveMediaUrl($media, 'card'))
             ->values()
             ->all();
     }
 
-    private function resolveMediaUrl(Media $media): string
+    private function resolveMediaUrl(Media $media, string $conversion = 'card'): string
     {
-        $lifetime = (int) config('media-library.temporary_url_default_lifetime', 5);
+        $useConversion = $media->hasGeneratedConversion($conversion) ? $conversion : '';
+        $lifetime = (int) config('media-library.temporary_url_default_lifetime', 60);
 
         if ($media->disk === 's3') {
-            return $media->getTemporaryUrl(now()->addMinutes($lifetime));
+            return $media->getTemporaryUrl(now()->addMinutes($lifetime), $useConversion);
         }
 
-        return $media->getUrl();
+        return $media->getUrl($useConversion);
     }
 
     // General collection of images

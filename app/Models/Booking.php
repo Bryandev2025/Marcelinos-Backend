@@ -2,8 +2,6 @@
 
 namespace App\Models;
 
-use App\Observers\BookingObserver;
-use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
@@ -12,7 +10,6 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\BookingCreated;
 
-#[ObservedBy([BookingObserver::class])]
 class Booking extends Model
 {
     use HasFactory;
@@ -82,26 +79,26 @@ class Booking extends Model
         });
 
         /**
-         * Existing room status logic (UNCHANGED)
+         * Existing room status logic (REMOVED - redundant)
          */
-        static::saved(function (Booking $booking) {
-            $rooms = $booking->rooms;
+        // static::saved(function (Booking $booking) {
+        //     $rooms = $booking->rooms;
 
-            if ($rooms->isEmpty()) {
-                return;
-            }
+        //     if ($rooms->isEmpty()) {
+        //         return;
+        //     }
 
-            if ($booking->status === self::STATUS_OCCUPIED) {
-                $rooms->each->update(['status' => 'occupied']);
-            }
+        //     if ($booking->status === self::STATUS_OCCUPIED) {
+        //         $rooms->each->update(['status' => 'occupied']);
+        //     }
 
-            if (in_array($booking->status, [
-                self::STATUS_COMPLETED,
-                self::STATUS_CANCELLED
-            ])) {
-                $rooms->each->update(['status' => 'available']);
-            }
-        });
+        //     if (in_array($booking->status, [
+        //         self::STATUS_COMPLETED,
+        //         self::STATUS_CANCELLED
+        //     ])) {
+        //         $rooms->each->update(['status' => 'available']);
+        //     }
+        // });
     }
 
     /* ================= RELATIONSHIPS ================= */
