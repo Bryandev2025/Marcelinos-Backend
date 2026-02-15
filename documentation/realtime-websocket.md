@@ -37,6 +37,8 @@ This document describes the real-time architecture, how to use it, and senior-le
 
 ### 2.1 Environment (.env)
 
+**Required for real-time sync:** `BROADCAST_CONNECTION` must be `reverb`. If it is `log`, events are only written to the log and the React client never receives them.
+
 ```env
 BROADCAST_CONNECTION=reverb
 
@@ -54,12 +56,17 @@ REVERB_ALLOWED_ORIGINS=*
 - **Development:** Use `REVERB_ALLOWED_ORIGINS=*` or comma-separated origins (e.g. `http://localhost:5173`).
 - **Production:** Set `REVERB_SCHEME=https`, a proper host, and restrict `REVERB_ALLOWED_ORIGINS`.
 
-### 2.2 Running Reverb
+### 2.2 Running Reverb and queue worker
 
-- **Manual:** `php artisan reverb:start`
-- **With dev stack:** `composer run dev` (starts server, Reverb, queue, logs, Vite).
+For the React client to receive updates **without a page reload**, two processes must be running:
 
-Events are broadcast via the queue. Ensure a queue worker is running (`php artisan queue:work` or `queue:listen`) so events are actually sent to Reverb.
+| Process | Command | Purpose |
+|--------|---------|--------|
+| **Reverb** | `php artisan reverb:start` | WebSocket server; delivers events to the browser |
+| **Queue worker** | `php artisan queue:work` | Runs queued jobs; broadcast events are queued, so this sends them to Reverb |
+
+- **Manual:** Run both in separate terminals (or use `composer run dev` if it starts server, Reverb, and queue).
+- If the queue worker is not running, events are never broadcast and the frontend will not refetch until the user reloads.
 
 ---
 
@@ -232,6 +239,16 @@ Use `useRealtimeChannel` to subscribe, then bind listeners (e.g. with `getEcho()
 
 2. Use `useRealtimeEvent` with `event: "MyNewEvent"` and `onEvent` will be typed.
 
+### 6.4 Global subscriber: sync without page reload
+
+The app uses **`useRealtimeGlobalSubscriber`** (mounted in `App.tsx`) to listen to resource-update events (rooms, venues, gallery, reviews, blocked-dates) and keep the React UI in sync with the backend **without a page reload**.
+
+- When the backend broadcasts (e.g. `RoomsUpdated`), the subscriber runs `queryClient.invalidateQueries({ queryKey })` and `queryClient.refetchQueries({ queryKey })`.
+- Use the **shared “all” query key** (e.g. `queryKeys.rooms.all` = `["rooms"]`) so that all related queries are matched: TanStack Query uses prefix matching, so `["rooms"]` matches `["rooms", "home"]` and `["rooms", checkIn, checkOut]`.
+- Any component that fetches data with a query key starting with that prefix will refetch when the event is received, and the UI updates automatically.
+
+To add a new resource to this flow, see [§11 How to add a new synchronization](#11-how-to-add-a-new-synchronization).
+
 ---
 
 ## 7. Senior Dev Practices
@@ -291,6 +308,8 @@ When adding a channel, update both and keep naming consistent (e.g. `booking.{re
 | Frontend | `src/lib/realtime/channels.ts` – channel name helpers |
 | Frontend | `src/types/realtime.types.ts` – event payload types |
 | Frontend | `src/hooks/useRealtimeEvent.ts`, `useRealtimeChannel.ts` – React hooks |
+| Frontend | `src/hooks/useRealtimeGlobalSubscriber.ts` – global listener for rooms, venues, gallery, reviews, blocked-dates; invalidates/refetches so UI syncs without reload |
+| Frontend | `src/App.tsx` – mounts `useRealtimeGlobalSubscriber()` so realtime is active app-wide |
 
 ---
 
@@ -298,7 +317,7 @@ When adding a channel, update both and keep naming consistent (e.g. `booking.{re
 
 | Issue | Check |
 |-------|--------|
-| No events received | Reverb running? Queue worker running? `BROADCAST_CONNECTION=reverb`? |
+| No events received / UI doesn’t update without reload | **`BROADCAST_CONNECTION=reverb`** (not `log`). Reverb running? **Queue worker running** (`php artisan queue:work`)? Frontend has `VITE_WS_HOST`, `VITE_WS_KEY` (and optionally `VITE_WS_PORT`, `VITE_WS_SCHEME`) so `getEcho()` is not null. |
 | 403 on private channel | User authenticated? Token sent to `/broadcasting/auth`? Channel callback in `channels.php` returns true for that user? |
 | CORS errors | `REVERB_ALLOWED_ORIGINS` includes the frontend origin. |
 | Wrong payload in React | Ensure `broadcastWith()` and `RealtimeEventMap` in `realtime.types.ts` match. |
@@ -319,3 +338,56 @@ WebSocket is used only for the **React frontend**; the Filament admin uses **pol
 | Reviews / testimonials | `ReviewsUpdated` | `reviews` | `ReviewSection` / `ClientReviews` (landing) |
 
 All of the above use **public** channels (`isPrivate: false`), so no auth is required.
+
+---
+
+## 11. How to add a new synchronization
+
+Use this checklist when you want a new resource (e.g. “promos” or “amenities”) to stay in sync between backend (e.g. Filament) and the React client **without a page reload**.
+
+### 11.1 Backend
+
+1. **Channel name (if new)**  
+   In `App\Broadcasting\BroadcastChannelNames`, add a method that returns the channel string (e.g. `promos` for a public channel). Use this in your event’s `broadcastOn()`.
+
+2. **Event class**  
+   In `app/Events/`, create a class that extends `App\Events\BaseBroadcastEvent`:
+   - `broadcastOn()`: return `[new Channel(BroadcastChannelNames::yourChannel())]` for a public channel.
+   - `broadcastWith()`: return a small payload (e.g. `['updated_at' => now()->toIso8601String()]`).
+
+3. **Dispatch the event**  
+   Dispatch it whenever the resource changes:
+   - **Model changes:** Create an Observer for the model (e.g. `app/Observers/PromoObserver.php`) and in `saved()` and `deleted()` call `YourEvent::dispatch()`. Register the observer in `App\Providers\AppServiceProvider` with `YourModel::observe(YourObserver::class)`.
+   - **One-off actions:** Dispatch from a controller or Filament action after create/update/delete.
+
+4. **Config**  
+   Ensure `BROADCAST_CONNECTION=reverb` in `.env`, and that **Reverb** and **queue worker** are running (see §2.2).
+
+### 11.2 Frontend
+
+1. **Channel name**  
+   In `src/lib/realtime/channels.ts`, add a function that returns the same channel name as the backend (e.g. `promos: () => "promos"`).
+
+2. **Query keys**  
+   In `src/lib/api/endpoints.ts`, add a query key factory for the resource, including an `all` key used for invalidation (e.g. `promos: { all: ["promos"] as const, ... }`). Use these keys in any `useApiQuery` / `useQuery` that fetches this resource so they share the same prefix (e.g. `["promos"]`, `["promos", "home"]`).
+
+3. **Subscribe and refetch**  
+   In `src/hooks/useRealtimeGlobalSubscriber.ts`:
+   - Add an entry to the `channels` array: `{ channel: RealtimeChannels.promos(), event: ".PromosUpdated", queryKey: queryKeys.promos.all }`.
+   - The event name must match the backend class short name (e.g. `PromosUpdated` → listen for `".PromosUpdated"`).
+
+4. **Use the query keys in the UI**  
+   Wherever you fetch the resource (e.g. homepage, booking step), use a query key that **starts with** the same segment as `queryKeys.promos.all` (e.g. `["promos"]` or `["promos", "home"]`). When the event is received, `invalidateQueries` and `refetchQueries` will run for all matching queries and the UI will update without a reload.
+
+### 11.3 Summary checklist
+
+| Step | Backend | Frontend |
+|------|--------|----------|
+| 1 | Add channel in `BroadcastChannelNames` | Add same channel in `channels.ts` |
+| 2 | Create event class extending `BaseBroadcastEvent` | — |
+| 3 | Dispatch event (Observer, controller, or Filament) | — |
+| 4 | — | Add `queryKeys.*.all` in `endpoints.ts`; use in queries |
+| 5 | — | Add channel + event + queryKey in `useRealtimeGlobalSubscriber` |
+| 6 | Run Reverb + queue worker | Ensure WS env vars (e.g. `VITE_WS_*`) so Echo connects |
+
+If the frontend still does not update, verify: `BROADCAST_CONNECTION=reverb`, queue worker running, Reverb running, and frontend env (e.g. `VITE_WS_KEY`, `VITE_WS_HOST`) set so `getEcho()` is not null.
