@@ -6,7 +6,7 @@ use App\Events\ReviewsUpdated;
 use App\Models\Review;
 
 /**
- * Broadcasts when a review/testimonial is added or updated so frontend (landing) stays up to date.
+ * Broadcasts when a review/testimonial is created, updated, or deleted so frontend (landing) refetches in real time.
  */
 class ReviewObserver
 {

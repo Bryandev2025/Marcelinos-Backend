@@ -16,7 +16,9 @@ class VenueController extends Controller
     use CachesApiResponses;
     /**
      * List venues.
-     * - is_all=true: return all venues.
+     * Same availability contract as RoomController: when check_in/check_out are provided,
+     * only venues available in that range are returned (no overlapping non-cancelled bookings, not in maintenance).
+     * - is_all=true: return all venues (e.g. homepage).
      * - Otherwise: require check_in & check_out; return only venues available in that date range.
      */
     public function index(Request $request)

@@ -7,7 +7,8 @@ use App\Models\Venue;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * Invalidates API cache and broadcasts so frontend (homepage) stays up to date.
+ * Invalidates API cache and broadcasts so frontend stays up to date in real time.
+ * Fires on create, update, and delete so the client refetches venues (Step1, homepage).
  */
 class VenueObserver
 {

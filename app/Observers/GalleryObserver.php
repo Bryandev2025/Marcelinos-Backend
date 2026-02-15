@@ -6,7 +6,7 @@ use App\Events\GalleryUpdated;
 use App\Models\Gallery;
 
 /**
- * Broadcasts when gallery changes so frontend (homepage) stays up to date.
+ * Broadcasts when gallery is created, updated, or deleted so frontend (homepage) refetches in real time.
  */
 class GalleryObserver
 {
