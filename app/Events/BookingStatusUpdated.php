@@ -4,9 +4,11 @@ namespace App\Events;
 
 use App\Broadcasting\BroadcastChannelNames;
 use App\Models\Booking;
+use Illuminate\Broadcasting\Channel;
 
 /**
  * Broadcast when a booking's status (or relevant data) changes.
+ * Public channel so guests on the receipt page can listen without auth.
  * Listen on channel "booking.{reference}" with event "BookingStatusUpdated".
  */
 final class BookingStatusUpdated extends BaseBroadcastEvent
@@ -18,7 +20,7 @@ final class BookingStatusUpdated extends BaseBroadcastEvent
     public function broadcastOn(): array
     {
         return [
-            new \Illuminate\Broadcasting\PrivateChannel(
+            new Channel(
                 BroadcastChannelNames::booking($this->booking->reference_number)
             ),
         ];

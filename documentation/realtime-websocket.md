@@ -286,7 +286,7 @@ When adding a channel, update both and keep naming consistent (e.g. `booking.{re
 | Backend | `app/Providers/BroadcastServiceProvider.php` – auth route + load channels |
 | Backend | `app/Broadcasting/BroadcastChannelNames.php` – channel name constants |
 | Backend | `app/Events/BaseBroadcastEvent.php` – base broadcast event |
-| Backend | `app/Events/BookingStatusUpdated.php`, `AdminDashboardNotification.php` – examples |
+| Backend | `app/Events/BookingStatusUpdated.php`, `BlockedDatesUpdated.php`, `RoomsUpdated.php`, `VenuesUpdated.php`, `GalleryUpdated.php`, `ReviewsUpdated.php`, `AdminDashboardNotification.php` |
 | Frontend | `src/lib/realtime/echo.ts` – Echo singleton |
 | Frontend | `src/lib/realtime/channels.ts` – channel name helpers |
 | Frontend | `src/types/realtime.types.ts` – event payload types |
@@ -302,3 +302,20 @@ When adding a channel, update both and keep naming consistent (e.g. `booking.{re
 | 403 on private channel | User authenticated? Token sent to `/broadcasting/auth`? Channel callback in `channels.php` returns true for that user? |
 | CORS errors | `REVERB_ALLOWED_ORIGINS` includes the frontend origin. |
 | Wrong payload in React | Ensure `broadcastWith()` and `RealtimeEventMap` in `realtime.types.ts` match. |
+
+---
+
+## 10. Frontend realtime usage (API + React only)
+
+WebSocket is used only for the **React frontend**; the Filament admin uses **polling** (e.g. Bookings table every 10s).
+
+| Data | Event | Channel | Where it’s used |
+|------|--------|---------|------------------|
+| Blocked dates | `BlockedDatesUpdated` | `blocked-dates` | `FormWrapper` (calendar/booking form) |
+| Booking status | `BookingStatusUpdated` | `booking.{reference}` | `BookingReceiptPage` |
+| Rooms | `RoomsUpdated` | `rooms` | `Step1` (booking), `RoomCard` (homepage) |
+| Venues | `VenuesUpdated` | `venues` | `Step1` (booking), `EventVenues` (homepage) |
+| Gallery | `GalleryUpdated` | `gallery` | `OurGallery` (homepage) |
+| Reviews / testimonials | `ReviewsUpdated` | `reviews` | `ReviewSection` / `ClientReviews` (landing) |
+
+All of the above use **public** channels (`isPrivate: false`), so no auth is required.

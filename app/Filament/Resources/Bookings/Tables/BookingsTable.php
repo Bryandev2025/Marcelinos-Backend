@@ -29,6 +29,7 @@ class BookingsTable
     {
         return $table
             ->recordAction('view')
+            ->poll('10s')
             ->columns([
                 ImageColumn::make('qr_code')
                     ->label('QR')

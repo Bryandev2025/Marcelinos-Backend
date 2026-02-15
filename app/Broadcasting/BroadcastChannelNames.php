@@ -5,10 +5,11 @@ namespace App\Broadcasting;
 /**
  * Centralized broadcast channel name constants.
  * Single source of truth for channel names used by events and frontend.
+ * Public channels (blocked-dates, rooms, etc.) are for frontend real-time updates only.
  */
 final class BroadcastChannelNames
 {
-    /** Private channel for a single booking (by reference). */
+    /** Public: single booking (by reference) – receipt page. */
     public static function booking(string $reference): string
     {
         return 'booking.' . $reference;
@@ -20,9 +21,33 @@ final class BroadcastChannelNames
         return 'admin.dashboard';
     }
 
-    /** Public channel for general booking lifecycle (optional). */
-    public static function bookingsPublic(): string
+    /** Public: blocked dates updated – calendar/booking form. */
+    public static function blockedDates(): string
     {
-        return 'bookings';
+        return 'blocked-dates';
+    }
+
+    /** Public: rooms list updated – Step1 & homepage. */
+    public static function rooms(): string
+    {
+        return 'rooms';
+    }
+
+    /** Public: venues list updated – homepage. */
+    public static function venues(): string
+    {
+        return 'venues';
+    }
+
+    /** Public: gallery updated – homepage. */
+    public static function gallery(): string
+    {
+        return 'gallery';
+    }
+
+    /** Public: reviews/testimonials updated – landing page. */
+    public static function reviews(): string
+    {
+        return 'reviews';
     }
 }

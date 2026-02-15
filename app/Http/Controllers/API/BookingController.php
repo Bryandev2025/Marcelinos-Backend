@@ -123,8 +123,8 @@ class BookingController extends Controller
         $validated = $request->validate(
             [
                 'reference_number' => 'nullable|string', // optional; server auto-generates if not provided
-                'rooms'   => 'required|array|min:1',
-                'rooms.*' => ['required', 'integer', 'distinct', Rule::exists('rooms', 'id')],
+                'rooms'   => 'nullable|array',
+                'rooms.*' => ['integer', 'distinct', Rule::exists('rooms', 'id')],
                 'venues'  => 'nullable|array',
                 'venues.*' => ['required_with:venues', 'integer', 'distinct', Rule::exists('venues', 'id')],
                 'check_in'  => 'required|string',
@@ -138,6 +138,17 @@ class BookingController extends Controller
                 'venues.*.exists' => 'Selected venue :input does not exist.',
             ]
         );
+
+        // At least either rooms or venues must be provided AND not both empty
+        $hasRooms = isset($validated['rooms']) && is_array($validated['rooms']) && count($validated['rooms']) > 0;
+        $hasVenues = isset($validated['venues']) && is_array($validated['venues']) && count($validated['venues']) > 0;
+
+        if (!$hasRooms && !$hasVenues) {
+            return response()->json([
+                'message' => 'Must select at least one room or one venue.',
+                'error'   => 'accommodation_required',
+            ], 422);
+        }
 
         try {
             $checkIn  = Carbon::createFromFormat('M d, Y', $validated['check_in'])->startOfDay();
@@ -160,55 +171,61 @@ class BookingController extends Controller
         // Store Guest first
         $guest = Guest::store($request);
 
-        $roomIds = collect($validated['rooms'])
-            ->map(function ($room) {
-                if (is_array($room)) {
-                    return $room['id'] ?? ($room[0] ?? null);
-                }
-                return $room;
-            })
-            ->filter()
-            ->map(fn ($id) => (int) $id)
-            ->values()
-            ->all();
+        $roomIds = $hasRooms
+            ? collect($validated['rooms'])
+                ->map(function ($room) {
+                    if (is_array($room)) {
+                        return $room['id'] ?? ($room[0] ?? null);
+                    }
+                    return $room;
+                })
+                ->filter()
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all()
+            : [];
 
-        $venueIds = isset($validated['venues']) ? collect($validated['venues'])
-            ->map(fn ($id) => (int) $id)
-            ->filter()
-            ->values()
-            ->all() : [];
+        $venueIds = $hasVenues
+            ? collect($validated['venues'])
+                ->map(fn ($id) => (int) $id)
+                ->filter()
+                ->values()
+                ->all()
+            : [];
 
         // Fail early if any provided room does not actually exist
-        $existingRoomIds = Room::whereIn('id', $roomIds)->pluck('id')->all();
-        if (count($existingRoomIds) !== count($roomIds)) {
-            return response()->json([
-                'message' => 'One or more selected rooms do not exist',
-            ], 422);
+        if ($hasRooms) {
+            $existingRoomIds = Room::whereIn('id', $roomIds)->pluck('id')->all();
+            if (count($existingRoomIds) !== count($roomIds)) {
+                return response()->json([
+                    'message' => 'One or more selected rooms do not exist',
+                ], 422);
+            }
+
+            /*
+            |--------------------------------------------------------------------------
+            | Prevent booking conflict: no double-booking within date range
+            |--------------------------------------------------------------------------
+            */
+            $availableRoomIds = Room::whereIn('id', $roomIds)
+                ->availableBetween($checkIn, $checkOut)
+                ->pluck('id')
+                ->all();
+            $conflictingRoomIds = array_values(array_diff($roomIds, $availableRoomIds));
+
+            if (!empty($conflictingRoomIds)) {
+                $conflictingRooms = Room::whereIn('id', $conflictingRoomIds)->get(['id', 'name']);
+                return response()->json([
+                    'message' => 'Booking conflict: one or more rooms are already booked for the selected dates.',
+                    'error'   => 'date_range_conflict',
+                    'conflicts' => [
+                        'rooms' => $conflictingRooms->map(fn ($r) => ['id' => $r->id, 'name' => $r->name])->values()->all(),
+                    ],
+                ], 422);
+            }
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | Prevent booking conflict: no double-booking within date range
-        |--------------------------------------------------------------------------
-        */
-        $availableRoomIds = Room::whereIn('id', $roomIds)
-            ->availableBetween($checkIn, $checkOut)
-            ->pluck('id')
-            ->all();
-        $conflictingRoomIds = array_values(array_diff($roomIds, $availableRoomIds));
-
-        if (!empty($conflictingRoomIds)) {
-            $conflictingRooms = Room::whereIn('id', $conflictingRoomIds)->get(['id', 'name']);
-            return response()->json([
-                'message' => 'Booking conflict: one or more rooms are already booked for the selected dates.',
-                'error'   => 'date_range_conflict',
-                'conflicts' => [
-                    'rooms' => $conflictingRooms->map(fn ($r) => ['id' => $r->id, 'name' => $r->name])->values()->all(),
-                ],
-            ], 422);
-        }
-
-        if (!empty($venueIds)) {
+        if ($hasVenues) {
             $availableVenueIds = Venue::whereIn('id', $venueIds)
                 ->availableBetween($checkIn, $checkOut)
                 ->pluck('id')
@@ -238,7 +255,9 @@ class BookingController extends Controller
             'status'            => 'pending',
         ]);
 
-        $booking->rooms()->attach($roomIds);
+        if (!empty($roomIds)) {
+            $booking->rooms()->attach($roomIds);
+        }
         if (!empty($venueIds)) {
             $booking->venues()->attach($venueIds);
         }
@@ -273,109 +292,6 @@ class BookingController extends Controller
             ], 500);
         }
     }
-
-    // public function update(Request $request, Booking $booking)
-    // {
-    //     try {
-    //         $validated = $request->validate([
-    //             'guest_id' => [
-    //                 'sometimes',
-    //                 'required',
-    //                 Rule::exists('guests', 'id')
-    //             ],
-    //             'room_id' => [
-    //                 'sometimes',
-    //                 'required',
-    //                 Rule::exists('rooms', 'id')
-    //             ],
-    //             'check_in' => 'sometimes|required|date',
-    //             'check_out' => 'sometimes|required|date',
-    //             'status' => [
-    //                 'sometimes',
-    //                 Rule::in(['pending','confirmed','occupied','completed','cancelled'])
-    //             ],
-    //             'remarks' => 'sometimes|nullable|string|max:255'
-    //         ]);
-
-    //         /*
-    //         |--------------------------------------------------------------------------
-    //         | Validate date relationship
-    //         |--------------------------------------------------------------------------
-    //         */
-    //         if (
-    //             isset($validated['check_in']) ||
-    //             isset($validated['check_out'])
-    //         ) {
-    //             $checkIn  = Carbon::parse($validated['check_in'] ?? $booking->check_in);
-    //             $checkOut = Carbon::parse($validated['check_out'] ?? $booking->check_out);
-
-    //             if ($checkOut->lessThanOrEqualTo($checkIn)) {
-    //                 return response()->json([
-    //                     'message' => 'Check-out must be after check-in.'
-    //                 ], 422);
-    //             }
-    //         }
-
-    //         /*
-    //         |--------------------------------------------------------------------------
-    //         | Handle cancellation rules
-    //         |--------------------------------------------------------------------------
-    //         */
-    //         if (
-    //             isset($validated['status']) &&
-    //             $validated['status'] === 'cancelled'
-    //         ) {
-    //             if (!in_array($booking->status, ['pending', 'confirmed'])) {
-    //                 return response()->json([
-    //                     'message' => 'Only pending or confirmed bookings can be cancelled.'
-    //                 ], 422);
-    //             }
-    //         }
-
-    //         /*
-    //         |--------------------------------------------------------------------------
-    //         | Recalculate price if dates or room changed
-    //         |--------------------------------------------------------------------------
-    //         */
-    //         if (
-    //             isset($validated['check_in']) ||
-    //             isset($validated['check_out']) ||
-    //             isset($validated['room_id'])
-    //         ) {
-    //             $checkIn  = Carbon::parse($validated['check_in'] ?? $booking->check_in);
-    //             $checkOut = Carbon::parse($validated['check_out'] ?? $booking->check_out);
-
-    //             $nights = max(1, $checkOut->diffInDays($checkIn));
-
-    //             $room = Room::findOrFail($validated['room_id'] ?? $booking->room_id);
-
-    //             $validated['total_price'] = $room->price_per_night * $nights;
-    //             $validated['num_of_days'] = $nights;
-    //         }
-
-    //         /*
-    //         |--------------------------------------------------------------------------
-    //         | Persist update
-    //         |--------------------------------------------------------------------------
-    //         */
-    //         $booking->update($validated);
-
-    //         return response()->json([
-    //             'message' => 'Booking updated successfully.',
-    //             'data' => $booking->load(['guest', 'room'])
-    //         ], 200);
-    //     } catch (\Illuminate\Validation\ValidationException $e) {
-    //         return response()->json([
-    //             'message' => 'Validation failed',
-    //             'errors' => $e->errors()
-    //         ], 422);
-    //     } catch (\Exception $e) {
-    //         return response()->json([
-    //             'message' => 'Error updating booking',
-    //             'error' => $e->getMessage()
-    //         ], 500);
-    //     }
-    // }
 
     public function destroy($id)
     {
