@@ -36,9 +36,10 @@ class RoomController extends Controller
                     'check_out.required' => 'check_out is required when is_all is not true.',
                 ]);
 
+                // Use same range as BookingController (startOfDay + endOfDay) so list matches conflict logic
                 try {
                     $checkIn  = Carbon::parse($request->query('check_in'))->startOfDay();
-                    $checkOut = Carbon::parse($request->query('check_out'))->startOfDay();
+                    $checkOut = Carbon::parse($request->query('check_out'))->endOfDay();
                 } catch (\Exception $e) {
                     return response()->json([
                         'success' => false,
