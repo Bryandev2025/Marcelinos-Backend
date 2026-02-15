@@ -16,7 +16,9 @@ class VenueController extends Controller
     use CachesApiResponses;
     /**
      * List venues.
-     * - is_all=true: return all venues.
+     * Same availability contract as RoomController: when check_in/check_out are provided,
+     * only venues available in that range are returned (no overlapping non-cancelled bookings, not in maintenance).
+     * - is_all=true: return all venues (e.g. homepage).
      * - Otherwise: require check_in & check_out; return only venues available in that date range.
      */
     public function index(Request $request)
@@ -35,9 +37,10 @@ class VenueController extends Controller
                     'check_out.required' => 'check_out is required when is_all is not true.',
                 ]);
 
+                // Use same range as BookingController (startOfDay + endOfDay) so list matches conflict logic
                 try {
                     $checkIn  = Carbon::parse($request->query('check_in'))->startOfDay();
-                    $checkOut = Carbon::parse($request->query('check_out'))->startOfDay();
+                    $checkOut = Carbon::parse($request->query('check_out'))->endOfDay();
                 } catch (\Exception $e) {
                     return response()->json([
                         'success' => false,

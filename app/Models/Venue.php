@@ -103,15 +103,18 @@ class Venue extends Model implements HasMedia
     }
 
     /**
-     * Scope: only venues not booked (by a non-cancelled booking) in the given date range.
+     * Scope: only venues available in the given date range.
+     * Same logic as Room::scopeAvailableBetween: exclude maintenance and those
+     * with a non-cancelled booking overlapping the range.
      */
     public function scopeAvailableBetween($query, $checkIn, $checkOut)
     {
-        return $query->whereDoesntHave('bookings', function ($q) use ($checkIn, $checkOut) {
-            $q->where('bookings.status', '!=', Booking::STATUS_CANCELLED)
-                ->where('bookings.check_in', '<', $checkOut)
-                ->where('bookings.check_out', '>', $checkIn);
-        });
+        return $query->where('status', '!=', self::STATUS_MAINTENANCE)
+            ->whereDoesntHave('bookings', function ($q) use ($checkIn, $checkOut) {
+                $q->where('bookings.status', '!=', Booking::STATUS_CANCELLED)
+                    ->where('bookings.check_in', '<', $checkOut)
+                    ->where('bookings.check_out', '>', $checkIn);
+            });
     }
 
     public function amenities()
