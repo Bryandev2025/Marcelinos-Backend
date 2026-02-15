@@ -2,9 +2,11 @@
 
 namespace App\Observers;
 
-use Filament\Notifications\Notification;
-use App\Models\User;
+use App\Events\AdminDashboardNotification;
+use App\Events\BookingStatusUpdated;
 use App\Models\Booking;
+use App\Models\User;
+use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
 
 class BookingObserver
@@ -30,6 +32,18 @@ class BookingObserver
                     ->sendToDatabase($user);
             }
         }
+
+        // Real-time: notify booking channel and admin dashboard
+        BookingStatusUpdated::dispatch($booking);
+        AdminDashboardNotification::dispatch('booking.created', 'New Booking', [
+            'reference' => $booking->reference_number,
+            'booking_id' => $booking->id,
+        ]);
+    }
+
+    public function updated(Booking $booking): void
+    {
+        BookingStatusUpdated::dispatch($booking);
     }
 }
 
