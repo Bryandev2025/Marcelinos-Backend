@@ -66,6 +66,7 @@ For the React client to receive updates **without a page reload**, two processes
 | **Queue worker** | `php artisan queue:work` | Runs queued jobs; broadcast events are queued, so this sends them to Reverb |
 
 - **Manual:** Run both in separate terminals (or use `composer run dev` if it starts server, Reverb, and queue).
+- **Single command (Linux/cPanel):** Use `php artisan services:start` to start Reverb, queue worker, and the scheduler together. See **`documentation/deployment-services.md`**.
 - If the queue worker is not running, events are never broadcast and the frontend will not refetch until the user reloads.
 
 ---

@@ -92,9 +92,13 @@ The application uses **Laravel's task scheduling**. A single system cron job run
 
 ## Server setup (cron)
 
-Only **one** cron entry is needed. Laravel runs all scheduled tasks from it.
+### Option A: Single-command services (recommended on cPanel)
 
-### Crontab (Linux / production)
+If you use **`php artisan services:start`** (or `./start-services.sh`) as described in **`documentation/deployment-services.md`**, the scheduler runs via `schedule:work` inside that process. You **do not** need a separate “every minute” cron for `schedule:run`. Use one **@reboot** cron to start all services (Reverb, queue, scheduler) at once.
+
+### Option B: Traditional cron (scheduler only)
+
+If you run Reverb and queue worker separately and do **not** use `schedule:work`, you need **one** cron entry so Laravel runs scheduled tasks every minute:
 
 ```bash
 * * * * * cd /path/to/your/project && php artisan schedule:run >> /dev/null 2>&1
