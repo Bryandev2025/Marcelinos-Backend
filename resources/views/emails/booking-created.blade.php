@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Booking Received</title>
+    <title>Marcelino's Resort and Hotel</title>
 </head>
 <body style="margin:0; padding:0; background-color:#ffffff; font-family:Arial, Helvetica, sans-serif; color:#1f2937;">
     <div style="display:none; max-height:0; overflow:hidden; opacity:0;">
@@ -19,7 +19,7 @@
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                                 <tr>
                                     <td style="vertical-align:middle;">
-                                        <img src="{{ rtrim(config('app.url'), '/') }}/logo.webp" alt="Marcelino's" width="120" style="display:block; height:auto;" />
+                                        <img src="{{ asset('storage/logos/logo.png') }}" alt="Marcelino's" width="120" style="display:block; height:auto;" />
                                     </td>
                                     <td style="vertical-align:middle; text-align:right; color:#111827;">
                                         <div style="font-size:16px; font-weight:700;">Booking Confirmation</div>
@@ -34,7 +34,7 @@
                         <td style="padding:28px 32px 8px;">
                             <p style="margin:0 0 12px; font-size:16px;">Hi {{ $booking->guest?->full_name ?? 'Guest' }},</p>
                             <p style="margin:0 0 16px; color:#4b5563; font-size:14.5px;">
-                                Thanks for booking with us! Your reservation is now in our system. We’ll follow up if we need anything else.
+                                Thanks for booking with us! Your reservation is now in our system. We'll follow up if we need anything else.
                             </p>
                         </td>
                     </tr>
@@ -79,15 +79,18 @@
 
                     <tr>
                         <td style="padding:0 32px 24px;">
+                            <p style="margin:0 0 12px; font-size:13.5px; color:#6b7280;">
+                                <a href="{{ rtrim(config('app.frontend_url'), '/') }}/booking-receipt/{{ $booking->reference_number }}" style="color:#2563eb; font-weight:600; text-decoration:none;">View your booking →</a>
+                            </p>
                             <p style="margin:0; font-size:13.5px; color:#6b7280;">
-                                Need help? Just reply to this email and we’ll assist you.
+                                Need help? Just reply to this email and we'll assist you.
                             </p>
                         </td>
                     </tr>
 
                     <tr>
                         <td style="padding:18px 32px; font-size:12.5px; color:#6b7280; border-top:1px solid #e5e7eb;">
-                            <div style="font-weight:600; color:#374151;">Marcelino’s Team</div>
+                            <div style="font-weight:600; color:#374151;">Marcelino's Team</div>
                             <div>Thank you for choosing us.</div>
                         </td>
                     </tr>

@@ -22,7 +22,7 @@ class BookingCreated extends Mailable implements ShouldQueue
     public function build()
     {
         return $this
-            ->subject('Booking Received')
+            ->subject('Marcelino\'s Resort and Hotel - Booking Confirmation')
             ->view('emails.booking-created');
     }
 }
