@@ -125,7 +125,7 @@ class Booking extends Model
 
     /* ================= STATUSES ================= */
 
-    const STATUS_PENDING    = 'pending';
+    const STATUS_UNPAID    = 'unpaid';
     const STATUS_CONFIRMED  = 'confirmed';
     const STATUS_OCCUPIED   = 'occupied';
     const STATUS_COMPLETED  = 'completed';
@@ -136,7 +136,7 @@ class Booking extends Model
     public static function statusOptions(): array
     {
         return [
-            self::STATUS_PENDING => 'Pending',
+            self::STATUS_UNPAID => 'Unpaid',
             self::STATUS_CONFIRMED => 'Confirmed',
             self::STATUS_OCCUPIED => 'Occupied',
             self::STATUS_PAID => 'Paid',
@@ -148,7 +148,7 @@ class Booking extends Model
     public static function statusColors(): array
     {
         return [
-            'primary' => self::STATUS_PENDING,
+            'primary' => self::STATUS_UNPAID,
             'success' => self::STATUS_CONFIRMED,
             'warning' => self::STATUS_OCCUPIED,
             'secondary' => self::STATUS_COMPLETED,

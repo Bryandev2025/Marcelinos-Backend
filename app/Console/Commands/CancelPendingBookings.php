@@ -13,7 +13,7 @@ class CancelPendingBookings extends Command
      *
      * @var string
      */
-    protected $signature = 'bookings:cancel-pending
+    protected $signature = 'bookings:cancel-unpaid
                             {--date= : The date (Y-m-d) to process; defaults to today}';
 
     /**
@@ -21,7 +21,7 @@ class CancelPendingBookings extends Command
      *
      * @var string
      */
-    protected $description = 'Cancel pending bookings whose check-in date is today (no payment by check-in)';
+    protected $description = 'Cancel unpaid bookings whose check-in date is today (no payment by check-in)';
 
     /**
      * Execute the console command.
@@ -35,7 +35,7 @@ class CancelPendingBookings extends Command
 
         $bookings = Booking::query()
             ->whereDate('check_in', $date)
-            ->where('status', Booking::STATUS_PENDING)
+            ->where('status', Booking::STATUS_UNPAID)
             ->get();
 
         $count = 0;
@@ -45,9 +45,9 @@ class CancelPendingBookings extends Command
         }
 
         if ($count > 0) {
-            $this->info("Cancelled {$count} pending booking(s) for check-in date {$date}.");
+            $this->info("Cancelled {$count} unpaid booking(s) for check-in date {$date}.");
         } else {
-            $this->comment("No pending bookings with check-in on {$date}.");
+            $this->comment("No unpaid bookings with check-in on {$date}.");
         }
 
         return self::SUCCESS;

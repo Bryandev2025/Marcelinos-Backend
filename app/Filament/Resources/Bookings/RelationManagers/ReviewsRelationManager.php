@@ -142,7 +142,7 @@ class ReviewsRelationManager extends RelationManager
                 TernaryFilter::make('is_approved')
                     ->label('Approved')
                     ->trueLabel('Approved')
-                    ->falseLabel('Pending'),
+                    ->falseLabel('Unpaid'),
 
                 SelectFilter::make('rating')
                     ->options([

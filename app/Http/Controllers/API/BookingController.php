@@ -252,7 +252,7 @@ class BookingController extends Controller
             'check_out'         => $checkOut,
             'no_of_days'        => $validated['days'],
             'total_price'       => $validated['total_price'],
-            'status'            => 'pending',
+            'status'            => 'unpaid',
         ]);
 
         if (!empty($roomIds)) {
@@ -316,7 +316,7 @@ class BookingController extends Controller
     public function cancel(Request $request, Booking $booking)
     {
         try {
-            if (!in_array($booking->status, ['pending', 'confirmed'])) {
+            if (!in_array($booking->status, ['unpaid', 'confirmed'])) {
                 return response()->json([
                     'message' => 'Booking cannot be cancelled in its current state.'
                 ], 422);

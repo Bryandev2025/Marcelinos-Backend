@@ -35,7 +35,7 @@ Schedule::command('bookings:activate-checkins')
     ->dailyAt('12:00')
     ->timezone('Asia/Manila');
 
-// Cancel no-shows: cancel pending bookings that were due to check in today.
-Schedule::command('bookings:cancel-pending')
+// Cancel no-shows: cancel unpaid bookings that were due to check in today.
+Schedule::command('bookings:cancel-unpaid')
     ->dailyAt('12:00')
     ->timezone('Asia/Manila');

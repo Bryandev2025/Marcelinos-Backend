@@ -70,7 +70,7 @@ class ReviewsTable
                 TernaryFilter::make('is_approved')
                     ->label('Approved')
                     ->trueLabel('Approved')
-                    ->falseLabel('Pending'),
+                    ->falseLabel('Unpaid'),
 
                 SelectFilter::make('rating')
                     ->options(Review::ratingOptions()),

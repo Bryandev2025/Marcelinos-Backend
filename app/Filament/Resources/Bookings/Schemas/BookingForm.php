@@ -107,7 +107,7 @@ class BookingForm
 
             Select::make('status')
                 ->options(Booking::statusOptions())
-                ->default(Booking::STATUS_PENDING)
+                ->default(Booking::STATUS_UNPAID)
                 ->required(),
 
             TextInput::make('reference_number')
