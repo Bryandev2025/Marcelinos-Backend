@@ -118,6 +118,7 @@ class BookingsTable
                                 'last_2_years' => 'Last 2 years',
                                 'this_year' => 'This year',
                             ])
+                            ->default('today')
                             ->inline()
                             ->visible(fn (Get $get) => ! (bool) $get('use_custom')),
                         Toggle::make('use_custom')
