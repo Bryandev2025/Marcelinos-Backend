@@ -24,6 +24,12 @@ Schedule::command('bookings:complete-checkouts')
     ->dailyAt('10:00')
     ->timezone('Asia/Manila');
 
+// Send Testimonial Feedback: send testimonial feedback email to guests 1 day after their booking is completed.
+Schedule::command('testimonials:send-feedback')
+    // ->dailyAt('12:00')
+    ->everyMinute()
+    ->timezone('Asia/Manila');
+
 // Activate stays: mark paid bookings that check in today as occupied.
 Schedule::command('bookings:activate-checkins')
     ->dailyAt('12:00')
