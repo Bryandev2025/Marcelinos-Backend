@@ -65,6 +65,7 @@ class RoomController extends Controller
                 return [
                     'id' => $room->id,
                     'name' => $room->name,
+                    'description' => $room->description,
                     'capacity' => $room->capacity,
                     'type' => $room->type,
                     'price' => $room->price,
@@ -107,6 +108,7 @@ class RoomController extends Controller
                     'data' => [
                         'id' => $room->id,
                         'name' => $room->name,
+                        'description' => $room->description,
                         'capacity' => $room->capacity,
                         'type' => $room->type,
                         'price' => $room->price,

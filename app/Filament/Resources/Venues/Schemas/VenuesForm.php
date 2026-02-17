@@ -8,6 +8,8 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Schemas\Schema;
 
+use Filament\Forms\Components\Textarea;
+
 class VenuesForm
 {
     public static function configure(Schema $schema): Schema
@@ -18,6 +20,10 @@ class VenuesForm
                     ->label('Venue Name')
                     ->required(),
 
+                Textarea::make('description')
+                    ->rows(3)
+                    ->columnSpanFull(),
+                    
                 TextInput::make('capacity')
                     ->required()
                     ->numeric(),
