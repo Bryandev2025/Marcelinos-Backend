@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Models\Venue;
-use App\Http\Controllers\Controller;
 use App\Http\Controllers\API\Concerns\CachesApiResponses;
+use App\Http\Controllers\Controller;
+use App\Http\Resources\API\VenueResource;
+use App\Models\Venue;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -14,6 +15,7 @@ use Exception;
 class VenueController extends Controller
 {
     use CachesApiResponses;
+
     /**
      * List venues.
      * Same availability contract as RoomController: when check_in/check_out are provided,
@@ -26,8 +28,6 @@ class VenueController extends Controller
         try {
             $isAll = filter_var($request->query('is_all', false), FILTER_VALIDATE_BOOLEAN);
 
-            $query = Venue::query()->with(['amenities', 'media']);
-
             if (!$isAll) {
                 $request->validate([
                     'check_in'  => 'required|string',
@@ -37,7 +37,6 @@ class VenueController extends Controller
                     'check_out.required' => 'check_out is required when is_all is not true.',
                 ]);
 
-                // Use same range as BookingController (startOfDay + endOfDay) so list matches conflict logic
                 try {
                     $checkIn  = Carbon::parse($request->query('check_in'))->startOfDay();
                     $checkOut = Carbon::parse($request->query('check_out'))->endOfDay();
@@ -55,30 +54,36 @@ class VenueController extends Controller
                     ], 422);
                 }
 
-                $query->availableBetween($checkIn, $checkOut);
+                $cacheKey = static::listCacheKey('venues', [
+                    'check_in'  => $checkIn->toDateString(),
+                    'check_out' => $checkOut->toDateString(),
+                ]);
+                $ttl = 120;
+            } else {
+                $cacheKey = 'api.venues.list.all';
+                $ttl = 300;
             }
 
-            $venues = $query->get();
+            return $this->rememberJson($cacheKey, function () use ($request) {
+                $isAll = filter_var($request->query('is_all', false), FILTER_VALIDATE_BOOLEAN);
 
-            $formattedVenues = $venues->map(function ($venue) {
-                return [
-                    'id' => $venue->id,
-                    'name' => $venue->name,
-                    'description' => $venue->description,
-                    'capacity' => $venue->capacity,
-                    'price' => $venue->price,
-                    'amenities' => $venue->amenities,
-                    'featured_image' => $venue->featured_image_url,
-                    'gallery' => $venue->gallery_urls,
+                $query = Venue::query()->with(['amenities', 'media']);
+
+                if (!$isAll) {
+                    $checkIn  = Carbon::parse($request->query('check_in'))->startOfDay();
+                    $checkOut = Carbon::parse($request->query('check_out'))->endOfDay();
+                    $query->availableBetween($checkIn, $checkOut);
+                }
+
+                $venues = $query->get();
+                $payload = [
+                    'success' => true,
+                    'data' => VenueResource::collection($venues)->resolve(),
                 ];
-            });
-
-            $payload = ['success' => true, 'data' => $formattedVenues];
-            $isAll = filter_var($request->query('is_all', false), FILTER_VALIDATE_BOOLEAN);
-            $cacheKey = $isAll ? 'api.venues.list.all' : null;
-            $ttl = $isAll ? 300 : 0;
-
-            return $this->rememberJson($cacheKey, fn () => response()->json($payload, 200), $ttl);
+                $response = response()->json($payload, 200);
+                $response->header('Cache-Control', $isAll ? 'public, max-age=300' : 'public, max-age=120');
+                return $response;
+            }, $ttl);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'success' => false,
@@ -103,17 +108,12 @@ class VenueController extends Controller
         return $this->rememberJson($cacheKey, function () use ($id) {
             try {
                 $venue = Venue::with(['amenities', 'media'])->findOrFail($id);
-                $data = [
-                    'id' => $venue->id,
-                    'name' => $venue->name,
-                    'description' => $venue->description,
-                    'capacity' => $venue->capacity,
-                    'price' => $venue->price,
-                    'amenities' => $venue->amenities,
-                    'featured_image' => $venue->featured_image_url,
-                    'gallery' => $venue->gallery_urls,
-                ];
-                return response()->json(['success' => true, 'data' => $data], 200);
+                $json = response()->json([
+                    'success' => true,
+                    'data' => (new VenueResource($venue))->resolve(),
+                ], 200);
+                $json->header('Cache-Control', 'public, max-age=300');
+                return $json;
             } catch (ModelNotFoundException $e) {
                 return response()->json(['success' => false, 'message' => 'Venue not found'], 404);
             } catch (Exception $e) {

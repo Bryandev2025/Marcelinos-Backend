@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\API\StoreBookingRequest;
 use App\Models\Booking;
 use App\Models\Room;
 use App\Models\Venue;
@@ -10,22 +11,21 @@ use App\Models\Guest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
 
 class BookingController extends Controller
 {
     //
     /**
-     * Display all bookings
+     * Display all bookings (paginated).
      */
-    public function index()
+    public function index(Request $request)
     {
         try {
-            if (Booking::count() === 0) {
-                return response()->json(['message' => 'No bookings found'], 404);
-            }
+            $perPage = min((int) $request->query('per_page', 15), 50);
+            $bookings = Booking::with(['guest', 'rooms', 'venues'])
+                ->orderByDesc('created_at')
+                ->paginate($perPage);
 
-            $bookings = Booking::with(['guest', 'rooms', 'venues'])->get();
             return response()->json($bookings, 200);
         } catch (\Exception $e) {
             return response()->json([
@@ -118,26 +118,9 @@ class BookingController extends Controller
 
 
 
-    public function store(Request $request)
+    public function store(StoreBookingRequest $request)
     {
-        $validated = $request->validate(
-            [
-                'reference_number' => 'nullable|string', // optional; server auto-generates if not provided
-                'rooms'   => 'nullable|array',
-                'rooms.*' => ['integer', 'distinct', Rule::exists('rooms', 'id')],
-                'venues'  => 'nullable|array',
-                'venues.*' => ['required_with:venues', 'integer', 'distinct', Rule::exists('venues', 'id')],
-                'check_in'  => 'required|string',
-                'check_out' => 'required|string',
-                'days'      => 'required|integer|min:1',
-                'total_price' => 'required|numeric|min:0',
-            ],
-            [
-                'rooms.*.exists' => 'Selected room :input does not exist.',
-                'rooms.*.distinct' => 'Duplicate room selection is not allowed.',
-                'venues.*.exists' => 'Selected venue :input does not exist.',
-            ]
-        );
+        $validated = $request->validated();
 
         // At least either rooms or venues must be provided AND not both empty
         $hasRooms = isset($validated['rooms']) && is_array($validated['rooms']) && count($validated['rooms']) > 0;

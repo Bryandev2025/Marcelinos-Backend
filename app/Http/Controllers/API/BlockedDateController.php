@@ -44,7 +44,9 @@ class BlockedDateController extends Controller
                 ->sortBy('date')
                 ->values();
 
-            return response()->json(['blocked_dates' => $blockedDates]);
+            $response = response()->json(['blocked_dates' => $blockedDates]);
+            $response->header('Cache-Control', 'public, max-age=300');
+            return $response;
         });
     }
 
@@ -59,10 +61,12 @@ class BlockedDateController extends Controller
         $totalRooms = Room::count();
         $totalVenues = Venue::count();
 
-        $bookings = Booking::whereIn('status', [
-            Booking::STATUS_CONFIRMED,
-            Booking::STATUS_OCCUPIED,
-        ])->get();
+        $bookings = Booking::with(['rooms', 'venues'])
+            ->whereIn('status', [
+                Booking::STATUS_CONFIRMED,
+                Booking::STATUS_OCCUPIED,
+            ])
+            ->get();
 
         if ($bookings->isEmpty()) {
             return $blockedDates;
@@ -77,8 +81,8 @@ class BlockedDateController extends Controller
 
             $dates = $this->getDateRange($checkIn, $checkOut);
 
-            $bookedRoomCount = $booking->rooms()->count();
-            $bookedVenueCount = $booking->venues()->count();
+            $bookedRoomCount = $booking->rooms->count();
+            $bookedVenueCount = $booking->venues->count();
 
             foreach ($dates as $date) {
                 $roomCountPerDate[$date] = ($roomCountPerDate[$date] ?? 0) + $bookedRoomCount;

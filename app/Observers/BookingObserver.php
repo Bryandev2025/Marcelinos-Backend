@@ -7,6 +7,7 @@ use App\Events\BookingStatusUpdated;
 use App\Models\Booking;
 use App\Models\User;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class BookingObserver
@@ -33,6 +34,9 @@ class BookingObserver
             }
         }
 
+        // Invalidate blocked-dates cache (booking affects availability)
+        Cache::forget('api.blocked-dates');
+
         // Real-time: notify booking channel and admin dashboard
         BookingStatusUpdated::dispatch($booking);
         AdminDashboardNotification::dispatch('booking.created', 'New Booking', [
@@ -43,7 +47,13 @@ class BookingObserver
 
     public function updated(Booking $booking): void
     {
+        Cache::forget('api.blocked-dates');
         BookingStatusUpdated::dispatch($booking);
+    }
+
+    public function deleted(Booking $booking): void
+    {
+        Cache::forget('api.blocked-dates');
     }
 }
 
