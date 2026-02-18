@@ -21,7 +21,7 @@ class StaffResource extends Resource
 {
     protected static ?string $model = User::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedIdentification;
     protected static string|\UnitEnum|null $navigationGroup = 'People';
     protected static ?int $navigationSort = 1;
     protected static ?string $navigationLabel = 'Staff';

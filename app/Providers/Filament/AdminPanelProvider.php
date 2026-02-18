@@ -39,9 +39,8 @@ class AdminPanelProvider extends PanelProvider
                 'gray' => Color::Slate,
             ])
             ->font('Inter')
-            ->brandName('Marcelinos Admin')
-            ->brandLogo(asset('brand-logo.png'))
-            ->brandLogoHeight('4rem')
+            ->brandLogoHeight('3.5rem')
+            ->brandName(fn () => view('filament.admin.brand'))            
             ->sidebarCollapsibleOnDesktop()
             ->databaseNotifications()
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')

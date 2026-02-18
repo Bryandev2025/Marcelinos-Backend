@@ -20,7 +20,7 @@ class VenuesResource extends Resource
 {
     protected static ?string $model = Venue::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedHomeModern;
     protected static string|\UnitEnum|null $navigationGroup = 'Properties';
     protected static ?int $navigationSort = 1;
     protected static ?string $navigationLabel = 'Venues';

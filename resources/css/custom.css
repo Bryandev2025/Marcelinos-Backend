@@ -1,0 +1,18 @@
+/* resources/css/custom.css */
+
+/* Compact sidebar items */
+.filament-sidebar .filament-sidebar-list-item {
+    padding-top: 0.25rem;    /* reduce vertical padding */
+    padding-bottom: 0.25rem;
+    margin-bottom: 0;        /* remove extra spacing */
+}
+
+/* Reduce icon-text gap */
+.filament-sidebar .filament-sidebar-list-item a {
+    gap: 0.5rem;             /* default might be 0.75rem */
+}
+
+/* Reduce spacing between grouped items */
+.filament-sidebar .filament-sidebar-group > .filament-sidebar-list {
+    gap: 0.25rem;            /* default is larger */
+}
