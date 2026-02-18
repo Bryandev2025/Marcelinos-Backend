@@ -17,6 +17,7 @@ class RoomSeeder extends Seeder
                 'type' => 'standard',
                 'price' => 1500.00,
                 'status' => 'available',
+                'description' => '2 Single Bed',
             ],
             [
                 'name' => 'Room 102',
@@ -24,6 +25,7 @@ class RoomSeeder extends Seeder
                 'type' => 'standard',
                 'price' => 1500.00,
                 'status' => 'available',
+                'description' => '2 Single Bed',
             ],
             [
                 'name' => 'Room 103',
@@ -31,6 +33,7 @@ class RoomSeeder extends Seeder
                 'type' => 'standard',
                 'price' => 1500.00,
                 'status' => 'available',
+                'description' => '1 Double Bed',
             ],
             [
                 'name' => 'Room 104',
@@ -38,6 +41,7 @@ class RoomSeeder extends Seeder
                 'type' => 'standard',
                 'price' => 1500.00,
                 'status' => 'available',
+                'description' => '1 Double Bed',
             ],
             [
                 'name' => 'Room 105',
@@ -45,6 +49,7 @@ class RoomSeeder extends Seeder
                 'type' => 'standard',
                 'price' => 1500.00,
                 'status' => 'available',
+                'description' => '1 Double Bed',
             ],
             [
                 'name' => 'Room 106',
@@ -52,6 +57,7 @@ class RoomSeeder extends Seeder
                 'type' => 'standard',
                 'price' => 1500.00,
                 'status' => 'available',
+                'description' => '2 Single Bed',
             ],
 
             // DELUXE ROOMS (₱2,200 | 3 persons)
@@ -61,6 +67,7 @@ class RoomSeeder extends Seeder
                 'type' => 'deluxe',
                 'price' => 2200.00,
                 'status' => 'available',
+                'description' => '1 Double Bed and 1 Single Bed',
             ],
             [
                 'name' => 'Room 108',
@@ -68,6 +75,7 @@ class RoomSeeder extends Seeder
                 'type' => 'deluxe',
                 'price' => 2200.00,
                 'status' => 'available',
+                'description' => '1 Double Bed and 1 Single Bed',
             ],
             [
                 'name' => 'Room 201',
@@ -75,6 +83,7 @@ class RoomSeeder extends Seeder
                 'type' => 'deluxe',
                 'price' => 2200.00,
                 'status' => 'available',
+                'description' => '1 Double Bed and 1 Single Bed',
             ],
             [
                 'name' => 'Room 202',
@@ -82,6 +91,7 @@ class RoomSeeder extends Seeder
                 'type' => 'deluxe',
                 'price' => 2200.00,
                 'status' => 'available',
+                'description' => '1 Double Bed and 1 Single Bed',
             ],
             [
                 'name' => 'Room 205',
@@ -89,6 +99,7 @@ class RoomSeeder extends Seeder
                 'type' => 'deluxe',
                 'price' => 2200.00,
                 'status' => 'available',
+                'description' => '1 Double Bed and 1 Single Bed',
             ],
             [
                 'name' => 'Room 206',
@@ -96,6 +107,7 @@ class RoomSeeder extends Seeder
                 'type' => 'deluxe',
                 'price' => 2200.00,
                 'status' => 'available',
+                'description' => '1 Double Bed and 1 Single Bed',
             ],
 
             // FAMILY ROOMS (₱3,000 | 3 persons)
@@ -105,6 +117,7 @@ class RoomSeeder extends Seeder
                 'type' => 'family',
                 'price' => 3000.00,
                 'status' => 'available',
+                'description' => '1 Queen Size Bed and 1 Single Bed',
             ],
             [
                 'name' => 'Room 204',
@@ -112,6 +125,7 @@ class RoomSeeder extends Seeder
                 'type' => 'family',
                 'price' => 3000.00,
                 'status' => 'available',
+                'description' => '1 Queen Size Bed and 1 Single Bed w/ Sala',
             ],
         ]);
     }
