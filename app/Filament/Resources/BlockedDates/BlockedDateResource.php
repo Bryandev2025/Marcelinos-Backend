@@ -19,7 +19,7 @@ class BlockedDateResource extends Resource
 {
     protected static ?string $model = BlockedDate::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCalendarDays;
 
     protected static ?string $navigationLabel = 'Blocked Dates';
 
