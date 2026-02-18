@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Models\Room;
-use App\Http\Controllers\Controller;
 use App\Http\Controllers\API\Concerns\CachesApiResponses;
+use App\Http\Controllers\Controller;
+use App\Http\Resources\API\RoomResource;
+use App\Models\Room;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -14,6 +15,7 @@ use Exception;
 class RoomController extends Controller
 {
     use CachesApiResponses;
+
     /**
      * List rooms.
      * Same availability contract as VenueController: when check_in/check_out are provided,
@@ -26,9 +28,6 @@ class RoomController extends Controller
         try {
             $isAll = filter_var($request->query('is_all', false), FILTER_VALIDATE_BOOLEAN);
 
-            $query = Room::with(['amenities', 'media'])
-                ->orderByRaw("FIELD(type, 'standard', 'family', 'deluxe')");
-
             if (!$isAll) {
                 $request->validate([
                     'check_in'  => 'required|string',
@@ -38,7 +37,6 @@ class RoomController extends Controller
                     'check_out.required' => 'check_out is required when is_all is not true.',
                 ]);
 
-                // Use same range as BookingController (startOfDay + endOfDay) so list matches conflict logic
                 try {
                     $checkIn  = Carbon::parse($request->query('check_in'))->startOfDay();
                     $checkOut = Carbon::parse($request->query('check_out'))->endOfDay();
@@ -56,32 +54,37 @@ class RoomController extends Controller
                     ], 422);
                 }
 
-                $query->availableBetween($checkIn, $checkOut);
+                $cacheKey = static::listCacheKey('rooms', [
+                    'check_in'  => $checkIn->toDateString(),
+                    'check_out' => $checkOut->toDateString(),
+                ]);
+                $ttl = 120;
+            } else {
+                $cacheKey = 'api.rooms.list.all';
+                $ttl = 300;
             }
 
-            $rooms = $query->get();
+            return $this->rememberJson($cacheKey, function () use ($request) {
+                $isAll = filter_var($request->query('is_all', false), FILTER_VALIDATE_BOOLEAN);
 
-            $formattedRooms = $rooms->map(function ($room) {
-                return [
-                    'id' => $room->id,
-                    'name' => $room->name,
-                    'description' => $room->description,
-                    'capacity' => $room->capacity,
-                    'type' => $room->type,
-                    'price' => $room->price,
-                    'status' => $room->status,
-                    'amenities' => $room->amenities,
-                    'featured_image' => $room->featured_image_url,
-                    'gallery' => $room->gallery_urls,
+                $query = Room::with(['amenities', 'media'])
+                    ->orderByRaw("FIELD(type, 'standard', 'family', 'deluxe')");
+
+                if (!$isAll) {
+                    $checkIn  = Carbon::parse($request->query('check_in'))->startOfDay();
+                    $checkOut = Carbon::parse($request->query('check_out'))->endOfDay();
+                    $query->availableBetween($checkIn, $checkOut);
+                }
+
+                $rooms = $query->get();
+                $payload = [
+                    'success' => true,
+                    'data' => RoomResource::collection($rooms)->resolve(),
                 ];
-            });
-
-            $payload = ['success' => true, 'data' => $formattedRooms];
-            $isAll = filter_var($request->query('is_all', false), FILTER_VALIDATE_BOOLEAN);
-            $cacheKey = $isAll ? 'api.rooms.list.all' : null;
-            $ttl = $isAll ? 300 : 0;
-
-            return $this->rememberJson($cacheKey, fn () => response()->json($payload, 200), $ttl);
+                $response = response()->json($payload, 200);
+                $response->header('Cache-Control', $isAll ? 'public, max-age=300' : 'public, max-age=120');
+                return $response;
+            }, $ttl);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'success' => false,
@@ -103,21 +106,12 @@ class RoomController extends Controller
         return $this->rememberJson($cacheKey, function () use ($id) {
             try {
                 $room = Room::with(['amenities', 'media'])->findOrFail($id);
-                return response()->json([
+                $json = response()->json([
                     'success' => true,
-                    'data' => [
-                        'id' => $room->id,
-                        'name' => $room->name,
-                        'description' => $room->description,
-                        'capacity' => $room->capacity,
-                        'type' => $room->type,
-                        'price' => $room->price,
-                        'status' => $room->status,
-                        'amenities' => $room->amenities,
-                        'featured_image' => $room->featured_image_url,
-                        'gallery' => $room->gallery_urls,
-                    ],
+                    'data' => (new RoomResource($room))->resolve(),
                 ], 200);
+                $json->header('Cache-Control', 'public, max-age=300');
+                return $json;
             } catch (ModelNotFoundException $e) {
                 return response()->json([
                     'success' => false,

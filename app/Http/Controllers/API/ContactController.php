@@ -3,12 +3,10 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\API\ContactRequest;
+use App\Jobs\SendContactNotification;
 use App\Models\ContactUs;
-use App\Models\User;
-use App\Notifications\NewContactInquiry;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Notification;
 
 class ContactController extends Controller
 {
@@ -16,28 +14,15 @@ class ContactController extends Controller
      * Store a contact form submission.
      * Validates input, stores in database, and notifies administrators.
      */
-    public function store(Request $request): JsonResponse
+    public function store(ContactRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'full_name' => 'required|string|max:255',
-            'email'     => 'required|email',
-            'phone'     => 'nullable|string|max:20',
-            'subject'   => 'required|string|max:255',
-            'message'   => 'required|string|max:5000',
-        ], [
-            'full_name.required' => 'Full name is required.',
-            'email.required'     => 'Email is required.',
-            'email.email'        => 'Please provide a valid email address.',
-            'subject.required'   => 'Please select a subject.',
-            'message.required'  => 'Message is required.',
-        ]);
+        $validated = $request->validated();
 
         // Store the inquiry
         $contact = ContactUs::create($validated);
 
-        // Notify all admin users
-        $admins = User::where('role', 'admin')->get();
-        Notification::send($admins, new NewContactInquiry($contact));
+        // Notify admins via queue (non-blocking)
+        SendContactNotification::dispatch($contact);
 
         return response()->json([
             'success' => true,
