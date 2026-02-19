@@ -23,9 +23,8 @@ return new class extends Migration
                 ->constrained()
                 ->nullOnDelete();
 
-            $table->nullableMorphs('reviewable');
-
-            $table->boolean('is_site_review')->default(false);
+            // This review is for the overall experience at Marcelinos Hotel
+            // No more morphs or specific room/venue references
 
             $table->unsignedTinyInteger('rating');
             $table->string('title')->nullable();
@@ -37,7 +36,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['guest_id', 'created_at']);
-            $table->index(['is_site_review', 'is_approved']);
+            $table->index(['is_approved']);
         });
     }
 

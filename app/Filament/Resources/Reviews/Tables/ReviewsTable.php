@@ -26,9 +26,6 @@ class ReviewsTable
                     ->formatStateUsing(fn ($record) => $record->guest?->full_name ?? '—')
                     ->searchable(['guest.first_name', 'guest.middle_name', 'guest.last_name']),
 
-                TextColumn::make('reviewable.name')
-                    ->label('Target')
-                    ->formatStateUsing(fn ($state, $record) => $record->is_site_review ? 'Site' : ($state ?? '')),
 
                 TextColumn::make('rating')
                     ->badge()
@@ -52,9 +49,7 @@ class ReviewsTable
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->dateTime(),
 
                 TextColumn::make('updated_at')
                     ->dateTime()

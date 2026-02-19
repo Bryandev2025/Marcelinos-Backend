@@ -122,9 +122,6 @@ class Venue extends Model implements HasMedia
         return $this->belongsToMany(Amenity::class);
     }
 
-    public function reviews()
-    {
-        return $this->morphMany(Review::class, 'reviewable');
-    }
+
 
 }

@@ -25,20 +25,11 @@ class Review extends Model
         ];
     }
 
-    public static function reviewableTypeOptions(): array
-    {
-        return [
-            Room::class => 'Room',
-            Venue::class => 'Venue',
-        ];
-    }
+
 
     protected $fillable = [
         'guest_id',
         'booking_id',
-        'reviewable_type',
-        'reviewable_id',
-        'is_site_review',
         'rating',
         'title',
         'comment',
@@ -47,7 +38,6 @@ class Review extends Model
     ];
 
     protected $casts = [
-        'is_site_review' => 'boolean',
         'is_approved' => 'boolean',
         'reviewed_at' => 'datetime',
         'rating' => 'integer',
@@ -65,10 +55,7 @@ class Review extends Model
         return $this->belongsTo(Booking::class);
     }
 
-    public function reviewable()
-    {
-        return $this->morphTo();
-    }
+
 
     /* ================= SCOPES ================= */
 
@@ -77,10 +64,7 @@ class Review extends Model
         return $query->where('is_approved', true);
     }
 
-    public function scopeSiteReviews($query)
-    {
-        return $query->where('is_site_review', true);
-    }
+
 
     
 }
