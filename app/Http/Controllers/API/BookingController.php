@@ -296,7 +296,7 @@ class BookingController extends Controller
         }
     }
 
-    public function cancel(Request $request, Booking $booking)
+        public function cancel(Request $request, Booking $booking)
     {
         try {
             if (!in_array($booking->status, ['unpaid', 'confirmed'])) {
@@ -306,14 +306,14 @@ class BookingController extends Controller
             }
 
             $booking->update([
-                'status' => 'cancelled',
-                'remarks' => $request->remarks
+                'status' => 'cancelled'
             ]);
 
             return response()->json([
                 'message' => 'Booking cancelled successfully.',
                 'booking' => $booking
             ], 200);
+
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Error cancelling booking',
