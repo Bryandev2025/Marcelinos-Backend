@@ -17,7 +17,6 @@ class ReviewController extends Controller
     {
         try {
         $reviews = Review::with('guest')
-            ->where('is_site_review', true)
             ->where('is_approved', true)
             ->latest('reviewed_at')
             ->get()
