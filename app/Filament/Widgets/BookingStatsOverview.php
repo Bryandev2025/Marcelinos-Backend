@@ -19,8 +19,10 @@ class BookingStatsOverview extends StatsOverviewWidget
         $todayDelta = $todayCount - $yesterdayCount;
 
         $currentRevenue = Booking::where('created_at', '>=', now()->subDays(30))
+            ->whereIn('status', [Booking::STATUS_PAID, Booking::STATUS_COMPLETED])
             ->sum('total_price');
         $previousRevenue = Booking::whereBetween('created_at', [now()->subDays(60), now()->subDays(30)])
+            ->whereIn('status', [Booking::STATUS_PAID, Booking::STATUS_COMPLETED])
             ->sum('total_price');
         $revenueDelta = $currentRevenue - $previousRevenue;
 
