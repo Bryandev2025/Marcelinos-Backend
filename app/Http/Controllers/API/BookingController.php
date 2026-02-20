@@ -97,9 +97,7 @@ class BookingController extends Controller
                 return response()->json(['message' => 'Booking not found'], 404);
             }
 
-            $hasTestimonial = $booking->reviews()
-                ->where('is_site_review', true)
-                ->exists();
+            $hasTestimonial = $booking->reviews()->exists();
 
             return response()->json([
                 'booking' => $booking,

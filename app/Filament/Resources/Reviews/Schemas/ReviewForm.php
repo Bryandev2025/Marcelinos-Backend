@@ -45,14 +45,7 @@ class ReviewForm
                         }
                     }),
 
-                Select::make('reviewable_type')
-                    ->label('Review Type')
-                    ->options(Review::reviewableTypeOptions())
-                    ->searchable()
-                    ->live()
-                    ->afterStateUpdated(fn (Set $set) => $set('reviewable_id', null))
-                    ->required(fn (Get $get) => ! $get('is_site_review'))
-                    ->visible(fn (Get $get) => ! $get('is_site_review')),
+
 
                 Select::make('reviewable_id')
                     ->label('Review Target')
@@ -71,8 +64,7 @@ class ReviewForm
                     ->options(Review::ratingOptions())
                     ->required(),
 
-                TextInput::make('title')
-                    ->maxLength(255),
+
 
                 Textarea::make('comment')
                     ->rows(4)

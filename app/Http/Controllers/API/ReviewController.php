@@ -74,7 +74,6 @@ class ReviewController extends Controller
         }
 
         $existing = Review::where('booking_id', $booking->id)
-            ->where('is_site_review', true)
             ->exists();
 
         if ($existing) {
@@ -104,7 +103,6 @@ class ReviewController extends Controller
             'booking_id' => $booking->id,
             'reviewable_type' => null,
             'reviewable_id' => null,
-            'is_site_review' => true,
             'rating' => (int) $data['rating'],
             'title' => $data['title'] ?? null,
             'comment' => $data['comment'] ?? null,

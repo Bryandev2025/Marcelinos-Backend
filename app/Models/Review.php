@@ -9,9 +9,13 @@ use App\Models\Venue;
 
 class Review extends Model
 {
-
-//hi
     use HasFactory;
+
+    // For compatibility with Filament/resources expecting this relationship
+    public function reviewable()
+    {
+        return $this->morphTo();
+    }
 
     /* ================= RATING ================= */
     public static function ratingOptions(): array
@@ -31,7 +35,6 @@ class Review extends Model
         'guest_id',
         'booking_id',
         'rating',
-        'title',
         'comment',
         'is_approved',
         'reviewed_at',
