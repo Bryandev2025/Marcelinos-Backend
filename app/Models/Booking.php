@@ -47,7 +47,6 @@ class Booking extends Model
          * Generate QR code AFTER booking is created
          */
         static::created(function (Booking $booking) {
-
             $qrData = json_encode([
                 'booking_id' => $booking->id,
                 'reference'  => $booking->reference_number,
@@ -70,26 +69,20 @@ class Booking extends Model
         });
 
         /**
-         * Existing room status logic (REMOVED - redundant)
+         * Send testimonial feedback email immediately when status changes to completed
          */
-        // static::saved(function (Booking $booking) {
-        //     $rooms = $booking->rooms;
-
-        //     if ($rooms->isEmpty()) {
-        //         return;
-        //     }
-
-        //     if ($booking->status === self::STATUS_OCCUPIED) {
-        //         $rooms->each->update(['status' => 'occupied']);
-        //     }
-
-        //     if (in_array($booking->status, [
-        //         self::STATUS_COMPLETED,
-        //         self::STATUS_CANCELLED
-        //     ])) {
-        //         $rooms->each->update(['status' => 'available']);
-        //     }
-        // });
+        static::updated(function (Booking $booking) {
+            if (
+                $booking->status === Booking::STATUS_COMPLETED &&
+                $booking->guest && $booking->guest->email &&
+                !$booking->testimonial_feedback_sent_at
+            ) {
+                \Illuminate\Support\Facades\Mail::to($booking->guest->email)
+                    ->send(new \App\Mail\TestimonialFeedbackEmail($booking));
+                $booking->updateQuietly(['testimonial_feedback_sent_at' => now()]);
+            }
+        });
+        // ...existing code...
     }
 
     /* ================= RELATIONSHIPS ================= */
