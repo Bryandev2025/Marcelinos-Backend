@@ -19,9 +19,9 @@ class RoomController extends Controller
     /**
      * List rooms.
      * Same availability contract as VenueController: when check_in/check_out are provided,
-     * only rooms available in that range are returned (no overlapping non-cancelled bookings, not in maintenance).
+     * All rooms are returned but add availability status (available or not available).
      * - is_all=true: return all rooms (e.g. homepage).
-     * - Otherwise: require check_in & check_out; return only rooms available in that date range.
+     * - Otherwise: require check_in & check_out; return rooms with availability status based on the date range.
      */
     public function index(Request $request)
     {
@@ -70,16 +70,33 @@ class RoomController extends Controller
                 $query = Room::with(['amenities', 'media'])
                     ->orderByRaw("FIELD(type, 'standard', 'family', 'deluxe')");
 
+                $checkIn = null;
+                $checkOut = null;
                 if (!$isAll) {
                     $checkIn  = Carbon::parse($request->query('check_in'))->startOfDay();
                     $checkOut = Carbon::parse($request->query('check_out'))->endOfDay();
-                    $query->availableBetween($checkIn, $checkOut);
+                    // Return all rooms; availability status is added per room below
                 }
 
                 $rooms = $query->get();
+
+                $availableRoomIds = [];
+                if (!$isAll && $rooms->isNotEmpty()) {
+                    $availableRoomIds = Room::whereIn('id', $rooms->pluck('id'))
+                        ->availableBetween($checkIn, $checkOut)
+                        ->pluck('id')
+                        ->all();
+                }
+
+                $data = RoomResource::collection($rooms)->resolve();
+                $data = array_map(function ($item) use ($isAll, $availableRoomIds) {
+                    $item['available'] = $isAll ? null : in_array($item['id'], $availableRoomIds);
+                    return $item;
+                }, $data);
+
                 $payload = [
                     'success' => true,
-                    'data' => RoomResource::collection($rooms)->resolve(),
+                    'data' => $data,
                 ];
                 $response = response()->json($payload, 200);
                 $response->header('Cache-Control', $isAll ? 'public, max-age=300' : 'public, max-age=120');
