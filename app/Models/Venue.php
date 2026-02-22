@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Eloquent\Relations\VenueReviewsRelation;
+use App\Models\Review;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\MediaLibrary\HasMedia;
@@ -122,6 +124,12 @@ class Venue extends Model implements HasMedia
         return $this->belongsToMany(Amenity::class);
     }
 
-
-
+    /**
+     * Reviews for this venue (via bookings that include this venue).
+     * Used by Filament ReviewsRelationManager.
+     */
+    public function reviews()
+    {
+        return new VenueReviewsRelation(Review::query(), $this);
+    }
 }

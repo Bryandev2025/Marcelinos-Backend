@@ -5,6 +5,8 @@ namespace App\Models;
 use Spatie\MediaLibrary\HasMedia;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use App\Eloquent\Relations\RoomReviewsRelation;
+use App\Models\Review;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
@@ -130,5 +132,13 @@ class Room extends Model implements HasMedia
         return $this->belongsToMany(Amenity::class);
     }
 
+    /**
+     * Reviews for this room (via bookings that include this room).
+     * Used by Filament ReviewsRelationManager.
+     */
+    public function reviews()
+    {
+        return new RoomReviewsRelation(Review::query(), $this);
+    }
 
 }

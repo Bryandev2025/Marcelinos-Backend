@@ -35,12 +35,19 @@ class VenuesResource extends Resource
         return VenuesTable::configure($table);
     }
 
-    public static function getRelations(): array
-    {
-        return [
-            ReviewsRelationManager::class,
-        ];
-    }
+    /**
+     * @return array
+     * @description: Ignore sa laman ni kay dili pani necesary na may relation manager
+     * @note: E uncomment ra laman (line 44-49) if kinahanglan ang reviews relation manager section 
+     * @since: 2026-02-23
+     */
+
+    // public static function getRelations(): array
+    // {
+    //     return [
+    //         ReviewsRelationManager::class,
+    //     ];
+    // }
 
     public static function getPages(): array
     {
