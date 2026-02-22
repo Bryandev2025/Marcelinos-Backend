@@ -19,9 +19,9 @@ class VenueController extends Controller
     /**
      * List venues.
      * Same availability contract as RoomController: when check_in/check_out are provided,
-     * only venues available in that range are returned (no overlapping non-cancelled bookings, not in maintenance).
+     * All venues are returned but add availability status (available or not available).
      * - is_all=true: return all venues (e.g. homepage).
-     * - Otherwise: require check_in & check_out; return only venues available in that date range.
+     * - Otherwise: require check_in & check_out; return venues with availability status based on the date range.
      */
     public function index(Request $request)
     {
@@ -69,16 +69,33 @@ class VenueController extends Controller
 
                 $query = Venue::query()->with(['amenities', 'media']);
 
+                $checkIn = null;
+                $checkOut = null;
                 if (!$isAll) {
                     $checkIn  = Carbon::parse($request->query('check_in'))->startOfDay();
                     $checkOut = Carbon::parse($request->query('check_out'))->endOfDay();
-                    $query->availableBetween($checkIn, $checkOut);
+                    // Return all venues; availability status is added per venue below
                 }
 
                 $venues = $query->get();
+
+                $availableVenueIds = [];
+                if (!$isAll && $venues->isNotEmpty()) {
+                    $availableVenueIds = Venue::whereIn('id', $venues->pluck('id'))
+                        ->availableBetween($checkIn, $checkOut)
+                        ->pluck('id')
+                        ->all();
+                }
+
+                $data = VenueResource::collection($venues)->resolve();
+                $data = array_map(function ($item) use ($isAll, $availableVenueIds) {
+                    $item['available'] = $isAll ? null : in_array($item['id'], $availableVenueIds);
+                    return $item;
+                }, $data);
+
                 $payload = [
                     'success' => true,
-                    'data' => VenueResource::collection($venues)->resolve(),
+                    'data' => $data,
                 ];
                 $response = response()->json($payload, 200);
                 $response->header('Cache-Control', $isAll ? 'public, max-age=300' : 'public, max-age=120');
