@@ -3,9 +3,20 @@
 @source '../../../../app/Filament/**/*';
 @source '../../../../resources/views/filament/**/*';
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 
-/* Hide scrollbar for the sidebar navigation specifically */
+
+
+@layer components {
+    .fi-sidebar {
+        width: 120% !important;
+    }
+
+
+    /* Hide scrollbar for the sidebar navigation specifically */
 .fi-sidebar-nav {
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;     /* Firefox */
@@ -13,4 +24,5 @@
 
 .fi-sidebar-nav::-webkit-scrollbar {
     display: none;             /* Chrome, Safari, and Opera */
+}
 }
