@@ -319,4 +319,40 @@ class BookingController extends Controller
             ], 500);
         }
     }
+
+public function reschedule(Request $request, $reference_number)
+{
+    // 1. Validate the incoming dates
+    $request->validate([
+        'check_in' => 'required|date',
+        'check_out' => 'required|date|after:check_in',
+    ]);
+
+    // 2. FIND the existing booking using the reference number from the URL
+    // Since your frontend passes MWA-2026-986906, we search by reference_number
+    $booking = Booking::where('reference_number', $reference_number)->first();
+
+    if (!$booking) {
+        return response()->json(['message' => 'Booking not found'], 404);
+    }
+
+    // 3. UPDATE the existing booking's dates
+    $booking->check_in = Carbon::parse($request->check_in);
+    $booking->check_out = Carbon::parse($request->check_out);
+    
+    // If you have a column for days, you might want to update it too:
+    $booking->no_of_days = $booking->check_in->diffInDays($booking->check_out);
+    
+    // Status update (optional, but good practice)
+    $booking->status = 'rescheduled'; 
+
+    // 4. SAVE the changes (This triggers an UPDATE, not an INSERT)
+    $booking->save();
+
+    // 5. Return success to React
+    return response()->json([
+        'message' => 'Booking rescheduled successfully!',
+        'booking' => $booking
+    ], 200);
+}
 }

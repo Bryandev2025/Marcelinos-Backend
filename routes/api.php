@@ -33,6 +33,7 @@ Route::middleware('throttle:api')->group(function () {
     Route::patch('bookings/{booking}/cancel', [BookingController::class, 'cancel']);
     Route::get('bookings/reference/{reference}', [BookingController::class, 'showByReferenceNumber']);
     Route::post('bookings/reference/{reference}/review', [ReviewController::class, 'storeByBookingReference'])->middleware('throttle:bookings');
+    Route::post('/booking/{bookingRef}/reschedule', [BookingController::class, 'reschedule']);
 
     Route::get('/booking-receipt/{reference}', [BookingController::class, 'showByReference']);
 
