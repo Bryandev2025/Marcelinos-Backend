@@ -5,7 +5,7 @@
      "
      class="flex items-center justify-center align-center">
 
-    <img src="https://marcelinos-backend.test/brand-logo.webp" 
+    <img src="{{ asset('brand-logo.webp') }}"
          alt="Marcelino's Logo" 
          class="h-11 mb-2 w-auto object-contain">
 
