@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\API\Concerns\CachesApiResponses;
 use App\Models\BlockedDate;
 use App\Models\Booking;
 use App\Models\Room;
@@ -13,10 +12,8 @@ use Illuminate\Support\Carbon;
 
 class BlockedDateController extends Controller
 {
-    use CachesApiResponses;
-
     /**
-     * Return all blocked dates as JSON (cached for performance).
+     * Return all blocked dates as JSON.
      * Includes:
      * - Manually blocked dates from BlockedDate table
      * - Dates where all rooms or all venues are fully booked
@@ -24,31 +21,27 @@ class BlockedDateController extends Controller
     public function index(): JsonResponse
     {
         try {
-            return $this->rememberJson('api.blocked-dates', function () {
-                $blockedDates = collect();
+            $blockedDates = collect();
 
-                // 1. Get manually blocked dates
-                $manualBlockedDates = BlockedDate::select('date', 'reason')->get()
-                    ->map(fn($d) => [
-                        'date' => $d->date,
-                        'reason' => $d->reason,
-                    ]);
-                $blockedDates = $blockedDates->merge($manualBlockedDates);
+            // 1. Get manually blocked dates
+            $manualBlockedDates = BlockedDate::select('date', 'reason')->get()
+                ->map(fn($d) => [
+                    'date' => $d->date,
+                    'reason' => $d->reason,
+                ]);
+            $blockedDates = $blockedDates->merge($manualBlockedDates);
 
-                // 2. Get dates blocked by fully booked rooms/venues
-                $bookingBlockedDates = $this->getBookingBlockedDates();
-                $blockedDates = $blockedDates->merge($bookingBlockedDates);
+            // 2. Get dates blocked by fully booked rooms/venues
+            $bookingBlockedDates = $this->getBookingBlockedDates();
+            $blockedDates = $blockedDates->merge($bookingBlockedDates);
 
-                // Unique and sort by date
-                $blockedDates = $blockedDates
-                    ->unique(fn($d) => $d['date'])
-                    ->sortBy('date')
-                    ->values();
+            // Unique and sort by date
+            $blockedDates = $blockedDates
+                ->unique(fn($d) => $d['date'])
+                ->sortBy('date')
+                ->values();
 
-                $response = response()->json(['blocked_dates' => $blockedDates]);
-                $response->header('Cache-Control', 'public, max-age=300');
-                return $response;
-            });
+            return response()->json(['blocked_dates' => $blockedDates]);
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Error retrieving blocked dates',

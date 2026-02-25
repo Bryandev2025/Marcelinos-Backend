@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Http\Controllers\API\Concerns\CachesApiResponses;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\API\VenueResource;
 use App\Models\Venue;
@@ -14,8 +13,6 @@ use Exception;
 
 class VenueController extends Controller
 {
-    use CachesApiResponses;
-
     /**
      * List venues.
      * Same availability contract as RoomController: when check_in/check_out are provided,
@@ -53,54 +50,36 @@ class VenueController extends Controller
                         'message' => 'check_out cannot be before check_in.',
                     ], 422);
                 }
-
-                $cacheKey = static::listCacheKey('venues', [
-                    'check_in'  => $checkIn->toDateString(),
-                    'check_out' => $checkOut->toDateString(),
-                ]);
-                $ttl = 120;
-            } else {
-                $cacheKey = 'api.venues.list.all';
-                $ttl = 300;
             }
 
-            return $this->rememberJson($cacheKey, function () use ($request) {
-                $isAll = filter_var($request->query('is_all', false), FILTER_VALIDATE_BOOLEAN);
+            $query = Venue::query()->with(['amenities', 'media']);
+            $checkIn = null;
+            $checkOut = null;
+            if (!$isAll) {
+                $checkIn  = Carbon::parse($request->query('check_in'))->startOfDay();
+                $checkOut = Carbon::parse($request->query('check_out'))->endOfDay();
+            }
 
-                $query = Venue::query()->with(['amenities', 'media']);
+            $venues = $query->get();
 
-                $checkIn = null;
-                $checkOut = null;
-                if (!$isAll) {
-                    $checkIn  = Carbon::parse($request->query('check_in'))->startOfDay();
-                    $checkOut = Carbon::parse($request->query('check_out'))->endOfDay();
-                    // Return all venues; availability status is added per venue below
-                }
+            $availableVenueIds = [];
+            if (!$isAll && $venues->isNotEmpty()) {
+                $availableVenueIds = Venue::whereIn('id', $venues->pluck('id'))
+                    ->availableBetween($checkIn, $checkOut)
+                    ->pluck('id')
+                    ->all();
+            }
 
-                $venues = $query->get();
+            $data = VenueResource::collection($venues)->resolve();
+            $data = array_map(function ($item) use ($isAll, $availableVenueIds) {
+                $item['available'] = $isAll ? null : in_array($item['id'], $availableVenueIds);
+                return $item;
+            }, $data);
 
-                $availableVenueIds = [];
-                if (!$isAll && $venues->isNotEmpty()) {
-                    $availableVenueIds = Venue::whereIn('id', $venues->pluck('id'))
-                        ->availableBetween($checkIn, $checkOut)
-                        ->pluck('id')
-                        ->all();
-                }
-
-                $data = VenueResource::collection($venues)->resolve();
-                $data = array_map(function ($item) use ($isAll, $availableVenueIds) {
-                    $item['available'] = $isAll ? null : in_array($item['id'], $availableVenueIds);
-                    return $item;
-                }, $data);
-
-                $payload = [
-                    'success' => true,
-                    'data' => $data,
-                ];
-                $response = response()->json($payload, 200);
-                $response->header('Cache-Control', $isAll ? 'public, max-age=300' : 'public, max-age=120');
-                return $response;
-            }, $ttl);
+            return response()->json([
+                'success' => true,
+                'data' => $data,
+            ], 200);
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
                 'success' => false,
@@ -117,29 +96,24 @@ class VenueController extends Controller
     }
 
     /**
-     * Display the specified resource (cached for performance).
+     * Display the specified resource.
      */
     public function show($id): JsonResponse
     {
-        $cacheKey = "api.venues.show.{$id}";
-        return $this->rememberJson($cacheKey, function () use ($id) {
-            try {
-                $venue = Venue::with(['amenities', 'media'])->findOrFail($id);
-                $json = response()->json([
-                    'success' => true,
-                    'data' => (new VenueResource($venue))->resolve(),
-                ], 200);
-                $json->header('Cache-Control', 'public, max-age=300');
-                return $json;
-            } catch (ModelNotFoundException $e) {
-                return response()->json(['success' => false, 'message' => 'Venue not found'], 404);
-            } catch (Exception $e) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Failed to fetch the venue',
-                    'error' => $e->getMessage(),
-                ], 500);
-            }
-        });
+        try {
+            $venue = Venue::with(['amenities', 'media'])->findOrFail($id);
+            return response()->json([
+                'success' => true,
+                'data' => (new VenueResource($venue))->resolve(),
+            ], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['success' => false, 'message' => 'Venue not found'], 404);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch the venue',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 }
