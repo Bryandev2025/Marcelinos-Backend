@@ -34,9 +34,12 @@ class AdminPanelProvider extends PanelProvider
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')
             ->colors([
-                'primary' => Color::Green,
+                'primary' => Color::hex('#83A070'),
                 'gray' => Color::Slate,
-            ])
+                'success' => Color::Emerald,
+                'danger' => Color::Rose,
+                'warning' => Color::Amber,
+                'info' => Color::Sky,            ])
             ->font('Inter')
             ->brandLogoHeight('3.5rem')
             ->brandName(fn () => view('filament.admin.brand'))            

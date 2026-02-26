@@ -5,6 +5,7 @@ namespace App\Filament\Resources\BlockedDates\Schemas;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
+use App\Models\BlockedDate;
 
 class BlockedDateForm
 {
@@ -13,8 +14,16 @@ class BlockedDateForm
         return $schema
             ->components([
                 DatePicker::make('date')
-                    ->required(),
-                TextInput::make('reason'),
+                    ->required()
+                    ->minDate(now())
+                    ->native(false)
+                    ->closeondateSelection(true)
+                    ->disabledDates(fn () =>
+                        BlockedDate::pluck('date')->toArray()
+                    ),
+                TextInput::make('reason')
+                ->required()
+                ->maxLength(255),
             ]);
     }
 }
