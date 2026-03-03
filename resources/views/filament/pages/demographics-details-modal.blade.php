@@ -1,4 +1,21 @@
-<div class="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+<div x-data="{ search: '' }" class="space-y-4 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+    
+    <!-- Filter UI Section -->
+    <div class="sticky top-0 z-20 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md pb-4 pt-1 border-b border-gray-100 dark:border-white/5 mb-4 px-1">
+        <label for="search" class="sr-only">Search demographics...</label>
+        <div class="relative flex items-center">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <x-filament::icon icon="heroicon-m-magnifying-glass" class="w-5 h-5 text-gray-400" />
+            </div>
+            <input type="text" x-model="search" @keydown.enter.prevent
+                class="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-700 rounded-xl leading-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500 sm:text-sm transition duration-150 ease-in-out shadow-sm"
+                placeholder="Search by Region, Province, or Municipality...">
+            <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                <span class="text-xs text-gray-400 font-medium bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded-md border border-gray-200 dark:border-gray-600">Filter</span>
+            </div>
+        </div>
+    </div>
+
     @if ($bookings->isEmpty())
         <div class="p-8 text-center text-sm text-gray-500 dark:text-gray-400">
             No bookings found for this period.
@@ -6,7 +23,15 @@
     @else
         <div class="flex flex-col gap-4">
             @foreach ($bookings as $booking)
-                <div class="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900 shadow-sm transition hover:shadow-md overflow-hidden">
+                <div x-show="
+                        search === '' || 
+                        '{{ strtolower($booking->guest->region ?? '') }}'.includes(search.toLowerCase()) || 
+                        '{{ strtolower($booking->guest->province ?? '') }}'.includes(search.toLowerCase()) || 
+                        '{{ strtolower($booking->guest->municipality ?? '') }}'.includes(search.toLowerCase()) ||
+                        '{{ strtolower($booking->guest->country ?? '') }}'.includes(search.toLowerCase())
+                     "
+                     class="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900 shadow-sm transition hover:shadow-md overflow-hidden">
+                    
                     <div class="px-5 py-4 flex flex-col sm:flex-row justify-between items-start gap-3 border-b border-gray-100 dark:border-white/5 bg-gray-50/50 dark:bg-white/5">
                         <div class="flex items-start gap-3">
                             <div class="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-50 dark:bg-primary-500/10 text-primary-600 dark:text-primary-400 font-bold">

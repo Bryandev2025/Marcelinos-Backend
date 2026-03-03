@@ -26,36 +26,85 @@ class GuestDemographics extends Page
             Booking::STATUS_OCCUPIED
         ];
 
+        // Fetch a full monthly breakdown for the printable tourism report
+        $startOfMonth = Carbon::now()->startOfMonth();
+        $endOfMonth = Carbon::now()->endOfMonth();
+
+        $monthlyDemographics = $this->getHierarchicalData($successStatuses, $startOfMonth, $endOfMonth);
+        $localDemographics = $monthlyDemographics->where('is_international', false);
+        $foreignDemographics = $monthlyDemographics->where('is_international', true);
+
         return [
             'unpaid' => [
-                'today' => $this->getTopMunicipality($unpaidStatuses, Carbon::today(), Carbon::today()),
-                'next_7_days' => $this->getTopMunicipality($unpaidStatuses, Carbon::tomorrow(), Carbon::today()->addDays(7)),
-                'this_month' => $this->getTopMunicipality($unpaidStatuses, Carbon::now()->startOfMonth(), Carbon::now()->endOfMonth()),
-                'next_month' => $this->getTopMunicipality($unpaidStatuses, Carbon::now()->addMonth()->startOfMonth(), Carbon::now()->addMonth()->endOfMonth()),
+                'today' => $this->getTopLocation($unpaidStatuses, Carbon::today(), Carbon::today()),
+                'next_7_days' => $this->getTopLocation($unpaidStatuses, Carbon::tomorrow(), Carbon::today()->addDays(7)),
+                'this_month' => $this->getTopLocation($unpaidStatuses, $startOfMonth, $endOfMonth),
+                'next_month' => $this->getTopLocation($unpaidStatuses, Carbon::now()->addMonth()->startOfMonth(), Carbon::now()->addMonth()->endOfMonth()),
             ],
             'successful' => [
-                'today' => $this->getTopMunicipality($successStatuses, Carbon::today(), Carbon::today()),
-                'next_7_days' => $this->getTopMunicipality($successStatuses, Carbon::tomorrow(), Carbon::today()->addDays(7)),
-                'this_month' => $this->getTopMunicipality($successStatuses, Carbon::now()->startOfMonth(), Carbon::now()->endOfMonth()),
-                'next_month' => $this->getTopMunicipality($successStatuses, Carbon::now()->addMonth()->startOfMonth(), Carbon::now()->addMonth()->endOfMonth()),
-            ]
+                'today' => $this->getTopLocation($successStatuses, Carbon::today(), Carbon::today()),
+                'next_7_days' => $this->getTopLocation($successStatuses, Carbon::tomorrow(), Carbon::today()->addDays(7)),
+                'this_month' => $this->getTopLocation($successStatuses, $startOfMonth, $endOfMonth),
+                'next_month' => $this->getTopLocation($successStatuses, Carbon::now()->addMonth()->startOfMonth(), Carbon::now()->addMonth()->endOfMonth()),
+            ],
+
+            // Raw data for printing complete hierarchy reports
+            'reports' => [
+                'unpaid' => [
+                    'today' => $this->getHierarchicalData($unpaidStatuses, Carbon::today(), Carbon::today()),
+                    'next_7_days' => $this->getHierarchicalData($unpaidStatuses, Carbon::tomorrow(), Carbon::today()->addDays(7)),
+                    'this_month' => $this->getHierarchicalData($unpaidStatuses, $startOfMonth, $endOfMonth),
+                    'next_month' => $this->getHierarchicalData($unpaidStatuses, Carbon::now()->addMonth()->startOfMonth(), Carbon::now()->addMonth()->endOfMonth()),
+                    'all' => $this->getHierarchicalData($unpaidStatuses, Carbon::now()->subYears(10), Carbon::now()->addYears(10)), // all time approx
+                ],
+                'successful' => [
+                    'today' => $this->getHierarchicalData($successStatuses, Carbon::today(), Carbon::today()),
+                    'next_7_days' => $this->getHierarchicalData($successStatuses, Carbon::tomorrow(), Carbon::today()->addDays(7)),
+                    'this_month' => $this->getHierarchicalData($successStatuses, $startOfMonth, $endOfMonth),
+                    'next_month' => $this->getHierarchicalData($successStatuses, Carbon::now()->addMonth()->startOfMonth(), Carbon::now()->addMonth()->endOfMonth()),
+                    'all' => $this->getHierarchicalData($successStatuses, Carbon::now()->subYears(10), Carbon::now()->addYears(10)),
+                ]
+            ],
+
+            'localDemographics' => $localDemographics,
+            'foreignDemographics' => $foreignDemographics,
+            'reportMonth' => Carbon::now()->format('F Y')
         ];
     }
 
-    private function getTopMunicipality(array $statusGroup, Carbon $startDate, Carbon $endDate): ?array
+    private function getHierarchicalData(array $statusGroup, Carbon $startDate, Carbon $endDate)
     {
-        $result = Booking::select('guests.municipality', DB::raw('count(*) as total'))
+        return Booking::select(
+            'guests.is_international',
+            'guests.country',
+            'guests.region',
+            'guests.province',
+            'guests.municipality',
+            DB::raw('count(*) as total')
+        )
             ->join('guests', 'bookings.guest_id', '=', 'guests.id')
             ->whereIn('bookings.status', $statusGroup)
             ->whereBetween('bookings.check_in', [$startDate->startOfDay(), $endDate->endOfDay()])
-            ->whereNotNull('guests.municipality')
-            ->where('guests.municipality', '!=', '')
-            ->groupBy('guests.municipality')
+            ->groupBy('guests.is_international', 'guests.country', 'guests.region', 'guests.province', 'guests.municipality')
+            ->orderByRaw("guests.is_international ASC, total DESC, guests.region ASC")
+            ->get();
+    }
+
+    private function getTopLocation(array $statusGroup, Carbon $startDate, Carbon $endDate): ?array
+    {
+        $result = Booking::select('guests.region', 'guests.province', DB::raw('count(*) as total'))
+            ->join('guests', 'bookings.guest_id', '=', 'guests.id')
+            ->whereIn('bookings.status', $statusGroup)
+            ->whereBetween('bookings.check_in', [$startDate->startOfDay(), $endDate->endOfDay()])
+            ->whereNotNull('guests.region')
+            ->where('guests.region', '!=', '')
+            ->groupBy('guests.region', 'guests.province')
             ->orderBy('total', 'desc')
             ->first();
 
         return $result ? [
-            'name' => $result->municipality,
+            'name' => $result->region,
+            'sub' => $result->province,
             'count' => $result->total
         ] : null;
     }
@@ -79,9 +128,12 @@ class GuestDemographics extends Page
                 $dates = $this->getDateRangeForPeriod($period);
 
                 $bookings = Booking::with('guest')
-                    ->whereIn('status', $statuses)
-                    ->whereBetween('check_in', [$dates[0]->startOfDay(), $dates[1]->endOfDay()])
-                    ->orderBy('check_in', 'asc')
+                    ->join('guests', 'bookings.guest_id', '=', 'guests.id')
+                    ->select('bookings.*') // make sure we get booking model attributes correctly
+                    ->whereIn('bookings.status', $statuses)
+                    ->whereBetween('bookings.check_in', [$dates[0]->startOfDay(), $dates[1]->endOfDay()])
+                    // Order by region, then province, then municipality
+                    ->orderByRaw("guests.region DESC, guests.province DESC, guests.municipality DESC, bookings.check_in ASC")
                     ->get();
 
                 return view('filament.pages.demographics-details-modal', [
