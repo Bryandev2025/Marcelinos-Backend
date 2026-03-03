@@ -21,6 +21,6 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
 
-            return redirect()->guest('/login');
+            return redirect()->guest('/admin/login');
         });
     })->create();
