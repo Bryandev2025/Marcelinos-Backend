@@ -1,127 +1,251 @@
 {{--
-Print Report Partial Template
-Variables: $title, $subtitle, $localData (Collection), $foreignData (Collection)
+Print Report Partial Template — Tourism Edition
+Variables:
+$title (string)
+$subtitle (string)
+$localData (Collection: region, province, municipality, total)
+$foreignData (Collection: country, total)
 --}}
-<div style="font-family: Arial, sans-serif; color: #111; padding: 32px; background: white;">
-    <!-- Header -->
-    <div style="text-align:center; margin-bottom: 32px; border-bottom: 2px solid #111; padding-bottom: 16px;">
-        <h1
-            style="font-size: 24px; font-weight: bold; margin: 0 0 6px 0; text-transform: uppercase; letter-spacing: 1px;">
-            {{ $title }}
-        </h1>
-        <p style="font-size: 13px; color: #555; margin: 0;">{{ $subtitle }}</p>
-        <p style="font-size: 11px; color: #888; margin: 6px 0 0 0;">Marcelinos Resort and Hotel — Tourism Demographics
-            Record</p>
+
+@php
+    // Compute region-level grouping for domestic data
+    $regionGroups = $localData->groupBy('region');
+    $topLocal = $localData->sortByDesc('total')->first();
+    $topForeign = $foreignData->sortByDesc('total')->first();
+@endphp
+
+<div
+    style="font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a2e; padding: 32px 40px; background: white; max-width: 900px; margin: 0 auto;">
+
+    {{-- ===== REPORT HEADER ===== --}}
+    <div style="text-align:center; margin-bottom: 24px;">
+        {{-- Government / Hotel Bar --}}
+        <div
+            style="background: #1d4ed8; color: white; padding: 8px 24px; border-radius: 6px 6px 0 0; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;">
+            Marcelinos Resort and Hotel &nbsp;·&nbsp; Tourism Demographics Report
+        </div>
+        <div style="border: 2px solid #1d4ed8; border-top: none; padding: 18px 24px 14px; border-radius: 0 0 6px 6px;">
+            <h1
+                style="font-size: 22px; font-weight: 800; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.5px;">
+                {{ $title }}
+            </h1>
+            <p style="font-size: 13px; color: #555; margin: 0 0 2px;">{{ $subtitle }}</p>
+            <p style="font-size: 11px; color: #999; margin: 0;">Official Record — For Tourism Office Use Only</p>
+        </div>
     </div>
 
-    <!-- Domestic Tourists -->
-    <div style="margin-bottom: 40px;">
+    {{-- ===== SUMMARY HIGHLIGHT BOXES ===== --}}
+    @if($topLocal || $topForeign)
+        <div style="display: flex; gap: 12px; margin-bottom: 24px;">
+            @if($topLocal)
+                <div
+                    style="flex: 1; background: #eff6ff; border: 1px solid #bfdbfe; border-left: 5px solid #2563eb; border-radius: 6px; padding: 12px 16px;">
+                    <div
+                        style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #2563eb; margin-bottom: 4px;">
+                        🏆 Top Domestic Region</div>
+                    <div style="font-size: 18px; font-weight: 800; color: #1e3a8a;">{{ $topLocal->region ?: 'N/A' }}</div>
+                    <div style="font-size: 12px; color: #3b82f6; margin-top: 2px;">
+                        {{ $topLocal->province ?: '' }}{{ $topLocal->province ? ' — ' : '' }}{{ $topLocal->municipality ?: '' }}
+                    </div>
+                    <div style="font-size: 11px; color: #64748b; margin-top: 4px; font-weight: 600;">{{ $topLocal->total }}
+                        booking(s) · Ranked #1</div>
+                </div>
+            @endif
+            @if($topForeign)
+                <div
+                    style="flex: 1; background: #f0fdf4; border: 1px solid #bbf7d0; border-left: 5px solid #16a34a; border-radius: 6px; padding: 12px 16px;">
+                    <div
+                        style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #16a34a; margin-bottom: 4px;">
+                        🌐 Top International</div>
+                    <div style="font-size: 18px; font-weight: 800; color: #14532d;">{{ $topForeign->country ?: 'N/A' }}</div>
+                    <div style="font-size: 12px; color: #22c55e; margin-top: 2px;">Country of Origin</div>
+                    <div style="font-size: 11px; color: #64748b; margin-top: 4px; font-weight: 600;">{{ $topForeign->total }}
+                        booking(s) · Ranked #1</div>
+                </div>
+            @endif
+            <div
+                style="flex: 0.6; background: #fafafa; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 16px; text-align: center;">
+                <div
+                    style="font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 6px;">
+                    Total Bookings</div>
+                <div style="font-size: 30px; font-weight: 900; color: #1d4ed8; line-height: 1;">
+                    {{ $localData->sum('total') + $foreignData->sum('total') }}</div>
+                <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">{{ $localData->sum('total') }} local
+                    &nbsp;+&nbsp; {{ $foreignData->sum('total') }} foreign</div>
+            </div>
+        </div>
+    @endif
+
+    {{-- ===== DOMESTIC TABLE ===== --}}
+    <div style="margin-bottom: 32px;">
         <div
-            style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #222; padding-bottom: 6px; margin-bottom: 12px;">
-            <h2 style="font-size: 16px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin: 0;">
-                🗺 Domestic Tourists</h2>
+            style="display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #1d4ed8; padding-bottom: 6px; margin-bottom: 12px;">
+            <h2
+                style="font-size: 15px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #1e3a8a; margin: 0;">
+                🗺&nbsp; Domestic Tourists
+            </h2>
             <span
-                style="font-size: 13px; font-weight: bold; background: #f3f4f6; border: 1px solid #ccc; padding: 2px 10px; border-radius: 4px;">
-                Total: {{ $localData->sum('total') }}
+                style="font-size: 12px; font-weight: 700; background: #dbeafe; color: #1d4ed8; padding: 3px 12px; border-radius: 20px;">
+                {{ $localData->sum('total') }} Total
             </span>
         </div>
 
         @if($localData->isEmpty())
-            <p style="text-align:center; color: #888; font-style: italic; padding: 16px 0;">No domestic guest records for
-                this period.</p>
+            <p
+                style="text-align:center; color: #94a3b8; font-style: italic; padding: 20px; border: 1px dashed #e2e8f0; border-radius: 6px;">
+                No domestic guest records for this period.
+            </p>
         @else
-            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            @php $rank = 0;
+            $prevRegion = null; @endphp
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
                 <thead>
-                    <tr style="background-color: #f9fafb;">
+                    <tr style="background: #1d4ed8; color: white;">
                         <th
-                            style="text-align:left; padding: 8px 12px; border: 1px solid #ddd; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
-                            Region</th>
+                            style="padding: 9px 10px; text-align: center; width: 36px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; border-right: 1px solid #2563eb;">
+                            #</th>
                         <th
-                            style="text-align:left; padding: 8px 12px; border: 1px solid #ddd; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
-                            Province</th>
+                            style="padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; border-right: 1px solid #2563eb;">
+                            REGION</th>
                         <th
-                            style="text-align:left; padding: 8px 12px; border: 1px solid #ddd; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
-                            Municipality / City</th>
+                            style="padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; border-right: 1px solid #2563eb;">
+                            PROVINCE</th>
                         <th
-                            style="text-align:right; padding: 8px 12px; border: 1px solid #ddd; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
-                            Booking Count</th>
+                            style="padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; border-right: 1px solid #2563eb;">
+                            MUNICIPALITY / CITY</th>
+                        <th
+                            style="padding: 9px 12px; text-align: center; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; width: 80px;">
+                            BOOKINGS</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach($localData as $i => $stat)
-                        <tr style="background-color: {{ $i % 2 === 0 ? '#ffffff' : '#f9fafb' }};">
-                            <td style="padding: 7px 12px; border: 1px solid #ddd; font-weight: 600; color: #1d4ed8;">
-                                {{ $stat->region ?: 'N/A' }}</td>
-                            <td style="padding: 7px 12px; border: 1px solid #ddd;">{{ $stat->province ?: 'N/A' }}</td>
-                            <td style="padding: 7px 12px; border: 1px solid #ddd;">{{ $stat->municipality ?: 'N/A' }}</td>
-                            <td style="padding: 7px 12px; border: 1px solid #ddd; text-align:right; font-weight: bold;">
-                                {{ $stat->total }}</td>
+                    @foreach($localData->sortByDesc('total') as $stat)
+                        @php
+                            $rank++;
+                            $isNewRegion = $stat->region !== $prevRegion;
+                            $prevRegion = $stat->region;
+                            $rowBg = $rank % 2 === 0 ? '#f8fafc' : '#ffffff';
+                            $isTop = $rank === 1;
+                        @endphp
+                        @if($isNewRegion && $rank > 1)
+                            {{-- Region subtotal row --}}
+                            @php
+                                $regionTotal = $localData->where('region', $prevRegion)->sum('total');
+                            @endphp
+                        @endif
+                        <tr style="background: {{ $isTop ? '#eff6ff' : $rowBg }}; {{ $isTop ? 'font-weight: 700;' : '' }}">
+                            <td
+                                style="padding: 8px 10px; text-align: center; border: 1px solid #e2e8f0; border-right: 2px solid #bfdbfe; color: {{ $isTop ? '#1d4ed8' : '#94a3b8' }}; font-weight: bold; font-size: 11px;">
+                                @if($isTop) 🥇 @elseif($rank === 2) 🥈 @elseif($rank === 3) 🥉 @else {{ $rank }} @endif
+                            </td>
+                            <td
+                                style="padding: 8px 12px; border: 1px solid #e2e8f0; font-weight: {{ $isTop ? '800' : '600' }}; color: {{ $isTop ? '#1e3a8a' : '#374151' }}; font-size: {{ $isTop ? '13px' : '12px' }};">
+                                {{ $stat->region ?: 'Not Specified' }}
+                            </td>
+                            <td style="padding: 8px 12px; border: 1px solid #e2e8f0; color: #4b5563;">
+                                {{ $stat->province ?: '—' }}</td>
+                            <td style="padding: 8px 12px; border: 1px solid #e2e8f0; color: #4b5563;">
+                                {{ $stat->municipality ?: '—' }}</td>
+                            <td
+                                style="padding: 8px 12px; border: 1px solid #e2e8f0; text-align: center; font-weight: bold; font-size: {{ $isTop ? '15px' : '13px' }}; color: {{ $isTop ? '#1d4ed8' : '#1f2937' }};">
+                                {{ $stat->total }}
+                            </td>
                         </tr>
                     @endforeach
-                    <tr style="background: #eff6ff; font-weight: bold;">
-                        <td colspan="3"
-                            style="padding: 8px 12px; border: 1px solid #ddd; text-align:right; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
-                            Grand Total (Domestic)</td>
-                        <td style="padding: 8px 12px; border: 1px solid #ddd; text-align:right; font-size: 14px;">
-                            {{ $localData->sum('total') }}</td>
+                    {{-- Grand Total Row --}}
+                    <tr style="background: #1d4ed8; color: white; font-weight: 800;">
+                        <td colspan="4"
+                            style="padding: 9px 12px; text-align: right; font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; border: 1px solid #1e40af;">
+                            Grand Total (Domestic)
+                        </td>
+                        <td style="padding: 9px 12px; text-align: center; font-size: 15px; border: 1px solid #1e40af;">
+                            {{ $localData->sum('total') }}
+                        </td>
                     </tr>
                 </tbody>
             </table>
         @endif
     </div>
 
-    <!-- International Tourists -->
+    {{-- ===== INTERNATIONAL TABLE ===== --}}
     <div>
         <div
-            style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #222; padding-bottom: 6px; margin-bottom: 12px;">
-            <h2 style="font-size: 16px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin: 0;">
-                🌐 International Tourists</h2>
+            style="display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #16a34a; padding-bottom: 6px; margin-bottom: 12px;">
+            <h2
+                style="font-size: 15px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #14532d; margin: 0;">
+                🌐&nbsp; International Tourists
+            </h2>
             <span
-                style="font-size: 13px; font-weight: bold; background: #f3f4f6; border: 1px solid #ccc; padding: 2px 10px; border-radius: 4px;">
-                Total: {{ $foreignData->sum('total') }}
+                style="font-size: 12px; font-weight: 700; background: #dcfce7; color: #16a34a; padding: 3px 12px; border-radius: 20px;">
+                {{ $foreignData->sum('total') }} Total
             </span>
         </div>
 
         @if($foreignData->isEmpty())
-            <p style="text-align:center; color: #888; font-style: italic; padding: 16px 0;">No international guest records
-                for this period.</p>
+            <p
+                style="text-align:center; color: #94a3b8; font-style: italic; padding: 20px; border: 1px dashed #e2e8f0; border-radius: 6px;">
+                No international guest records for this period.
+            </p>
         @else
-            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            @php $iRank = 0; @endphp
+            <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
                 <thead>
-                    <tr style="background-color: #f9fafb;">
+                    <tr style="background: #16a34a; color: white;">
                         <th
-                            style="text-align:left; padding: 8px 12px; border: 1px solid #ddd; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
-                            Country of Origin</th>
+                            style="padding: 9px 10px; text-align: center; width: 36px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; border-right: 1px solid #15803d;">
+                            #</th>
                         <th
-                            style="text-align:right; padding: 8px 12px; border: 1px solid #ddd; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;">
-                            Booking Count</th>
+                            style="padding: 9px 12px; text-align: left; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; border-right: 1px solid #15803d;">
+                            COUNTRY OF ORIGIN</th>
+                        <th
+                            style="padding: 9px 12px; text-align: center; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; width: 80px;">
+                            BOOKINGS</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach($foreignData as $i => $stat)
-                        <tr style="background-color: {{ $i % 2 === 0 ? '#ffffff' : '#f9fafb' }};">
-                            <td style="padding: 7px 12px; border: 1px solid #ddd; font-weight: 600;">
-                                {{ $stat->country ?: 'N/A' }}</td>
-                            <td style="padding: 7px 12px; border: 1px solid #ddd; text-align:right; font-weight: bold;">
-                                {{ $stat->total }}</td>
+                    @foreach($foreignData->sortByDesc('total') as $stat)
+                        @php $iRank++;
+                        $iTop = $iRank === 1; @endphp
+                        <tr style="background: {{ $iTop ? '#f0fdf4' : ($iRank % 2 === 0 ? '#f8fafc' : '#ffffff') }};">
+                            <td
+                                style="padding: 8px 10px; text-align: center; border: 1px solid #e2e8f0; border-right: 2px solid #bbf7d0; color: {{ $iTop ? '#16a34a' : '#94a3b8' }}; font-weight: bold; font-size: 11px;">
+                                @if($iTop) 🥇 @elseif($iRank === 2) 🥈 @elseif($iRank === 3) 🥉 @else {{ $iRank }} @endif
+                            </td>
+                            <td
+                                style="padding: 8px 12px; border: 1px solid #e2e8f0; font-weight: {{ $iTop ? '800' : '600' }}; color: {{ $iTop ? '#14532d' : '#374151' }}; font-size: {{ $iTop ? '13px' : '12px' }};">
+                                {{ $stat->country ?: 'Not Specified' }}
+                            </td>
+                            <td
+                                style="padding: 8px 12px; border: 1px solid #e2e8f0; text-align: center; font-weight: bold; font-size: {{ $iTop ? '15px' : '13px' }}; color: {{ $iTop ? '#16a34a' : '#1f2937' }};">
+                                {{ $stat->total }}
+                            </td>
                         </tr>
                     @endforeach
-                    <tr style="background: #f0fdf4; font-weight: bold;">
-                        <td
-                            style="padding: 8px 12px; border: 1px solid #ddd; text-align:right; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
-                            Grand Total (International)</td>
-                        <td style="padding: 8px 12px; border: 1px solid #ddd; text-align:right; font-size: 14px;">
-                            {{ $foreignData->sum('total') }}</td>
+                    <tr style="background: #16a34a; color: white; font-weight: 800;">
+                        <td colspan="2"
+                            style="padding: 9px 12px; text-align: right; font-size: 11px; letter-spacing: 0.5px; text-transform: uppercase; border: 1px solid #15803d;">
+                            Grand Total (International)
+                        </td>
+                        <td style="padding: 9px 12px; text-align: center; font-size: 15px; border: 1px solid #15803d;">
+                            {{ $foreignData->sum('total') }}
+                        </td>
                     </tr>
                 </tbody>
             </table>
         @endif
     </div>
 
-    <!-- Footer -->
+    {{-- ===== FOOTER ===== --}}
     <div
-        style="margin-top: 48px; border-top: 1px solid #ccc; padding-top: 12px; display: flex; justify-content: space-between; font-size: 11px; color: #888;">
-        <span>Marcelinos Resort and Hotel — Confidential Tourism Report</span>
-        <span>Printed: {{ now()->format('F j, Y  g:i A') }}</span>
+        style="margin-top: 40px; padding-top: 12px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #94a3b8;">
+        <div>
+            <strong style="color: #374151;">Marcelinos Resort and Hotel</strong><br>
+            Confidential — For Tourism Office Use Only
+        </div>
+        <div style="text-align: right;">
+            Printed: {{ now()->format('F j, Y  g:i A') }}<br>
+            <span style="color: #cbd5e1;">System-generated report</span>
+        </div>
     </div>
+
 </div>
