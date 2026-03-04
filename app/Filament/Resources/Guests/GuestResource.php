@@ -24,7 +24,7 @@ class GuestResource extends Resource
     protected static ?int $navigationSort = 2;
     protected static ?string $navigationLabel = 'Guests';
 
-    protected static ?string $recordTitleAttribute = 'full_name';
+    protected static ?string $recordTitleAttribute = 'first_name';
 
     public static function getGloballySearchableAttributes(): array
     {

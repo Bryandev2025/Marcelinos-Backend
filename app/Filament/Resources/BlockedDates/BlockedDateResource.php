@@ -27,7 +27,7 @@ class BlockedDateResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
-    protected static ?string $recordTitleAttribute = 'recordTitleAttribute';
+    protected static ?string $recordTitleAttribute = 'date';
 
     public static function form(Schema $schema): Schema
     {
