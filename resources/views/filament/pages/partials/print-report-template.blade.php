@@ -52,23 +52,18 @@ $foreignData (Collection: country, total)
     $countryRanks = $countryTotals->keys()->toArray();
 @endphp
 
-<div
-    style="font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a2e; padding: 32px 40px; background: white; max-width: 900px; margin: 0 auto;">
+<div class="print-report" style="font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; color: #1a1a2e; background: #fff; padding: 0 24px 24px; margin: 0 auto; max-width: 210mm; box-sizing: border-box;">
 
-    {{-- ===== REPORT HEADER ===== --}}
-    <div style="text-align:center; margin-bottom: 24px;">
-        {{-- Government / Hotel Bar --}}
-        <div
-            style="background: #15803d; color: white; padding: 8px 24px; border-radius: 6px 6px 0 0; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;">
-            Marcelinos Resort and Hotel &nbsp;·&nbsp; Tourism Demographics Report
+    {{-- ===== REPORT HEADER WITH LOGO ===== --}}
+    <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 3px solid #15803d;">
+        <div style="flex-shrink: 0;">
+            <img src="{{ asset('brand-logo.webp') }}" alt="Marcelinos Resort and Hotel" style="height: 64px; width: auto; display: block;" />
         </div>
-        <div style="border: 2px solid #15803d; border-top: none; padding: 18px 24px 14px; border-radius: 0 0 6px 6px;">
-            <h1
-                style="font-size: 22px; font-weight: 800; margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.5px;">
-                {{ $title }}
-            </h1>
-            <p style="font-size: 13px; color: #555; margin: 0 0 2px;">{{ $subtitle }}</p>
-            <p style="font-size: 11px; color: #999; margin: 0;">Official Record — For Tourism Office Use Only</p>
+        <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 10px; font-weight: 700; letter-spacing: 1.2px; color: #15803d; text-transform: uppercase; margin-bottom: 2px;">Tourism Demographics Report</div>
+            <h1 style="font-size: 20px; font-weight: 800; margin: 0 0 4px; color: #0f172a; letter-spacing: 0.3px;">{{ $title }}</h1>
+            <p style="font-size: 12px; color: #64748b; margin: 0 0 2px;">{{ $subtitle }}</p>
+            <p style="font-size: 10px; color: #94a3b8; margin: 0;">Confidential — For Tourism Office Use Only</p>
         </div>
     </div>
 
@@ -289,14 +284,13 @@ $foreignData (Collection: country, total)
 
     {{-- ===== FOOTER ===== --}}
     <div
-        style="margin-top: 40px; padding-top: 12px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #94a3b8;">
-        <div>
-            <strong style="color: #374151;">Marcelinos Resort and Hotel</strong><br>
-            Confidential — For Tourism Office Use Only
+        style="margin-top: 32px; padding-top: 12px; border-top: 2px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #64748b;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <img src="{{ asset('brand-logo.webp') }}" alt="" style="height: 28px; width: auto;" aria-hidden="true" />
+            <span><strong style="color: #0f172a;">Marcelinos Resort and Hotel</strong> · Confidential</span>
         </div>
         <div style="text-align: right;">
-            Printed: {{ now()->format('F j, Y  g:i A') }}<br>
-            <span style="color: #cbd5e1;">System-generated report</span>
+            Printed {{ now()->format('F j, Y  g:i A') }} · System-generated report
         </div>
     </div>
 

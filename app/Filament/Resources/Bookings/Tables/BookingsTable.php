@@ -190,8 +190,13 @@ class BookingsTable
             ->defaultSort('created_at', 'desc')
             ->headerActions([
                 ExportAction::make()
-                    ->label('Export Bookings')
-                    ->exporter(BookingExporter::class),
+                    ->label('Export')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->exporter(BookingExporter::class)
+                    ->modalHeading('Export Bookings')
+                    ->modalDescription('Download the current list as Excel or CSV. Applied filters and sort order are used. Choose format and start export.')
+                    ->modalSubmitActionLabel('Start export')
+                    ->columnMappingColumns(2),
             ])
             ->actions([
                 ActionGroup::make([
