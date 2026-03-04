@@ -24,7 +24,7 @@ class ReviewResource extends Resource
     protected static ?int $navigationSort = 3;
     protected static ?string $navigationLabel = 'Reviews';
 
-    protected static ?string $recordTitleAttribute = 'title';
+    protected static ?string $recordTitleAttribute = 'comment';
 
     public static function form(Schema $schema): Schema
     {
