@@ -4,7 +4,8 @@
         @media print {
 
             @page {
-                margin: 10mm;
+                size: portrait;
+                margin: 12mm;
             }
 
             * {
@@ -124,7 +125,7 @@
                             Preset
                         </label>
                         <div
-                            class="mt-1 inline-flex w-full flex-wrap gap-2 rounded-xl bg-gray-50 px-2 py-2 text-xs dark:bg-gray-800/60">
+                            class="mt-1 inline-flex w-full flex-wrap gap-2 rounded-xl px-2 py-2 text-xs dark:bg-gray-800/60">
                             @php
                                 $presets = [
                                     'this_month' => 'This month',
@@ -176,7 +177,7 @@
                             Summary
                         </label>
                         <div
-                            class="mt-1 inline-flex w-full items-center justify-between gap-2 rounded-xl bg-gray-50 px-3 py-2 text-xs font-medium text-gray-700 dark:bg-gray-800/60 dark:text-gray-100">
+                            class="mt-1 inline-flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs font-bold text-black-700 dark:bg-gray-800/60 dark:text-black-200">
                             <span class="truncate">{{ $overviewLabel }}</span>
                             <span
                                 class="inline-flex items-center rounded-full bg-success-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-success-700 dark:bg-success-500/15 dark:text-success-300">
