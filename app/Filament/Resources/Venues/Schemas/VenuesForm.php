@@ -6,7 +6,7 @@ use App\Models\Amenity;
 use App\Models\Venue;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\ToggleButtons;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Schemas\Schema;
 
@@ -77,13 +77,16 @@ class VenuesForm
                     ->multiple()
                     ->label('Gallery Images')
                     ->image(),
-                ToggleButtons::make('amenities')
+                CheckboxList::make('amenities')
                     ->label('Amenities')
-                    ->options(fn () => Amenity::orderBy('name')->pluck('name', 'id')->all())
-                    ->multiple()
-                    ->inline()
-                    ->default([])
-                    ->helperText('Use the buttons to select amenities (no dropdown). If none appear, add amenities in Properties → Amenities first.'),
+                    ->relationship(
+                        titleAttribute: 'name',
+                        modifyQueryUsing: fn ($query) => $query->orderBy('name'),
+                    )
+                    ->columns(2)
+                    ->searchable()
+                    ->bulkToggleable()
+                    ->helperText('Check the amenities available at this venue. If none appear, add amenities in Properties → Amenities first.'),
             ]);
     }
 }

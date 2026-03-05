@@ -11,7 +11,7 @@ use Filament\Schemas\Schema;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\ToggleButtons;
+use Filament\Forms\Components\Radio;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 
@@ -114,29 +114,21 @@ class BookingForm
                 ->prefix('₱')
                 ->helperText('Auto-calculated from selected rooms/venues × nights.'),
 
-            ToggleButtons::make('status')
+            Radio::make('status')
                 ->label('Booking Status')
                 ->options(Booking::statusOptions())
-                ->icons([
-                    Booking::STATUS_UNPAID => 'heroicon-o-clock',
-                    Booking::STATUS_CONFIRMED => 'heroicon-o-check-circle',
-                    Booking::STATUS_PAID => 'heroicon-o-banknotes',
-                    Booking::STATUS_OCCUPIED => 'heroicon-o-home-modern',
-                    Booking::STATUS_COMPLETED => 'heroicon-o-flag',
-                    Booking::STATUS_CANCELLED => 'heroicon-o-x-circle',
+                ->descriptions([
+                    Booking::STATUS_UNPAID => 'Awaiting payment.',
+                    Booking::STATUS_CONFIRMED => 'Booking confirmed.',
+                    Booking::STATUS_PAID => 'Payment received.',
+                    Booking::STATUS_OCCUPIED => 'Guest checked in.',
+                    Booking::STATUS_COMPLETED => 'Stay completed.',
+                    Booking::STATUS_CANCELLED => 'Booking cancelled.',
                 ])
-                ->colors([
-                    Booking::STATUS_UNPAID => 'primary',
-                    Booking::STATUS_CONFIRMED => 'success',
-                    Booking::STATUS_PAID => 'info',
-                    Booking::STATUS_OCCUPIED => 'warning',
-                    Booking::STATUS_COMPLETED => 'secondary',
-                    Booking::STATUS_CANCELLED => 'danger',
-                ])
-                ->inline()
+                ->columns(2)
                 ->default(Booking::STATUS_UNPAID)
                 ->required()
-                ->helperText('Use the buttons to change status quickly (no dropdown).'),
+                ->helperText('Select the current status for this booking.'),
 
             TextInput::make('reference_number')
                 ->label('Reference Number')
