@@ -57,6 +57,21 @@ class RoomForm
                         }
                     ]),
                 TextInput::make('capacity')->required()->numeric(),
+                Select::make('bedSpecifications') // matches the relationship name 
+                    ->label('Bed Specifications') 
+                    ->relationship('bedSpecifications', 'specification') 
+                    ->multiple() // allows multiple selection 
+                    ->searchable() 
+                    ->preload() 
+                    ->required() 
+                    ->helperText('Select all bed specifications for this room.'),
+                Select::make('bedModifiers') 
+                    ->label('Bed Modifiers') 
+                    ->relationship('bedModifiers', 'name') 
+                    ->multiple() // allow multiple modifiers 
+                    ->searchable() 
+                    ->preload() 
+                    ->helperText('Optional: select modifiers like w/Living Room or w/Balcony'),
                 Select::make('type')
                     ->options(Room::typeOptions())
                     ->required(),
