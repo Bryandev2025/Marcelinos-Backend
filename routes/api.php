@@ -35,8 +35,6 @@ Route::middleware([\App\Http\Middleware\EnsureApiKeyIsValid::class])->group(func
         Route::get('bookings/reference/{reference}', [BookingController::class, 'showByReferenceNumber']);
         Route::post('bookings/reference/{reference}/review', [ReviewController::class, 'storeByBookingReference'])->middleware('throttle:bookings');
 
-        Route::get('/booking-receipt/{reference}', [BookingController::class, 'showByReference']);
-
         // Venues
         Route::get('/venues', [VenueController::class, 'index']);
         Route::get('/venues/{id}', [VenueController::class, 'show']);

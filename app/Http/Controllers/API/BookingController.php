@@ -35,63 +35,6 @@ class BookingController extends Controller
         }
     }
 
-    public function showByReference(string $reference)
-    {
-        try {
-            $booking = Booking::with(['guest', 'rooms', 'venues'])
-                ->where('reference_number', $reference)
-                ->first();
-
-            if (!$booking) {
-                return response()->json(['message' => 'Receipt not found'], 404);
-            }
-
-            // Convert check_in/check_out to Carbon safely
-            $check_in = Carbon::parse($booking->check_in);
-            $check_out = Carbon::parse($booking->check_out);
-            $issued_on = Carbon::parse($booking->created_at);
-
-            return response()->json([
-                'reference_number' => $booking->reference_number,
-                'created_at' => $booking->created_at->format('M d, Y'),
-                'booking_status' => $booking->status,
-                'check_in' => $check_in->format('M d, Y'),
-                'check_out' => $check_out->format('M d, Y'),
-                'issued_on' => $issued_on->format('M d, Y'),
-                'nights' => $booking->no_of_days,
-                'guest_name' => $booking->guest->last_name . ' ' . $booking->guest->first_name,
-                'guest_email' => $booking->guest->email,
-                'guest_contact' => $booking->guest->contact_num,
-                'guest_address' => implode(', ', array_filter([
-                    $booking->guest->barangay,
-                    $booking->guest->municipality,
-                    $booking->guest->province,
-                    $booking->guest->region,
-                    $booking->guest->country,
-                ])),
-                'rooms' => $booking->rooms->map(fn($room) => [
-                    'name' => $room->name,
-                    'type' => $room->type,
-                    'capacity' => $room->capacity,
-                    'price' => $room->price,
-                ])->all(),
-                'venues' => $booking->venues->map(fn($venue) => [
-                    'name' => $venue->name,
-                    'capacity' => $venue->capacity,
-                    'price' => $venue->price,
-                ])->all(),
-                'subtotal' => $booking->total_price,
-                'grand_total' => $booking->total_price,
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to load receipt',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
     /**
      * Display a booking by reference number (frontend QR lookup)
      */
