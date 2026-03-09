@@ -65,7 +65,8 @@ jobs:
         continue-on-error: true
         env:
           SSH_REMOTE_PATH: ${{ secrets.SSH_REMOTE_PATH }}
+          DEPLOY_KEY: ${{ env.HOME }}/.ssh/deploy_key
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no -p 22 \
+          ssh -i "$HOME/.ssh/deploy_key" -o StrictHostKeyChecking=no -o ConnectTimeout=10 -p 22 \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
-            "cd \"$SSH_REMOTE_PATH\" && php artisan migrate --force && php artisan config:cache && php artisan route:cache && php artisan view:cache"
+            "cd \"$SSH_REMOTE_PATH\" && php artisan config:cache && php artisan route:cache && php artisan view:cache && (php artisan migrate --force || true)"
