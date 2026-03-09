@@ -243,19 +243,32 @@ class AppServiceProvider extends ServiceProvider
 
     /**
      * Configure API rate limiting.
+     * All limiters return JSON for API consistency and include Retry-After when available.
      */
     protected function configureRateLimiting(): void
     {
-        RateLimiter::for('api', function (Request $request) {
-            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        $jsonTooManyRequests = function (Request $request, array $headers) {
+            return response()->json([
+                'message' => 'Too many requests. Please slow down and try again later.',
+            ], 429, $headers);
+        };
+
+        RateLimiter::for('api', function (Request $request) use ($jsonTooManyRequests) {
+            return Limit::perMinute(60)
+                ->by($request->user()?->id ?: $request->ip())
+                ->response($jsonTooManyRequests);
         });
 
-        RateLimiter::for('bookings', function (Request $request) {
-            return Limit::perMinute(10)->by($request->ip());
+        RateLimiter::for('bookings', function (Request $request) use ($jsonTooManyRequests) {
+            return Limit::perMinute(10)
+                ->by($request->ip())
+                ->response($jsonTooManyRequests);
         });
 
-        RateLimiter::for('contact', function (Request $request) {
-            return Limit::perMinute(5)->by($request->ip());
+        RateLimiter::for('contact', function (Request $request) use ($jsonTooManyRequests) {
+            return Limit::perMinute(5)
+                ->by($request->ip())
+                ->response($jsonTooManyRequests);
         });
     }
 }
