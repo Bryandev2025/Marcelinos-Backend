@@ -20,6 +20,10 @@ class ActivityHistory extends Page
 
     protected int $logsStep = 10;
 
+    private ?Collection $resolvedLogs = null;
+
+    private bool $resolvedHasMoreLogs = false;
+
     protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-clock';
 
     protected static ?string $navigationLabel = 'Activity History';
@@ -43,13 +47,12 @@ class ActivityHistory extends Page
 
     public function getTimelineGroupsProperty(): Collection
     {
-        $logs = $this->getLogsQuery()
-            ->latest('created_at')
-            ->limit($this->logsLimit)
-            ->get();
+        $logs = $this->resolveLogs();
 
         return $logs->groupBy(function (ActivityLog $log): string {
-            $createdAt = Carbon::parse($log->created_at);
+            $createdAt = $log->created_at instanceof Carbon
+                ? $log->created_at
+                : Carbon::parse($log->created_at);
 
             if ($createdAt->isToday()) {
                 return 'Today';
@@ -65,7 +68,9 @@ class ActivityHistory extends Page
 
     public function getHasMoreLogsProperty(): bool
     {
-        return $this->getLogsQuery()->count() > $this->logsLimit;
+        $this->resolveLogs();
+
+        return $this->resolvedHasMoreLogs;
     }
 
     public function seeMore(): void
@@ -118,6 +123,23 @@ class ActivityHistory extends Page
                         });
                 });
             });
+    }
+
+    private function resolveLogs(): Collection
+    {
+        if ($this->resolvedLogs !== null) {
+            return $this->resolvedLogs;
+        }
+
+        $logs = $this->getLogsQuery()
+            ->latest('created_at')
+            ->limit($this->logsLimit + 1)
+            ->get();
+
+        $this->resolvedHasMoreLogs = $logs->count() > $this->logsLimit;
+        $this->resolvedLogs = $logs->take($this->logsLimit)->values();
+
+        return $this->resolvedLogs;
     }
 
     public function getLogIcon(string $category, string $event): string
