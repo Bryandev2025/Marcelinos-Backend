@@ -24,13 +24,42 @@ class RoomObserver
 
     private function broadcastRoomsUpdated(): void
     {
+        if ($this->shouldSkipBroadcast()) {
+            return;
+        }
+
         try {
             RoomsUpdated::dispatch();
         } catch (\Throwable $exception) {
             Log::warning('RoomsUpdated broadcast failed', [
                 'message' => $exception->getMessage(),
             ]);
-            report($exception);
         }
+    }
+
+    private function shouldSkipBroadcast(): bool
+    {
+        $connection = (string) config('broadcasting.default');
+
+        if ($connection !== 'reverb') {
+            return false;
+        }
+
+        $host = strtolower((string) data_get(config('broadcasting.connections.reverb'), 'options.host', ''));
+
+        if (! app()->environment('production')) {
+            return false;
+        }
+
+        if (! in_array($host, ['localhost', '127.0.0.1'], true)) {
+            return false;
+        }
+
+        Log::warning('Skipping RoomsUpdated broadcast: invalid Reverb host for production.', [
+            'host' => $host,
+            'connection' => $connection,
+        ]);
+
+        return true;
     }
 }
