@@ -1,0 +1,66 @@
+name: 🚀 PRODUCTION - Marcelino's APIs via FTP
+
+on:
+  push:
+    branches:
+      - production
+
+jobs:
+  ftp-deploy:
+    runs-on: ubuntu-latest
+    env:
+      APP_KEY: base64:YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=  # Placeholder for CI (not used on server)
+      APP_ENV: production
+
+    steps:
+      - name: 📦 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐘 Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: mbstring, bcmath, intl, pdo_mysql, zip, gd
+          coverage: none
+
+      - name: 📥 Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: 📦 Install PHP Dependencies
+        run: composer install --no-dev --optimize-autoloader
+
+      - name: 📦 Install and Build Frontend Assets
+        run: |
+          npm ci
+          npm run build
+
+      - name: ⚙️ Optimize Laravel
+        run: |
+          php artisan storage:link || true
+          php artisan optimize
+          mkdir -p storage/framework/{sessions,views,cache}
+
+      - name: 📤 FTP Deploy to cPanel
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ${{ secrets.PRODUCTION_FTP_SERVER }}
+          username: ${{ secrets.PRODUCTION_FTP_USERNAME }}
+          password: ${{ secrets.PRODUCTION_FTP_PASSWORD }}
+          protocol: ftp
+          port: 21
+          server-dir: /public_html/
+          local-dir: ./
+          exclude: |
+            **/.git*
+            **/.github*
+            **/node_modules/**
+            **/tests/**
+            **/uploads/**
+            .env
+            phpunit.xml
+            README.md
+            package-lock.json
+            vite.config.js

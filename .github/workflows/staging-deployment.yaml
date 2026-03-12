@@ -3,11 +3,14 @@ name: 🚀 STAGING - Marcelino's APIs via FTP
 on:
   push:
     branches:
-      - testing
+      - staging
 
 jobs:
   ftp-deploy:
     runs-on: ubuntu-latest
+    env:
+      APP_KEY: base64:YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=  # Placeholder for CI (not used on server)
+      APP_ENV: production
 
     steps:
       - name: 📦 Checkout code
@@ -24,12 +27,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "npm"
 
       - name: 📦 Install PHP Dependencies
         run: composer install --no-dev --optimize-autoloader
 
+      - name: 📦 Install and Build Frontend Assets
+        run: |
+          npm ci
+          npm run build
+
       - name: ⚙️ Optimize Laravel
         run: |
+          php artisan storage:link || true
           php artisan optimize
           mkdir -p storage/framework/{sessions,views,cache}
 
@@ -41,7 +51,7 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftp
           port: 21
-          server-dir: /test-marcelinos/
+          server-dir: /marcelinos-resources.webactivities.online/
           local-dir: ./
           # IMPORTANT: vendor and public/build are NOT excluded anymore
           exclude: |
