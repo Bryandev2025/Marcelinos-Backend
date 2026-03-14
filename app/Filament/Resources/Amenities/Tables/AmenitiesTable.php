@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Amenities\Tables;
 
 use App\Filament\Resources\Amenities\AmenityResource;
+use App\Models\Amenity;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;

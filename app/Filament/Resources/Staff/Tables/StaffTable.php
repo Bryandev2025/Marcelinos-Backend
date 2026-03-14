@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Staff\Tables;
 
+use App\Models\User;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;

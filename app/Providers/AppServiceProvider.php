@@ -2,12 +2,20 @@
 
 namespace App\Providers;
 
+use App\Filament\Resources\Amenities\Pages\ListAmenities;
+use App\Filament\Resources\Guests\Pages\ListGuests;
+use App\Filament\Resources\Rooms\Pages\ListRooms;
+use App\Filament\Resources\Staff\Pages\ListStaff;
+use App\Filament\Resources\Venues\Pages\ListVenues;
 use App\Http\Responses\LoginResponse;
 use App\Http\Responses\LogoutResponse;
 use App\Models\ActivityLog;
+use App\Models\Amenity;
 use App\Support\ActivityLogger;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse as LoginResponseContract;
 use Filament\Auth\Http\Responses\Contracts\LogoutResponse as LogoutResponseContract;
+use Filament\Support\Facades\FilamentView;
+use Filament\Tables\View\TablesRenderHook;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Auth\Events\Login;
@@ -22,6 +30,7 @@ use App\Models\BlockedDate;
 use App\Models\Gallery;
 use App\Models\Review;
 use App\Models\Room;
+use App\Models\User;
 use App\Models\Venue;
 use App\Observers\BlockedDateObserver;
 use App\Observers\BookingObserver;
@@ -56,6 +65,7 @@ class AppServiceProvider extends ServiceProvider
         Schema::defaultStringLength(191);
 
         $this->configureRateLimiting();
+        $this->registerTableTotalsHooks();
 
         Booking::observe(BookingObserver::class);
         Room::observe(RoomObserver::class);
@@ -66,6 +76,39 @@ class AppServiceProvider extends ServiceProvider
 
         $this->registerAuthActivityListeners();
         $this->registerModelActivityListeners();
+    }
+
+    protected function registerTableTotalsHooks(): void
+    {
+        FilamentView::registerRenderHook(
+            TablesRenderHook::TOOLBAR_START,
+            fn (): string => '<div class="text-sm font-medium">Total Staff: ' . User::query()->where('role', 'staff')->count() . '</div>',
+            scopes: [ListStaff::class],
+        );
+
+        FilamentView::registerRenderHook(
+            TablesRenderHook::TOOLBAR_START,
+            fn (): string => '<div class="text-sm font-medium">Total Guests: ' . \App\Models\Guest::query()->count() . '</div>',
+            scopes: [ListGuests::class],
+        );
+
+        FilamentView::registerRenderHook(
+            TablesRenderHook::TOOLBAR_START,
+            fn (): string => '<div class="text-sm font-medium">Total Venues: ' . Venue::query()->count() . '</div>',
+            scopes: [ListVenues::class],
+        );
+
+        FilamentView::registerRenderHook(
+            TablesRenderHook::TOOLBAR_START,
+            fn (): string => '<div class="text-sm font-medium">Total Rooms: ' . Room::query()->count() . '</div>',
+            scopes: [ListRooms::class],
+        );
+
+        FilamentView::registerRenderHook(
+            TablesRenderHook::TOOLBAR_START,
+            fn (): string => '<div class="text-sm font-medium">Total Amenities: ' . Amenity::query()->count() . '</div>',
+            scopes: [ListAmenities::class],
+        );
     }
 
     protected function registerAuthActivityListeners(): void
