@@ -224,8 +224,18 @@ class ActivityHistory extends Page
 
         $baseModelName = class_basename($modelName);
         $humanModelName = strtolower(trim((string) preg_replace('/(?<!^)[A-Z]/', ' $0', $baseModelName)));
+        $baseModelNameLower = strtolower($baseModelName);
 
-        if (strtolower($baseModelName) === 'review' && $verb === 'updated') {
+        if ($baseModelNameLower === 'gallery') {
+            return match ($verb) {
+                'created' => 'added an image in gallery.',
+                'updated' => 'updated an image in gallery.',
+                'deleted' => 'deleted an image from gallery.',
+                default => sprintf('%s %s: %s.', $verb, $humanModelName, $subject),
+            };
+        }
+
+        if ($baseModelNameLower === 'review' && $verb === 'updated') {
             if (preg_match('/^(#[^\s]+)\s*\((.+)\)$/', $subject, $reviewMatches) === 1) {
                 $reviewId = ltrim(trim((string) $reviewMatches[1]), '#');
                 $friendlyChanges = $this->humanizeReviewChanges(trim((string) $reviewMatches[2]));
@@ -236,7 +246,7 @@ class ActivityHistory extends Page
             }
         }
 
-        if (strtolower($baseModelName) === 'blockeddate') {
+        if ($baseModelNameLower === 'blockeddate') {
             try {
                 $subject = Carbon::parse($subject)->format('F d, Y');
             } catch (\Throwable) {

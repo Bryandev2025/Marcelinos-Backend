@@ -22,9 +22,8 @@ class GalleryResource extends Resource
     protected static string|\UnitEnum|null $navigationGroup = 'Content';
     protected static ?int $navigationSort = 1;
     protected static ?string $navigationLabel = 'Gallery';
-
-    // The attribute to display in the title when editing/viewing a record
-    protected static ?string $recordTitleAttribute = 'id';
+    protected static ?string $modelLabel = 'gallery';
+    protected static ?string $pluralModelLabel = 'gallery';
 
     public static function form(Schema $schema): Schema
     {
