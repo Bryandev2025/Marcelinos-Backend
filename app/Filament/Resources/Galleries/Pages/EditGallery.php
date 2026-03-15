@@ -13,7 +13,10 @@ class EditGallery extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            DeleteAction::make(),
+            DeleteAction::make()
+                ->label('Delete image')
+                ->modalHeading('Delete image')
+                ->successNotificationTitle('Image deleted'),
         ];
     }
 }

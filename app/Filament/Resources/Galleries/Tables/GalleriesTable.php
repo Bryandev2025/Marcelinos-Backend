@@ -2,11 +2,9 @@
 
 namespace App\Filament\Resources\Galleries\Tables;
 
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
+use App\Filament\Resources\Galleries\GalleryResource;
+use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
-use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
 class GalleriesTable
@@ -14,30 +12,26 @@ class GalleriesTable
     public static function configure(Table $table): Table
     {
         return $table
-            ->columns([
-                TextColumn::make('id')
-                    ->label('ID')
-                    ->sortable(),
-
-                SpatieMediaLibraryImageColumn::make('image')
-                    ->label('Image')
-                    ->circular()
-                    ->collection('image'),
-
-                TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable(),
+            ->extraAttributes([
+                'class' => 'gallery-table-flat',
             ])
+            ->columns([])
+            ->content(view('filament.tables.content.galleries-grid'))
+            ->defaultSort('created_at', 'desc')
+            ->paginated(false)
+            ->recordUrl(fn ($record): string => GalleryResource::getUrl('edit', ['record' => $record]))
             ->filters([
                 //
             ])
             ->recordActions([
-                EditAction::make(),
-            ])
-            ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
+                EditAction::make()
+                    ->label('Edit image')
+                    ->extraAttributes(['class' => 'hidden']),
+                DeleteAction::make()
+                    ->label('Delete image')
+                    ->modalHeading('Delete image')
+                    ->successNotificationTitle('Image deleted')
+                    ->extraAttributes(['class' => 'hidden']),
             ]);
     }
 }
