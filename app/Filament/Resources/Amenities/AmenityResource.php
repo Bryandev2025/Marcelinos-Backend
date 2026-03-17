@@ -6,6 +6,8 @@ use App\Filament\Resources\Amenities\Pages\CreateAmenity;
 use App\Filament\Resources\Amenities\Pages\EditAmenity;
 use App\Filament\Resources\Amenities\Pages\ListAmenities;
 use App\Filament\Resources\Amenities\Pages\ViewAmenity;
+use App\Filament\Resources\Amenities\RelationManagers\RoomsRelationManager;
+use App\Filament\Resources\Amenities\RelationManagers\VenuesRelationManager;
 use App\Filament\Resources\Amenities\Schemas\AmenityForm;
 use App\Filament\Resources\Amenities\Tables\AmenitiesTable;
 use App\Models\Amenity;
@@ -54,7 +56,8 @@ class AmenityResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            RoomsRelationManager::class,
+            VenuesRelationManager::class,
         ];
     }
 

@@ -16,11 +16,6 @@ class EditVenues extends EditRecord
         return $data;
     }
 
-    protected function afterSave(): void
-    {
-        $this->record->amenities()->sync($this->form->getState()['amenities'] ?? []);
-    }
-
     protected function getHeaderActions(): array
     {
         return [

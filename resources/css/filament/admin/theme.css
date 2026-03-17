@@ -28,3 +28,80 @@
 .fi-wi-chart .fi-section-content {
     padding: 5px !important;
 }
+
+    /* Make file upload errors render as a visible alert instead of blending into dark surfaces. */
+    .fi-fo-file-upload-error-message {
+        margin-top: 0.75rem;
+        border: 1px solid #fecaca;
+        background: #fef2f2;
+        color: #991b1b;
+        border-radius: 0.5rem;
+        padding: 0.625rem 0.75rem;
+        font-size: 0.8125rem;
+        line-height: 1.25rem;
+    }
+
+    .dark .fi-fo-file-upload-error-message {
+        border-color: rgba(248, 113, 113, 0.45);
+        background: rgba(127, 29, 29, 0.35);
+        color: #fecaca;
+    }
+
+    /* Ensure modal-based error details remain readable when rendered in dark mode. */
+    .fi-modal-window pre,
+    .fi-modal-window code {
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+/* Force a consistent green button treatment across the admin UI. */
+.fi-btn {
+    background-color: #517645 !important;
+    border-color: #517645 !important;
+    color: #ffffff !important;
+}
+
+.fi-btn:hover,
+.fi-btn:focus-visible,
+.fi-btn:active {
+    background-color: #517645 !important;
+    border-color: #517645 !important;
+    color: #ffffff !important;
+}
+
+.fi-btn .fi-btn-label,
+.fi-btn .fi-icon,
+.fi-btn svg {
+    color: #ffffff !important;
+    stroke: currentColor;
+}
+
+/* Keep destructive actions visually distinct. */
+.fi-btn.fi-color-danger,
+.fi-btn.fi-color-danger:not(.fi-outlined),
+.fi-btn.fi-outlined.fi-color-danger,
+.fi-icon-btn.fi-color-danger {
+    background-color: #dc2626 !important;
+    border-color: #dc2626 !important;
+    color: #ffffff !important;
+}
+
+.fi-btn.fi-color-danger:hover,
+.fi-btn.fi-color-danger:focus-visible,
+.fi-btn.fi-color-danger:active,
+.fi-icon-btn.fi-color-danger:hover,
+.fi-icon-btn.fi-color-danger:focus-visible,
+.fi-icon-btn.fi-color-danger:active {
+    background-color: #b91c1c !important;
+    border-color: #b91c1c !important;
+    color: #ffffff !important;
+}
+
+.fi-btn.fi-color-danger .fi-btn-label,
+.fi-btn.fi-color-danger .fi-icon,
+.fi-btn.fi-color-danger svg,
+.fi-icon-btn.fi-color-danger .fi-icon,
+.fi-icon-btn.fi-color-danger svg {
+    color: #ffffff !important;
+    stroke: currentColor;
+}
