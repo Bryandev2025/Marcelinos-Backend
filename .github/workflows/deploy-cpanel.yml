@@ -3,9 +3,9 @@ name: Deploy to cPanel Staging
 on:
   push:
     branches:
-      - staging   # change if your deploy branch is different
+      - testing   # change if your deploy branch is different
 
-jobs:
+jobs: #try
   deploy:
     runs-on: ubuntu-latest
 
