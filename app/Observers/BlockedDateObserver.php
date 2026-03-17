@@ -4,31 +4,43 @@ namespace App\Observers;
 
 use App\Events\BlockedDatesUpdated;
 use App\Models\BlockedDate;
-use Illuminate\Broadcasting\BroadcastException;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
-/**
- * Broadcasts so frontend stays up to date when blocked dates change.
- * Broadcast failures (e.g. Reverb not running) do not fail the request.
- */
 class BlockedDateObserver
 {
     public function saved(BlockedDate $blockedDate): void
     {
-        $this->safeBroadcast();
+        $this->safeBroadcast($blockedDate, 'saved');
     }
 
     public function deleted(BlockedDate $blockedDate): void
     {
-        $this->safeBroadcast();
+        $this->safeBroadcast($blockedDate, 'deleted');
     }
 
-    private function safeBroadcast(): void
+    private function safeBroadcast(BlockedDate $blockedDate, string $action): void
     {
         try {
             BlockedDatesUpdated::dispatch();
-        } catch (BroadcastException $e) {
-            // Reverb/Pusher unreachable (e.g. local dev without server) – don't fail the request
-            report($e);
+        } catch (Throwable $exception) {
+            Log::warning('BlockedDatesUpdated broadcast failed', [
+                'blocked_date_id' => $blockedDate->id,
+                'action' => $action,
+                'error' => $this->normalizeBroadcastError($exception),
+                'exception' => $exception::class,
+            ]);
         }
+    }
+
+    private function normalizeBroadcastError(Throwable $exception): string
+    {
+        $message = trim($exception->getMessage());
+
+        if (str_contains($message, '<!DOCTYPE html>')) {
+            return 'Received HTML response instead of broadcast server response (likely Reverb endpoint misconfiguration).';
+        }
+
+        return $message;
     }
 }

@@ -14,16 +14,21 @@ class BookingObserver
 {
     public function created(Booking $booking): void
     {
-        Log::info('BookingObserver triggered for booking: ' . $booking->id . ' with reference: ' . $booking->reference_number);
+        Log::info('BookingObserver triggered', [
+            'booking_id' => $booking->id,
+            'reference_number' => $booking->reference_number,
+        ]);
 
         $users = User::whereIn('role', ['admin', 'staff'])
             ->where('is_active', true)
             ->get();
 
-        Log::info('Users found for notification: ' . $users->count());
+        Log::info('Users found for booking notification', [
+            'count' => $users->count(),
+            'booking_id' => $booking->id,
+        ]);
 
         if ($users->isNotEmpty()) {
-            Log::info('Sending notification to users');
             foreach ($users as $user) {
                 Notification::make()
                     ->title('New Booking Created')
@@ -34,19 +39,22 @@ class BookingObserver
             }
         }
 
-        // Real-time: notify booking channel and admin dashboard (non-blocking; don't fail request if Reverb/Pusher is down)
-        try {
-            BookingStatusUpdated::dispatch($booking);
-            AdminDashboardNotification::dispatch('booking.created', 'New Booking', [
+        $this->safeBroadcast(
+            fn (): mixed => BookingStatusUpdated::dispatch($booking),
+            'BookingStatusUpdated',
+            $booking,
+            'created'
+        );
+
+        $this->safeBroadcast(
+            fn (): mixed => AdminDashboardNotification::dispatch('booking.created', 'New Booking', [
                 'reference' => $booking->reference_number,
                 'booking_id' => $booking->id,
-            ]);
-        } catch (\Throwable $e) {
-            Log::warning('Broadcast failed (Reverb may not be running). Booking created successfully.', [
-                'error' => $e->getMessage(),
-                'booking_id' => $booking->id,
-            ]);
-        }
+            ]),
+            'AdminDashboardNotification',
+            $booking,
+            'created'
+        );
     }
 
     public function updated(Booking $booking): void
@@ -70,16 +78,47 @@ class BookingObserver
             );
         }
 
-        try {
-            BookingStatusUpdated::dispatch($booking);
-        } catch (\Throwable $e) {
-            Log::warning('Broadcast failed on booking update.', ['error' => $e->getMessage(), 'booking_id' => $booking->id]);
-        }
+        $this->safeBroadcast(
+            fn (): mixed => BookingStatusUpdated::dispatch($booking),
+            'BookingStatusUpdated',
+            $booking,
+            'updated'
+        );
     }
 
     public function deleted(Booking $booking): void
     {
-        //
+         $this->safeBroadcast(
+            fn () => BookingStatusUpdated::dispatch($booking),
+            'BookingStatusUpdated',
+            $booking,
+            'deleted'
+        );
+    }
+
+    private function safeBroadcast(callable $dispatch, string $eventName, Booking $booking, string $action): void
+    {
+        try {
+            $dispatch();
+        } catch (\Throwable $exception) {
+            Log::warning("{$eventName} broadcast failed", [
+                'booking_id' => $booking->id,
+                'reference_number' => $booking->reference_number,
+                'action' => $action,
+                'error' => $this->normalizeBroadcastError($exception),
+                'exception' => get_class($exception),
+            ]);
+        }
+    }
+
+    private function normalizeBroadcastError(\Throwable $exception): string
+    {
+        $message = trim($exception->getMessage());
+
+        if (str_contains($message, '<!DOCTYPE html>')) {
+            return 'Received HTML response instead of broadcast server response (likely Reverb endpoint misconfiguration).';
+        }
+
+        return $message;
     }
 }
-
