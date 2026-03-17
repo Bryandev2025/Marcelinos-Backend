@@ -4,7 +4,7 @@ namespace App\Observers;
 
 use App\Events\BlockedDatesUpdated;
 use App\Models\BlockedDate;
-use Illuminate\Broadcasting\BroadcastException;
+use Throwable;
 
 /**
  * Broadcasts so frontend stays up to date when blocked dates change.
@@ -26,7 +26,7 @@ class BlockedDateObserver
     {
         try {
             BlockedDatesUpdated::dispatch();
-        } catch (BroadcastException $e) {
+        } catch (Throwable $e) {
             // Reverb/Pusher unreachable (e.g. local dev without server) – don't fail the request
             report($e);
         }

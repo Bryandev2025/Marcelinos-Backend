@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Events\ReviewsUpdated;
 use App\Models\Review;
 use App\Support\ActivityLogger;
+use Throwable;
 
 /**
  * Broadcasts when a review/testimonial is created, updated, or deleted so frontend (landing) refetches in real time.
@@ -28,11 +29,20 @@ class ReviewObserver
             );
         }
 
-        ReviewsUpdated::dispatch();
+        $this->dispatchReviewsUpdated();
     }
 
     public function deleted(Review $review): void
     {
-        ReviewsUpdated::dispatch();
+        $this->dispatchReviewsUpdated();
+    }
+
+    private function dispatchReviewsUpdated(): void
+    {
+        try {
+            ReviewsUpdated::dispatch();
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 }
