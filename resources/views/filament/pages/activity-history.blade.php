@@ -87,7 +87,7 @@
                                 $actor = $log->user?->name ?? 'System';
                             @endphp
 
-                            <article class="relative rounded-xl border border-gray-200 bg-white p-3 shadow-xs ">
+                            <article class="relative rounded-xl border border-gray-200 bg-white p-3 shadow-xs dark:border-white/10 dark:bg-white/5">
                                 <span class="absolute -left-[1.85rem] top-5 inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900">
                                     <x-filament::icon
                                         :icon="$icon"
