@@ -30,13 +30,15 @@ class AmenitiesTable
                 TextColumn::make('rooms_count')
                     ->label('Rooms')
                     ->badge()
-                    ->color(fn (int $state): string => $state > 0 ? 'info' : 'gray')
+                    ->formatStateUsing(fn ($state): string => (string) ((int) ($state ?? 0)))
+                    ->color(fn ($state): string => ((int) ($state ?? 0)) > 0 ? 'info' : 'gray')
                     ->sortable(),
 
                 TextColumn::make('venues_count')
                     ->label('Venues')
                     ->badge()
-                    ->color(fn (int $state): string => $state > 0 ? 'success' : 'gray')
+                    ->formatStateUsing(fn ($state): string => (string) ((int) ($state ?? 0)))
+                    ->color(fn ($state): string => ((int) ($state ?? 0)) > 0 ? 'success' : 'gray')
                     ->sortable(),
 
                 TextColumn::make('created_at')

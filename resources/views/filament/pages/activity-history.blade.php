@@ -15,8 +15,8 @@
                                         type="button"
                                         wire:click="$set('dateMode', 'all_time')"
                                         @class([
-                                            'px-3 py-2 text-sm font-medium transition-colors duration-300 ease-out',
-                                            'bg-primary-600 text-white' => $this->dateMode === 'all_time',
+                                            'px-3 py-2 text-sm font-medium transition-colors rounded-lg duration-300 ease-out',
+                                            'bg-[#517645] text-white' => $this->dateMode === 'all_time',
                                             'text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/10' => $this->dateMode !== 'all_time',
                                         ])
                                     >
@@ -26,8 +26,8 @@
                                         type="button"
                                         wire:click="$set('dateMode', 'custom_date')"
                                         @class([
-                                            'border-l border-gray-300 px-3 py-2 text-sm font-medium transition-colors duration-300 ease-out dark:border-white/20',
-                                            'bg-primary-600 text-white' => $this->dateMode === 'custom_date',
+                                            'px-3 py-2 text-sm font-medium transition-colors duration-300 ease-out',
+                                            'fi-btn text-white' => $this->dateMode === 'custom_date',
                                             'text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/10' => $this->dateMode !== 'custom_date',
                                         ])
                                     >
@@ -87,7 +87,7 @@
                                 $actor = $log->user?->name ?? 'System';
                             @endphp
 
-                            <article class="relative rounded-xl border border-gray-200 bg-white p-3 shadow-xs dark:border-white/10 dark:bg-white/5">
+                            <article class="relative rounded-xl border border-gray-200 bg-white p-3 shadow-xs ">
                                 <span class="absolute -left-[1.85rem] top-5 inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white dark:border-white/10 dark:bg-gray-900">
                                     <x-filament::icon
                                         :icon="$icon"
@@ -132,7 +132,7 @@
                                     wire:click="$set('dateMode', 'all_time')"
                                     @class([
                                         'px-3 py-2 text-sm font-medium transition-colors duration-300 ease-out',
-                                        'bg-primary-600 text-white' => $this->dateMode === 'all_time',
+                                        'fi-btn' => $this->dateMode === 'all_time',
                                         'text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/10' => $this->dateMode !== 'all_time',
                                     ])
                                 >
@@ -142,8 +142,8 @@
                                     type="button"
                                     wire:click="$set('dateMode', 'custom_date')"
                                     @class([
-                                        'border-l border-gray-300 px-3 py-2 text-sm font-medium transition-colors duration-300 ease-out dark:border-white/20',
-                                        'bg-primary-600 text-white' => $this->dateMode === 'custom_date',
+                                        'px-3 py-2 text-sm font-medium transition-colors duration-300 ease-out',
+                                        'fi-btn' => $this->dateMode === 'custom_date',
                                         'text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/10' => $this->dateMode !== 'custom_date',
                                     ])
                                 >
@@ -161,7 +161,7 @@
                                 type="search"
                                 wire:model.live.debounce.400ms="search"
                                 placeholder="Search user, event, message, device..."
-                                class="fi-input block h-9 w-full rounded-lg border-none bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-300 transition focus:ring-2 focus:ring-primary-500 dark:bg-white/5 dark:text-white dark:ring-white/20"
+                                class="fi-input block h-9 w-full border-none bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-300 transition focus:ring-2 focus:ring-primary-500 dark:bg-white/5 dark:text-white dark:ring-white/20"
                             />
                         </div>
 
@@ -172,7 +172,7 @@
                                 wire:click="$set('dateMode', 'custom_date')"
                                 onclick="document.getElementById('activity-date-filter-empty')?.showPicker?.()"
                                 @class([
-                                    'fi-input inline-flex items-center gap-2 rounded-lg border-none bg-white px-3 py-2 text-sm text-gray-900 ring-1 focus:ring-2 focus:ring-[#539302] dark:bg-white/5 dark:text-white',
+                                    'fi-input inline-flex items-center gap-2 rounded-lg border-none bg-white px-3 py-2 text-sm text-gray-900 ring-1 focus:ring-2 focus:ring-[#517645] dark:bg-white/5 dark:text-white',
                                     'ring-[#539302] dark:ring-[#539302]' => $this->dateMode === 'custom_date',
                                     'ring-gray-300 dark:ring-white/20' => $this->dateMode !== 'custom_date',
                                 ])
