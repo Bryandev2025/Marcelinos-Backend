@@ -1,0 +1,21 @@
+# Apache WebSocket Proxy for Laravel Reverb (Production)
+#
+# Add this INSIDE your <VirtualHost *:443> block (the SSL vhost).
+# Requires: a2enmod proxy proxy_wstunnel proxy_http
+#
+# The client connects to wss://yourdomain.com/app/... (port 443).
+# Apache proxies to Reverb on localhost:8080.
+
+ProxyPreserveHost On
+
+# WebSocket connections (Pusher protocol)
+<Location /app>
+    ProxyPass ws://127.0.0.1:8080/app
+    ProxyPassReverse ws://127.0.0.1:8080/app
+</Location>
+
+# HTTP API (health checks, event publishing from Laravel)
+<Location /apps>
+    ProxyPass http://127.0.0.1:8080/apps
+    ProxyPassReverse http://127.0.0.1:8080/apps
+</Location>

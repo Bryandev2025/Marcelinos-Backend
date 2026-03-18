@@ -25,8 +25,9 @@ return [
             'key' => env('REVERB_APP_KEY', env('VITE_PUSHER_APP_KEY')),
             'cluster' => env('VITE_PUSHER_APP_CLUSTER', 'mt1'),
             'wsHost' => env('REVERB_HOST', env('VITE_PUSHER_HOST')),
-            'wsPort' => env('REVERB_PORT', env('VITE_PUSHER_PORT', 8080)),
-            'wssPort' => env('REVERB_PORT', env('VITE_PUSHER_PORT', 443)),
+            // wsPort/wssPort: client-facing port. Local=8080. Production behind proxy=443.
+            'wsPort' => (int) env('REVERB_PORT', env('VITE_PUSHER_PORT', 8080)),
+            'wssPort' => (int) env('REVERB_WSS_PORT', env('REVERB_PORT', env('VITE_PUSHER_PORT', 443))),
             'authEndpoint' => '/broadcasting/auth',
             'disableStats' => true,
             'encrypted' => env('REVERB_SCHEME', 'http') === 'https',
