@@ -14,19 +14,23 @@ return [
     |
     */
 
+    /*
+    | Filament uses the same Reverb/Pusher config as the React app.
+    | Falls back to VITE_PUSHER_* for compatibility; REVERB_* takes precedence.
+    */
     'broadcasting' => [
 
         'echo' => [
             'broadcaster' => 'pusher',
-            'key' => env('VITE_PUSHER_APP_KEY'),
-            'cluster' => env('VITE_PUSHER_APP_CLUSTER'),
-            'wsHost' => env('VITE_PUSHER_HOST'),
-            'wsPort' => env('VITE_PUSHER_PORT'),
-            'wssPort' => env('VITE_PUSHER_PORT'),
+            'key' => env('REVERB_APP_KEY', env('VITE_PUSHER_APP_KEY')),
+            'cluster' => env('VITE_PUSHER_APP_CLUSTER', 'mt1'),
+            'wsHost' => env('REVERB_HOST', env('VITE_PUSHER_HOST')),
+            'wsPort' => env('REVERB_PORT', env('VITE_PUSHER_PORT', 8080)),
+            'wssPort' => env('REVERB_PORT', env('VITE_PUSHER_PORT', 443)),
             'authEndpoint' => '/broadcasting/auth',
             'disableStats' => true,
-            'encrypted' => true,
-            'forceTLS' => true,
+            'encrypted' => env('REVERB_SCHEME', 'http') === 'https',
+            'forceTLS' => env('REVERB_SCHEME', 'http') === 'https',
         ],
 
     ],
