@@ -12,6 +12,35 @@ class VenueObserver
     {
         $this->safeBroadcast();
         $this->safeBroadcast();
+
+        // Only log if an authenticated user with staff/admin role is present
+        $user = auth()->user();
+        if ($user && in_array($user->role, ['admin', 'staff'])) {
+            $oldMedia = $venue->getOriginal('featured_image');
+            $newMedia = $venue->getFirstMedia('featured');
+            $hadPhoto = $oldMedia || $venue->getMedia('featured')->count() > 0;
+            $hasPhoto = $newMedia !== null;
+
+            if ($hasPhoto && !$hadPhoto) {
+                \App\Support\ActivityLogger::log(
+                    category: 'venue',
+                    event: 'photo.uploaded',
+                    description: sprintf('Venue photo uploaded for "%s".', $venue->name),
+                    subject: $venue,
+                    meta: ['venue_id' => $venue->id, 'action' => 'uploaded'],
+                    userId: $user->id,
+                );
+            } elseif ($hasPhoto && $hadPhoto) {
+                \App\Support\ActivityLogger::log(
+                    category: 'venue',
+                    event: 'photo.replaced',
+                    description: sprintf('Venue photo replaced for "%s".', $venue->name),
+                    subject: $venue,
+                    meta: ['venue_id' => $venue->id, 'action' => 'replaced'],
+                    userId: $user->id,
+                );
+            }
+        }
     }
 
     public function deleted(Venue $venue): void
