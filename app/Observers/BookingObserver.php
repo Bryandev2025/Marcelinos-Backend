@@ -60,22 +60,27 @@ class BookingObserver
     public function updated(Booking $booking): void
     {
         if ($booking->wasChanged('status')) {
-            ActivityLogger::log(
-                category: 'booking',
-                event: 'booking.status_changed',
-                description: sprintf(
-                    'Booking %s status changed from %s to %s.',
-                    $booking->reference_number,
-                    (string) $booking->getOriginal('status'),
-                    (string) $booking->status,
-                ),
-                subject: $booking,
-                meta: [
-                    'reference_number' => $booking->reference_number,
-                    'old_status' => (string) $booking->getOriginal('status'),
-                    'new_status' => (string) $booking->status,
-                ],
-            );
+            // Only log if an authenticated user with staff/admin role is present
+            $user = auth()->user();
+            if ($user && in_array($user->role, ['admin', 'staff'])) {
+                ActivityLogger::log(
+                    category: 'booking',
+                    event: 'booking.status_changed',
+                    description: sprintf(
+                        'Booking %s status changed from %s to %s.',
+                        $booking->reference_number,
+                        (string) $booking->getOriginal('status'),
+                        (string) $booking->status,
+                    ),
+                    subject: $booking,
+                    meta: [
+                        'reference_number' => $booking->reference_number,
+                        'old_status' => (string) $booking->getOriginal('status'),
+                        'new_status' => (string) $booking->status,
+                    ],
+                    userId: $user->id,
+                );
+            }
         }
 
         $this->safeBroadcast(

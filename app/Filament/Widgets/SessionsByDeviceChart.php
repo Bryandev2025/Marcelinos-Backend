@@ -50,7 +50,7 @@ class SessionsByDeviceChart extends ChartWidget
 
         return new HtmlString(
             '<div style="display: flex; font-size: .9rem; justify-content: space-between; align-items: center; width: 100%;">' .
-            '<span>Active Devices</span>' .
+            '<span>Active Sessions</span>' .
             '<span style="font-weight: 600; color: #374151;">' . $total . '</span>' .
             '</div>'
         );
@@ -82,9 +82,8 @@ class SessionsByDeviceChart extends ChartWidget
                 [
                     'data' => $data,
                     'backgroundColor' => $colors,
-                    'borderColor' => '#FFFFFF',
-                    'borderWidth' => 3,
-                    'hoverOffset' => 6,
+                    'borderColor' => 'transparent',
+                    'hoverOffset' => 3,
                 ],
             ],
         ];
@@ -116,4 +115,5 @@ class SessionsByDeviceChart extends ChartWidget
             ],
         ];
     }
+
 }

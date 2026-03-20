@@ -20,7 +20,11 @@ class BookingCancelled implements ShouldBroadcast
      } 
      public function broadcastOn (): PrivateChannel     
      { 
-        return new PrivateChannel(             BroadcastChannelNames::bookingCancelled(                 $this->booking->reference_number             )         );     
+        return new PrivateChannel(             
+          BroadcastChannelNames::bookingCancelled(                 
+               $this->booking->reference_number             
+          )         
+          );     
     } 
     public function broadcastAs (): string     {
          return 'booking.cancelled' ;     

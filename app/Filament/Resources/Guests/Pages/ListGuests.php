@@ -10,10 +10,4 @@ class ListGuests extends ListRecords
 {
     protected static string $resource = GuestResource::class;
 
-    protected function getHeaderActions(): array
-    {
-        return [
-            CreateAction::make(),
-        ];
-    }
 }

@@ -50,7 +50,7 @@ class MonthlyBookingsChart extends ChartWidget
                     'backgroundColor' => 'rgba(59, 130, 246, 0.5)',
                     'borderColor' => 'rgba(59, 130, 246, 1)',
                     'borderWidth' => 1,
-                    'borderRadius' => 6,
+                    'borderRadius' => 2,
                     'borderSkipped' => false,
                     'maxBarThickness' => 28,
                 ],

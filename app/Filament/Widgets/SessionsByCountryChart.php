@@ -43,7 +43,7 @@ class SessionsByCountryChart extends ChartWidget
                 [
                     'data' => $rows->pluck('total')->map(fn ($value) => (int) $value)->all(),
                     'backgroundColor' => ['#22C55E',' #FAED33',  '#3B82F6', '#EF4444', '#8B5CF6'],
-                    'borderColor' => '#FFFFFF',
+                    'borderColor' => 'transparent',
                     'borderWidth' => 3,
                     'width' => 1,
                     'hoverOffset' => 5,
@@ -72,7 +72,7 @@ class SessionsByCountryChart extends ChartWidget
                     'labels' => [
                         'usePointStyle' => true,
                         'pointStyle' => 'circle',
-                            'padding' => 10,
+                        'padding' => 10,
                     ],
                 ],
             ],

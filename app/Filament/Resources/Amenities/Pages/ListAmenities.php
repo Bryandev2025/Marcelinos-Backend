@@ -16,8 +16,7 @@ class ListAmenities extends ListRecords
     {
         return [
             CreateAction::make()
-                ->label('Add amenity')
-                ->icon('heroicon-o-plus'),
+                ->label('New amenity')
         ];
     }
 }
