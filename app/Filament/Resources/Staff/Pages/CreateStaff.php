@@ -3,48 +3,27 @@
 namespace App\Filament\Resources\Staff\Pages;
 
 use App\Filament\Resources\Staff\StaffResource;
+use App\Filament\Resources\Staff\Schemas\StaffForm;
 use App\Mail\StaffOtpVerification;
 use App\Models\OtpVerification;
 use Filament\Actions\Action;
-use Filament\Forms\Components\TextInput;
-use Filament\Schemas\Schema;
-use Filament\Resources\Pages\CreateRecord;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 use Filament\Notifications\Notification;
+use Filament\Resources\Pages\CreateRecord;
+use Filament\Schemas\Schema;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\Rule;
+use Throwable;
 
 class CreateStaff extends CreateRecord
 {
     protected static string $resource = StaffResource::class;
+    public ?string $otpSentTo = null;
 
     public function form(Schema $schema): Schema
     {
-        return $schema->schema([
-            TextInput::make('name')
-                ->label('Full Name')
-                ->required()
-                ->maxLength(255),
-
-            TextInput::make('email')
-                ->label('Email Address')
-                ->email()
-                ->required()
-                ->unique(ignoreRecord: true)
-                ->maxLength(255),
-
-            TextInput::make('password')
-                ->label('Password')
-                ->password()
-                ->required()
-                ->minLength(8)
-                ->maxLength(255),
-
-            TextInput::make('otp')
-                ->label('Verification Code')
-                ->numeric()
-                ->length(6)
-                ->helperText('Click "Send OTP" to receive a verification code via email.'),
-        ]);
+        return StaffForm::configure($schema, withOtp: true);
     }
 
     protected function getHeaderActions(): array
@@ -53,32 +32,105 @@ class CreateStaff extends CreateRecord
             Action::make('sendOtp')
                 ->label('Send OTP')
                 ->icon('heroicon-o-envelope')
+                ->color('info')
+                ->tooltip('Send verification code to the entered email address.')
                 ->action(function () {
-                    $email = $this->form->getState()['email'] ?? null;
+                    $email = strtolower(trim((string) ($this->form->getState()['email'] ?? '')));
 
-                    if (!$email) {
+                    $validator = Validator::make(
+                        ['email' => $email],
+                        [
+                            'email' => [
+                                'required',
+                                'email',
+                                Rule::unique('users', 'email'),
+                            ],
+                        ]
+                    );
+
+                    if ($validator->fails()) {
                         Notification::make()
-                            ->title('Email Required')
-                            ->body('Please enter an email address first.')
+                            ->title('Valid Email Required')
+                            ->body($validator->errors()->first('email'))
                             ->warning()
                             ->send();
+
                         return;
                     }
 
-                    $otp = OtpVerification::createForEmail($email);
-                    Mail::to($email)->send(new StaffOtpVerification($otp->code));
+                    try {
+                        $otp = OtpVerification::createForEmail($email);
+                        Mail::mailer('smtp')->to($email)->send(new StaffOtpVerification($otp->code));
+                        $this->otpSentTo = $email;
 
-                    Notification::make()
-                        ->title('OTP Sent')
-                        ->body('A verification code has been sent to ' . $email)
-                        ->success()
-                        ->send();
+                        Log::info('Staff OTP sent', [
+                            'email' => $email,
+                        ]);
+
+                        Notification::make()
+                            ->title('OTP Sent')
+                            ->body('A verification code has been sent to ' . $email)
+                            ->success()
+                            ->send();
+                    } catch (Throwable $exception) {
+                        Log::error('Primary OTP send failed', [
+                            'email' => $email,
+                            'error' => $exception->getMessage(),
+                        ]);
+
+                        try {
+                            $otp ??= OtpVerification::createForEmail($email);
+
+                            Mail::mailer('smtp')->raw(
+                                "Your verification code is {$otp->code}. This code expires in 10 minutes.",
+                                function ($message) use ($email): void {
+                                    $message->to($email)->subject('Staff Account Verification Code');
+                                }
+                            );
+
+                            $this->otpSentTo = $email;
+
+                            Notification::make()
+                                ->title('OTP Sent (Fallback)')
+                                ->body('OTP was sent using fallback delivery to ' . $email)
+                                ->warning()
+                                ->send();
+                        } catch (Throwable $fallbackException) {
+                            Log::error('Fallback OTP send failed', [
+                                'email' => $email,
+                                'error' => $fallbackException->getMessage(),
+                            ]);
+
+                            Notification::make()
+                                ->title('Failed to Send OTP')
+                                ->body('Could not deliver OTP. Please try again or check Mailtrap logs.')
+                                ->danger()
+                                ->send();
+                        }
+                    }
                 }),
         ];
     }
 
+    public function canCreateAnother(): bool
+    {
+        return false;
+    }
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
+        $email = strtolower(trim((string) ($data['email'] ?? '')));
+
+        if (! $this->otpSentTo || $this->otpSentTo !== $email) {
+            Notification::make()
+                ->title('OTP Not Sent')
+                ->body('Please click "Send OTP" after entering the final email address.')
+                ->danger()
+                ->send();
+
+            $this->halt();
+        }
+
         if (empty($data['otp'])) {
             Notification::make()
                 ->title('OTP Required')
@@ -89,7 +141,7 @@ class CreateStaff extends CreateRecord
             $this->halt();
         }
 
-        $otpRecord = OtpVerification::where('email', $data['email'])->first();
+        $otpRecord = OtpVerification::where('email', $email)->first();
 
         if (!$otpRecord || !$otpRecord->verify($data['otp'])) {
             Notification::make()
@@ -102,9 +154,9 @@ class CreateStaff extends CreateRecord
         }
 
         unset($data['otp']);
-        $data['password'] = Hash::make($data['password']);
+        $data['email'] = $email;
         $data['role'] = 'staff';
-        $data['is_active'] = true;
+        $data['is_active'] = (bool) ($data['is_active'] ?? true);
 
         return $data;
     }

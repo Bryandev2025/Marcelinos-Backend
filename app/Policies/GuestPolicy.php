@@ -13,7 +13,7 @@ class GuestPolicy
      */
     public function viewAny(User $user): bool
     {
-        return in_array($user->role, ['admin', 'staff'], true);
+        return $user->hasPrivilege('manage_guests');
     }
 
     /**
@@ -21,7 +21,7 @@ class GuestPolicy
      */
     public function view(User $user, Guest $guest): bool
     {
-        return in_array($user->role, ['admin', 'staff'], true);
+        return $user->hasPrivilege('manage_guests');
     }
 
     /**
@@ -29,7 +29,7 @@ class GuestPolicy
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->hasPrivilege('manage_guests');
     }
 
     /**
@@ -37,7 +37,7 @@ class GuestPolicy
      */
     public function update(User $user, Guest $guest): bool
     {
-        return true;
+        return $user->hasPrivilege('manage_guests');
     }
 
     /**
@@ -45,7 +45,7 @@ class GuestPolicy
      */
     public function delete(User $user, Guest $guest): bool
     {
-        return true;
+        return $user->hasPrivilege('manage_guests');
     }
 
     /**

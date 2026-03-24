@@ -13,7 +13,7 @@ class RoomPolicy
      */
     public function viewAny(User $user): bool
     {
-        return in_array($user->role, ['admin', 'staff'], true);
+        return $user->hasPrivilege('manage_rooms');
     }
 
     /**
@@ -21,7 +21,7 @@ class RoomPolicy
      */
     public function view(User $user, Room $room): bool
     {
-        return in_array($user->role, ['admin', 'staff'], true);
+        return $user->hasPrivilege('manage_rooms');
     }
 
     /**
@@ -29,7 +29,7 @@ class RoomPolicy
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->hasPrivilege('manage_rooms');
     }
 
     /**
@@ -37,7 +37,7 @@ class RoomPolicy
      */
     public function update(User $user, Room $room): bool
     {
-        return $user->role === 'admin';
+        return $user->hasPrivilege('manage_rooms');
     }
 
     /**
@@ -45,7 +45,7 @@ class RoomPolicy
      */
     public function delete(User $user, Room $room): bool
     {
-        return $user->role === 'admin';
+        return $user->hasPrivilege('manage_rooms');
     }
 
     /**
@@ -66,6 +66,6 @@ class RoomPolicy
 
      public function bulkDelete(User $user): bool
     {
-        return $user->role === 'admin';
+        return $user->hasPrivilege('manage_rooms');
     }
 }

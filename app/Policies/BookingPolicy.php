@@ -13,7 +13,7 @@ class BookingPolicy
      */
     public function viewAny(User $user): bool
     {
-        return in_array($user->role, ['admin','staff'], true);
+        return $user->hasPrivilege('manage_bookings');
     }
 
     /**
@@ -21,7 +21,7 @@ class BookingPolicy
      */
     public function view(User $user, Booking $booking): bool
     {
-        return in_array($user->role, ['admin', 'staff'], true);
+        return $user->hasPrivilege('manage_bookings');
     }
 
     /**
@@ -29,7 +29,7 @@ class BookingPolicy
      */
     public function create(User $user): bool
     {
-        return $user->role === 'admin';
+        return $user->hasPrivilege('manage_bookings');
     }
 
     /**
@@ -37,7 +37,7 @@ class BookingPolicy
      */
     public function update(User $user, Booking $booking): bool
     {
-        return $user->role === 'admin';
+        return $user->hasPrivilege('manage_bookings');
     }
 
     /**
@@ -45,7 +45,7 @@ class BookingPolicy
      */
     public function delete(User $user, Booking $booking): bool
     {
-         return $user->role === 'admin';
+        return $user->hasPrivilege('manage_bookings');
     }
 
     /**
@@ -69,6 +69,6 @@ class BookingPolicy
      */
     public function bulkDelete(User $user): bool
     {
-        return $user->role === 'admin';
+        return $user->hasPrivilege('manage_bookings');
     }
 }

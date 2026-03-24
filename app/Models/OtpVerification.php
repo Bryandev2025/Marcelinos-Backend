@@ -44,6 +44,19 @@ class OtpVerification extends Model
 
     public function verify(string $code): bool
     {
-        return $this->code === $code && !$this->isExpired();
+        $normalizedInput = preg_replace('/\D/', '', trim($code));
+
+        if ($normalizedInput === null || $normalizedInput === '') {
+            return false;
+        }
+
+        // Backward compatibility: if UI casted OTP to number previously,
+        // leading zeros may have been dropped (e.g. 012345 -> 12345).
+        $candidates = [$normalizedInput];
+        if (strlen($normalizedInput) < 6) {
+            $candidates[] = str_pad($normalizedInput, 6, '0', STR_PAD_LEFT);
+        }
+
+        return in_array($this->code, $candidates, true) && ! $this->isExpired();
     }
 }

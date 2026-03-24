@@ -45,6 +45,17 @@ class StaffTable
                     ])
                     ->sortable(),
 
+                TextColumn::make('permissions')
+                    ->label('Privileges')
+                    ->badge()
+                    ->formatStateUsing(function (?array $state): string {
+                        if (! is_array($state) || empty($state)) {
+                            return 'No privileges';
+                        }
+
+                        return (string) count($state) . ' selected';
+                    }),
+
                 TextColumn::make('created_at')
                     ->label('Created')
                     ->dateTime()

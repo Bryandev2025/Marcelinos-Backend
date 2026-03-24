@@ -2,38 +2,77 @@
 
 namespace App\Filament\Resources\Staff\Schemas;
 
-use Filament\Schemas\Schema;
-use Filament\Forms\Components\TextInput;
+use App\Models\User;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Hash;
 
 class StaffForm
 {
-    public static function configure(Schema $schema): Schema
+    public static function configure(Schema $schema, bool $withOtp = false): Schema
     {
         return $schema->schema([
-            TextInput::make('name')
-                ->label('Full Name')
-                ->required()
-                ->maxLength(255),
+            Section::make('Staff Details')
+                ->description('Set identity and login credentials for the staff account.')
+                ->schema([
+                    TextInput::make('name')
+                        ->label('Full Name')
+                        ->required()
+                        ->placeholder('e.g. John Doe')
+                        ->maxLength(255),
 
-            TextInput::make('email')
-                ->label('Email Address')
-                ->email()
-                ->required()
-                ->unique(ignoreRecord: true)
-                ->maxLength(255),
+                    TextInput::make('email')
+                        ->label('Email Address')
+                        ->email()
+                        ->required()
+                        ->placeholder('staff@example.com')
+                        ->unique(ignoreRecord: true)
+                        ->maxLength(255),
 
-            TextInput::make('password') // ✅ password field in v3
-                ->label('Password')
-                ->password() // important for v3
-                ->required(fn ($record) => $record === null) // only required on create
-                ->dehydrateStateUsing(fn ($state) => filled($state) ? Hash::make($state) : null)
-                ->dehydrated(fn ($state) => filled($state)),
+                    TextInput::make('password')
+                        ->label('Password')
+                        ->password()
+                        ->helperText('Leave blank during edit to keep the current password.')
+                        ->required(fn ($record) => $record === null)
+                        ->dehydrateStateUsing(fn ($state) => filled($state) ? Hash::make($state) : null)
+                        ->dehydrated(fn ($state) => filled($state)),
 
-            Hidden::make('role')
-                ->default('staff')
-                ->dehydrated(true) // force role to staff
+                    TextInput::make('otp')
+                        ->label('Verification Code')
+                        ->tel()
+                        ->maxLength(6)
+                        ->minLength(6)
+                        ->rule('regex:/^\d{6}$/')
+                        ->placeholder('Enter 6-digit OTP')
+                        ->autocomplete(false)
+                        ->helperText('Step 1: Enter email. Step 2: Click "Send OTP" (top-right). Step 3: Enter code, then create staff.')
+                        ->visible(fn () => $withOtp)
+                        ->required(fn () => $withOtp),
+
+                    Hidden::make('role')
+                        ->default('staff')
+                        ->dehydrated(true),
+                ])
+                ->columns(2),
+
+            Section::make('Access & Privileges')
+                ->description('Choose what this staff member can manage inside admin.')
+                ->schema([
+                    Toggle::make('is_active')
+                        ->label('Active account')
+                        ->helperText('Inactive staff cannot log in to any panel.')
+                        ->default(true),
+
+                    CheckboxList::make('permissions')
+                        ->label('Allowed actions')
+                        ->options(User::staffPrivilegeOptions())
+                        ->columns(2)
+                        ->bulkToggleable(),
+                ]),
         ]);
     }
 }

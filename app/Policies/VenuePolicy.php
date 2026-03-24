@@ -13,7 +13,7 @@ class VenuePolicy
      */
     public function viewAny(User $user): bool
     {
-        return in_array($user->role, ['admin', 'staff'], true);
+        return $user->hasPrivilege('manage_venues');
     }
 
     /**
@@ -21,7 +21,7 @@ class VenuePolicy
      */
     public function view(User $user, Venue $venue): bool
     {
-        return in_array($user->role, ['admin', 'staff'], true);
+        return $user->hasPrivilege('manage_venues');
     }
 
     /**
@@ -29,7 +29,7 @@ class VenuePolicy
      */
     public function create(User $user): bool
     {
-        return true;
+        return $user->hasPrivilege('manage_venues');
     }
 
     /**
@@ -37,7 +37,7 @@ class VenuePolicy
      */
     public function update(User $user, Venue $venue): bool
     {
-        return $user->role === 'admin';
+        return $user->hasPrivilege('manage_venues');
     }
 
     /**
@@ -45,7 +45,7 @@ class VenuePolicy
      */
     public function delete(User $user, Venue $venue): bool
     {
-        return $user->role === 'admin';
+        return $user->hasPrivilege('manage_venues');
     }
 
     /**

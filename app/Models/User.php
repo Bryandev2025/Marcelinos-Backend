@@ -19,6 +19,7 @@ class User extends Authenticatable implements FilamentUser
         'password',
         'role',
         'is_active',
+        'permissions',
     ];
 
     protected $hidden = [
@@ -31,8 +32,49 @@ class User extends Authenticatable implements FilamentUser
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'permissions' => 'array',
         ];
     }   
+
+    /**
+     * Central list used by admin UI when assigning staff permissions.
+     *
+     * @return array<string, string>
+     */
+    public static function staffPrivilegeOptions(): array
+    {
+        return [
+            'manage_rooms' => 'Manage rooms',
+            'manage_venues' => 'Manage venues',
+            'manage_bookings' => 'Manage bookings',
+            'manage_guests' => 'Manage guests',
+            'manage_amenities' => 'Manage amenities',
+            'manage_galleries' => 'Manage galleries',
+            'manage_reviews' => 'Manage reviews',
+            'manage_blocked_dates' => 'Manage blocked dates',
+            'manage_contact_messages' => 'Manage contact messages',
+            'manage_activity_logs' => 'Manage activity logs',
+        ];
+    }
+
+    public function hasPrivilege(string $privilege): bool
+    {
+        if ($this->role === 'admin') {
+            return true;
+        }
+
+        if ($this->role !== 'staff') {
+            return false;
+        }
+
+        $permissions = $this->permissions ?? [];
+
+        if (! is_array($permissions)) {
+            return false;
+        }
+
+        return in_array($privilege, $permissions, true);
+    }
 
     protected static function booted()
     {
