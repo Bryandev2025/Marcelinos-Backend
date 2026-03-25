@@ -50,9 +50,7 @@ class StaffForm
                         ->placeholder('Enter 6-digit OTP')
                         ->autocomplete(false)
                         ->helperText('Step 1: Enter email. Step 2: Click "Send OTP" (top-right). Step 3: Enter code, then create staff.')
-                        ->visible(fn () => $withOtp)
-                        ->required(fn () => $withOtp),
-
+                        ->visible(fn () => $withOtp),
                     Hidden::make('role')
                         ->default('staff')
                         ->dehydrated(true),
