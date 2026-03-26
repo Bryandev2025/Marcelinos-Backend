@@ -43,3 +43,6 @@ Broadcast::channel('booking.{reference}.cancelled', function ($user, string $ref
     return in_array($user->role ?? null, ['admin', 'staff'], true) 
         || true; // allow guest if needed 
 });
+Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
+    return (int) $user->id === (int) $id;
+});
