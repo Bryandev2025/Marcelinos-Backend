@@ -2,8 +2,15 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
+use App\Mail\BookingCreated;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class Booking extends Model
 {
@@ -36,7 +43,7 @@ class Booking extends Model
          */
         static::creating(function ($booking) {
             $booking->reference_number =
-                'MWA-' . now()->year . '-' . str_pad(rand(1, 999999), 6, '0', STR_PAD_LEFT);
+                'MWA-'.now()->year.'-'.str_pad(rand(1, 999999), 6, '0', STR_PAD_LEFT);
         });
 
         /**
@@ -47,8 +54,8 @@ class Booking extends Model
 
             $booking->loadMissing('guest');
             if ($booking->guest && $booking->guest->email) {
-                \Illuminate\Support\Facades\Mail::to($booking->guest->email)
-                    ->send(new \App\Mail\BookingCreated($booking));
+                Mail::to($booking->guest->email)
+                    ->send(new BookingCreated($booking));
             }
         });
 
@@ -99,11 +106,17 @@ class Booking extends Model
     /* ================= STATUSES ================= */
 
     const STATUS_UNPAID = 'unpaid';
+
     const STATUS_CONFIRMED = 'confirmed';
+
     const STATUS_OCCUPIED = 'occupied';
+
     const STATUS_COMPLETED = 'completed';
+
     const STATUS_PAID = 'paid';
+
     const STATUS_CANCELLED = 'cancelled';
+
     const STATUS_RESCHEDULE = 'reschedule';
 
     public static function statusOptions(): array
@@ -136,9 +149,9 @@ class Booking extends Model
      * Scope: bookings that overlap a given date (any part of that day).
      * Excludes cancelled (and optionally completed) so staff see active bookings.
      */
-    public function scopeOverlappingDate($query, $date): \Illuminate\Database\Eloquent\Builder
+    public function scopeOverlappingDate($query, $date): Builder
     {
-        $date = \Illuminate\Support\Carbon::parse($date);
+        $date = Carbon::parse($date);
         $dateStart = $date->copy()->startOfDay();
         $dateEnd = $date->copy()->endOfDay();
 
@@ -206,6 +219,35 @@ class Booking extends Model
         })->values()->all();
     }
 
+    /**
+     * Bookings overlapping a calendar day that include a given venue (for staff block warnings).
+     *
+     * @return array<int, array{id: int, reference_number: string, guest_name: string, email: string, contact_num: string, rooms: string, venues: string, check_in: string, check_out: string, status: string}>
+     */
+    public static function getConflictsForVenueOnDate(int $venueId, $date): array
+    {
+        $bookings = self::overlappingDate($date)
+            ->whereHas('venues', fn ($q) => $q->where('venues.id', $venueId))
+            ->with(['guest', 'rooms', 'venues'])
+            ->orderBy('check_in')
+            ->get();
+
+        return $bookings->map(function (Booking $b) {
+            return [
+                'id' => $b->id,
+                'reference_number' => $b->reference_number,
+                'guest_name' => $b->guest?->full_name ?? '—',
+                'email' => $b->guest?->email ?? '—',
+                'contact_num' => $b->guest?->contact_num ?? '—',
+                'rooms' => $b->rooms->pluck('name')->join(', ') ?: '—',
+                'venues' => $b->venues->pluck('name')->join(', ') ?: '—',
+                'check_in' => $b->check_in?->format('M j, Y g:i A') ?? '—',
+                'check_out' => $b->check_out?->format('M j, Y g:i A') ?? '—',
+                'status' => $b->status,
+            ];
+        })->values()->all();
+    }
+
     /* ================= PAYMENT HELPERS ================= */
 
     /**
@@ -229,7 +271,7 @@ class Booking extends Model
      */
     public function generateQrCode(): void
     {
-        if (!empty($this->qr_code)) {
+        if (! empty($this->qr_code)) {
             return;
         }
 
@@ -239,11 +281,11 @@ class Booking extends Model
             'guest_id' => $this->guest_id,
         ]);
 
-        $path = 'qr/bookings/' . \Illuminate\Support\Str::uuid() . '.svg';
+        $path = 'qr/bookings/'.Str::uuid().'.svg';
 
-        \Illuminate\Support\Facades\Storage::disk('public')->put(
+        Storage::disk('public')->put(
             $path,
-            \SimpleSoftwareIO\QrCode\Facades\QrCode::size(300)->generate($qrData)
+            QrCode::size(300)->generate($qrData)
         );
 
         $this->updateQuietly([

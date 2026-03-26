@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Eloquent\Relations\VenueReviewsRelation;
-use App\Models\Review;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\MediaLibrary\HasMedia;
@@ -23,7 +22,9 @@ class Venue extends Model implements HasMedia
 
     /* ================= STATUSES ================= */
     const STATUS_AVAILABLE = 'available';
+
     const STATUS_BOOKED = 'booked';
+
     const STATUS_MAINTENANCE = 'maintenance';
 
     public static function statusOptions(): array
@@ -104,10 +105,15 @@ class Venue extends Model implements HasMedia
         return $this->belongsToMany(Booking::class, 'booking_venue')->withTimestamps();
     }
 
+    public function venueBlockedDates()
+    {
+        return $this->hasMany(VenueBlockedDate::class);
+    }
+
     /**
      * Scope: only venues available in the given date range.
-     * Same logic as Room::scopeAvailableBetween: exclude maintenance and those
-     * with a non-cancelled booking overlapping the range.
+     * Excludes maintenance, staff-blocked calendar days (venue_blocked_dates),
+     * and non-cancelled bookings overlapping the range.
      */
     public function scopeAvailableBetween($query, $checkIn, $checkOut, $excludeBookingId = null)
     {
@@ -116,10 +122,13 @@ class Venue extends Model implements HasMedia
                 $q->where('bookings.status', '!=', Booking::STATUS_CANCELLED)
                     ->where('bookings.check_in', '<', $checkOut)
                     ->where('bookings.check_out', '>', $checkIn);
-                
+
                 if ($excludeBookingId) {
                     $q->where('bookings.id', '!=', $excludeBookingId);
                 }
+            })
+            ->whereDoesntHave('venueBlockedDates', function ($q) use ($checkIn, $checkOut) {
+                $q->overlappingBookingRange($checkIn, $checkOut);
             });
     }
 

@@ -11,35 +11,38 @@ use App\Http\Responses\LoginResponse;
 use App\Http\Responses\LogoutResponse;
 use App\Models\ActivityLog;
 use App\Models\Amenity;
+use App\Models\BlockedDate;
+use App\Models\Booking;
+use App\Models\Gallery;
+use App\Models\Guest;
+use App\Models\Review;
+use App\Models\Room;
+use App\Models\RoomBlockedDate;
+use App\Models\User;
+use App\Models\Venue;
+use App\Models\VenueBlockedDate;
+use App\Observers\BlockedDateObserver;
+use App\Observers\BookingObserver;
+use App\Observers\GalleryObserver;
+use App\Observers\ReviewObserver;
+use App\Observers\RoomBlockedDateObserver;
+use App\Observers\RoomObserver;
+use App\Observers\VenueBlockedDateObserver;
+use App\Observers\VenueObserver;
 use App\Support\ActivityLogger;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse as LoginResponseContract;
 use Filament\Auth\Http\Responses\Contracts\LogoutResponse as LogoutResponseContract;
 use Filament\Support\Facades\FilamentView;
 use Filament\Tables\View\TablesRenderHook;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
-use App\Models\Booking;
-use App\Models\BlockedDate;
-use App\Models\RoomBlockedDate;
-use App\Models\Gallery;
-use App\Models\Review;
-use App\Models\Room;
-use App\Models\User;
-use App\Models\Venue;
-use App\Observers\BlockedDateObserver;
-use App\Observers\RoomBlockedDateObserver;
-use App\Observers\BookingObserver;
-use App\Observers\GalleryObserver;
-use App\Observers\ReviewObserver;
-use App\Observers\RoomObserver;
-use App\Observers\VenueObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -74,6 +77,7 @@ class AppServiceProvider extends ServiceProvider
         Venue::observe(VenueObserver::class);
         BlockedDate::observe(BlockedDateObserver::class);
         RoomBlockedDate::observe(RoomBlockedDateObserver::class);
+        VenueBlockedDate::observe(VenueBlockedDateObserver::class);
         Gallery::observe(GalleryObserver::class);
         Review::observe(ReviewObserver::class);
 
@@ -85,31 +89,31 @@ class AppServiceProvider extends ServiceProvider
     {
         FilamentView::registerRenderHook(
             TablesRenderHook::TOOLBAR_START,
-            fn (): string => '<div class="text-sm font-medium">Total Staff: ' . User::query()->where('role', 'staff')->count() . '</div>',
+            fn (): string => '<div class="text-sm font-medium">Total Staff: '.User::query()->where('role', 'staff')->count().'</div>',
             scopes: [ListStaff::class],
         );
 
         FilamentView::registerRenderHook(
             TablesRenderHook::TOOLBAR_START,
-            fn (): string => '<div class="text-sm font-medium">Total Guests: ' . \App\Models\Guest::query()->count() . '</div>',
+            fn (): string => '<div class="text-sm font-medium">Total Guests: '.Guest::query()->count().'</div>',
             scopes: [ListGuests::class],
         );
 
         FilamentView::registerRenderHook(
             TablesRenderHook::TOOLBAR_START,
-            fn (): string => '<div class="text-sm font-medium">Total Venues: ' . Venue::query()->count() . '</div>',
+            fn (): string => '<div class="text-sm font-medium">Total Venues: '.Venue::query()->count().'</div>',
             scopes: [ListVenues::class],
         );
 
         FilamentView::registerRenderHook(
             TablesRenderHook::TOOLBAR_START,
-            fn (): string => '<div class="text-sm font-medium">Total Rooms: ' . Room::query()->count() . '</div>',
+            fn (): string => '<div class="text-sm font-medium">Total Rooms: '.Room::query()->count().'</div>',
             scopes: [ListRooms::class],
         );
 
         FilamentView::registerRenderHook(
             TablesRenderHook::TOOLBAR_START,
-            fn (): string => '<div class="text-sm font-medium">Total Amenities: ' . Amenity::query()->count() . '</div>',
+            fn (): string => '<div class="text-sm font-medium">Total Amenities: '.Amenity::query()->count().'</div>',
             scopes: [ListAmenities::class],
         );
     }
@@ -189,7 +193,7 @@ class AppServiceProvider extends ServiceProvider
                 ->reject(fn (mixed $newValue, string $field) => $this->valuesAreEquivalent($model->getOriginal($field), $newValue))
                 ->all();
 
-            if ($model::class === \App\Models\User::class) {
+            if ($model::class === User::class) {
                 $meaningfulUserFields = array_diff(array_keys($changes), [
                     'remember_token',
                 ]);
@@ -285,6 +289,7 @@ class AppServiceProvider extends ServiceProvider
 
         if (is_scalar($value)) {
             $stringValue = trim((string) $value);
+
             return $stringValue === '' ? 'empty' : $stringValue;
         }
 
@@ -315,7 +320,7 @@ class AppServiceProvider extends ServiceProvider
             }
         }
 
-        return '#' . (string) $model->getKey();
+        return '#'.(string) $model->getKey();
     }
 
     /**
