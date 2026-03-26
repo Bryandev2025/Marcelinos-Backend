@@ -116,8 +116,7 @@ class Booking extends Model
     const STATUS_PAID = 'paid';
 
     const STATUS_CANCELLED = 'cancelled';
-
-    const STATUS_RESCHEDULE = 'reschedule';
+    const STATUS_RESCHEDULED = 'rescheduled';
 
     public static function statusOptions(): array
     {
@@ -128,6 +127,7 @@ class Booking extends Model
             self::STATUS_PAID => 'Paid',
             self::STATUS_COMPLETED => 'Completed',
             self::STATUS_CANCELLED => 'Cancelled',
+            self::STATUS_RESCHEDULED => 'Rescheduled',
         ];
     }
 
@@ -140,6 +140,7 @@ class Booking extends Model
             'secondary' => self::STATUS_COMPLETED,
             'info' => self::STATUS_PAID,
             'danger' => self::STATUS_CANCELLED,
+            'default' => self::STATUS_RESCHEDULED,
         ];
     }
 

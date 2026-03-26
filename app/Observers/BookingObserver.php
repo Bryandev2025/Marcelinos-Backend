@@ -8,6 +8,8 @@ use App\Models\Booking;
 use App\Models\User;
 use App\Support\ActivityLogger;
 use Filament\Notifications\Notification;
+use Filament\Actions\Action;
+use App\Filament\Resources\Bookings\BookingResource;
 use Illuminate\Support\Facades\Log;
 
 class BookingObserver
@@ -35,7 +37,14 @@ class BookingObserver
                     ->body("Booking {$booking->reference_number} was created.")
                     ->icon('heroicon-o-calendar-days')
                     ->color('success')
-                    ->sendToDatabase($user);
+                    ->actions([
+                        Action::make('view')
+                            ->label('View Booking')
+                            ->button()
+                            ->url(BookingResource::getUrl('view', ['record' => $booking]))
+                    ])
+                    ->sendToDatabase($user)
+                    ->broadcast($user);
             }
         }
 
@@ -60,6 +69,30 @@ class BookingObserver
     public function updated(Booking $booking): void
     {
         if ($booking->wasChanged('status')) {
+
+            if ($booking->status === 'cancelled') {
+                $users = User::whereIn('role', ['admin', 'staff'])
+                    ->where('is_active', true)
+                    ->get();
+                
+                foreach ($users as $user) {
+                    Notification::make()
+                        ->title('Booking Cancelled')
+                        ->body("Booking {$booking->reference_number} has been cancelled.")
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->actions([
+                            Action::make('view')
+                                ->label('View Booking')
+                                ->button()
+                                ->color('danger')
+                                ->url(BookingResource::getUrl('view', ['record' => $booking]))
+                        ])
+                        ->sendToDatabase($user)
+                        ->broadcast($user);
+                }
+            }
+
             // Only log if an authenticated user with staff/admin role is present
             $user = auth()->user();
             if ($user && in_array($user->role, ['admin', 'staff'])) {
