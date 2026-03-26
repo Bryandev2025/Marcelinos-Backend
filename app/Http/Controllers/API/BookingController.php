@@ -179,7 +179,7 @@ class BookingController extends Controller
             // Single booking row; attach multiple rooms and venues
             $booking = Booking::create([
                 'guest_id' => $guest->id,
-                'reference_number' => $validated['reference_number'] ?? null, // model auto-generates if null
+                'reference_number' => $validated['reference_number'] ?? null,
                 'check_in' => $checkIn,
                 'check_out' => $checkOut,
                 'no_of_days' => $validated['days'],
@@ -187,15 +187,32 @@ class BookingController extends Controller
                 'status' => Booking::STATUS_UNPAID,
             ]);
 
+            $payload = json_encode([
+                'booking_id' => $booking->id,
+                'reference_number' => $booking->reference_number,
+                'guest_id' => $booking->guest_id,
+            ]);
+
+            $filename = Str::uuid() . '.svg';
+            $path = 'qr/bookings/' . $filename;
+
+            $svg = QrCode::format('svg')->size(300)->generate($payload);
+
+            Storage::disk('public')->put($path, $svg);
+
+            $booking->update([
+                'qr_code' => $path,
+            ]);
+
             if (!empty($roomIds)) {
                 $booking->rooms()->attach($roomIds);
             }
+
             if (!empty($venueIds)) {
                 $booking->venues()->attach($venueIds);
             }
 
             $booking->load(['guest', 'rooms', 'venues']);
-
             return response()->json([
                 'message' => 'Booking created successfully',
                 'guest' => $guest,
