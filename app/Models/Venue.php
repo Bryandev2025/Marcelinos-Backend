@@ -18,7 +18,12 @@ class Venue extends Model implements HasMedia
         'gallery_urls',
     ];
 
-    protected $fillable = ['name', 'description', 'capacity', 'price', 'status'];
+    protected $fillable = ['name', 'description', 'capacity', 'price', 'seminar_price', 'status'];
+
+    protected $casts = [
+        'price' => 'decimal:2',
+        'seminar_price' => 'decimal:2',
+    ];
 
     /* ================= STATUSES ================= */
     const STATUS_AVAILABLE = 'available';

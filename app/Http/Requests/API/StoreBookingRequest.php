@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\API;
 
+use App\Support\BookingPricing;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -29,13 +30,23 @@ class StoreBookingRequest extends FormRequest
     {
         return [
             'reference_number' => 'nullable|string',
-            'rooms'   => 'nullable|array',
+            'rooms' => 'nullable|array',
             'rooms.*' => ['integer', 'distinct', Rule::exists('rooms', 'id')],
-            'venues'  => 'nullable|array',
+            'venues' => 'nullable|array',
             'venues.*' => ['required_with:venues', 'integer', 'distinct', Rule::exists('venues', 'id')],
-            'check_in'  => 'required|string',
+            'venue_event_type' => [
+                'nullable',
+                'string',
+                Rule::in([
+                    BookingPricing::VENUE_EVENT_WEDDING,
+                    BookingPricing::VENUE_EVENT_BIRTHDAY,
+                    BookingPricing::VENUE_EVENT_SEMINAR,
+                ]),
+                Rule::requiredIf(fn () => is_array($this->venues) && count($this->venues) > 0),
+            ],
+            'check_in' => 'required|string',
             'check_out' => 'required|string',
-            'days'      => 'required|integer|min:1',
+            'days' => 'required|integer|min:1',
             'total_price' => 'required|numeric|min:0',
         ];
     }

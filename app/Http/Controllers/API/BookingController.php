@@ -11,6 +11,7 @@ use App\Models\Guest;
 use App\Models\Room;
 use App\Models\Venue;
 use App\Services\BookingActionOtpService;
+use App\Support\BookingPricing;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -230,13 +231,33 @@ class BookingController extends Controller
                 }
             }
 
+            $venueEventType = $hasVenues
+                ? ($validated['venue_event_type'] ?? BookingPricing::VENUE_EVENT_WEDDING)
+                : null;
+
+            $expectedTotal = BookingPricing::expectedTotal(
+                (int) $validated['days'],
+                $hasRooms ? Room::whereIn('id', $roomIds)->get() : collect(),
+                $hasVenues ? Venue::whereIn('id', $venueIds)->get() : collect(),
+                $venueEventType,
+            );
+
+            if (! BookingPricing::totalsMatch($expectedTotal, (float) $validated['total_price'])) {
+                return response()->json([
+                    'message' => 'Total price does not match the selected rooms, venues, and event type.',
+                    'error' => 'price_mismatch',
+                ], 422);
+            }
+
             $booking = DB::transaction(function () use (
                 $guest,
                 $validated,
                 $checkIn,
                 $checkOut,
                 $roomIds,
-                $venueIds
+                $venueIds,
+                $venueEventType,
+                $expectedTotal
             ) {
                 $booking = Booking::create([
                     'guest_id' => $guest->id,
@@ -244,7 +265,8 @@ class BookingController extends Controller
                     'check_in' => $checkIn,
                     'check_out' => $checkOut,
                     'no_of_days' => $validated['days'],
-                    'total_price' => $validated['total_price'],
+                    'venue_event_type' => $venueEventType,
+                    'total_price' => $expectedTotal,
                     'status' => Booking::STATUS_UNPAID,
                 ]);
 
@@ -265,7 +287,7 @@ class BookingController extends Controller
                 'message' => 'Booking created successfully',
                 'guest' => $guest,
                 'booking' => $booking,
-                'total_price' => $validated['total_price'],
+                'total_price' => $expectedTotal,
             ], 201);
         } catch (\Throwable $e) {
             return response()->json([
@@ -476,22 +498,17 @@ class BookingController extends Controller
             ], 422);
         }
 
-        $nights = \Carbon\Carbon::parse($request->check_in)
-            ->diffInDays(\Carbon\Carbon::parse($request->check_out));
+        $nights = max(1, (int) \Carbon\Carbon::parse($request->check_in)
+            ->diffInDays(\Carbon\Carbon::parse($request->check_out)));
 
-        $newTotal = 0;
+        $booking->loadMissing(['rooms', 'venues']);
 
-        if ($booking->rooms && $booking->rooms->count()) {
-            foreach ($booking->rooms as $room) {
-                $newTotal += $room->price * $nights;
-            }
-        }
-
-        if ($booking->venues && $booking->venues->count()) {
-            foreach ($booking->venues as $venue) {
-                $newTotal += $venue->price;
-            }
-        }
+        $newTotal = BookingPricing::expectedTotal(
+            $nights,
+            $booking->rooms,
+            $booking->venues,
+            $booking->venue_event_type,
+        );
 
         $booking->update([
             'check_in' => $request->check_in,

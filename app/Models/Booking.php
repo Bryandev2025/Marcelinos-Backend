@@ -25,6 +25,7 @@ class Booking extends Model
         'total_price',
         'status',
         'no_of_days',
+        'venue_event_type',
         'testimonial_feedback_sent_at',
     ];
 
@@ -116,6 +117,7 @@ class Booking extends Model
     const STATUS_PAID = 'paid';
 
     const STATUS_CANCELLED = 'cancelled';
+
     const STATUS_RESCHEDULED = 'rescheduled';
 
     public static function statusOptions(): array

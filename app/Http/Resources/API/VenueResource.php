@@ -15,6 +15,7 @@ class VenueResource extends JsonResource
             'description' => $this->description,
             'capacity' => $this->capacity,
             'price' => $this->price,
+            'seminar_price' => $this->seminar_price,
             'amenities' => $this->whenLoaded('amenities', $this->amenities),
             'featured_image' => $this->featured_image_url,
             'gallery' => $this->gallery_urls,
