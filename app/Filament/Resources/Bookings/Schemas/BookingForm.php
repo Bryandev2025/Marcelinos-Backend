@@ -2,18 +2,19 @@
 
 namespace App\Filament\Resources\Bookings\Schemas;
 
-use Carbon\Carbon;
+use App\Models\Booking;
+use App\Models\Guest;
 use App\Models\Room;
 use App\Models\Venue;
-use App\Models\Guest;
-use App\Models\Booking;
-use Filament\Schemas\Schema;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
+use App\Support\BookingPricing;
+use Carbon\Carbon;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
 
 class BookingForm
 {
@@ -63,6 +64,14 @@ class BookingForm
                 ])
                 ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePricing($get, $set)),
 
+            Radio::make('venue_event_type')
+                ->label('Venue event type')
+                ->options(BookingPricing::venueEventTypeOptions())
+                ->default(BookingPricing::VENUE_EVENT_WEDDING)
+                ->visible(fn (Get $get) => ! empty(array_filter((array) ($get('venues') ?? []))))
+                ->live()
+                ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePricing($get, $set)),
+
             DateTimePicker::make('check_in')
                 ->required()
                 ->native(false)
@@ -101,8 +110,8 @@ class BookingForm
 
             TextInput::make('no_of_days')
                 ->label('Nights')
-                ->numeric() 
-                ->suffix(' nights') 
+                ->numeric()
+                ->suffix(' nights')
                 ->readOnly()
                 ->dehydrated(),
 
@@ -148,8 +157,9 @@ class BookingForm
         $checkIn = $get('check_in');
         $checkOut = $get('check_out');
 
-        if (!$checkIn || !$checkOut) {
+        if (! $checkIn || ! $checkOut) {
             $set('no_of_days', 0);
+
             return;
         }
 
@@ -157,7 +167,7 @@ class BookingForm
             $startDate = Carbon::parse($checkIn);
             $endDate = Carbon::parse($checkOut);
             $days = (int) $startDate->diffInDays($endDate);
-            
+
             $set('no_of_days', max(1, $days)); // Store integer 1, 2, etc.
         } catch (\Exception $e) {
             $set('no_of_days', 0);
@@ -177,7 +187,9 @@ class BookingForm
 
         if (($roomIds || $venueIds) && $days > 0) {
             $roomsTotal = Room::whereIn('id', $roomIds)->sum('price');
-            $venuesTotal = Venue::whereIn('id', $venueIds)->sum('price');
+            $venueEventType = $get('venue_event_type');
+            $venues = Venue::whereIn('id', $venueIds)->get();
+            $venuesTotal = BookingPricing::sumVenueLine($venues, $venueEventType);
             $set('total_price', ($roomsTotal + $venuesTotal) * $days);
         } else {
             $set('total_price', 0);

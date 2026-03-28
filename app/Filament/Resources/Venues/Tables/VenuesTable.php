@@ -2,15 +2,16 @@
 
 namespace App\Filament\Resources\Venues\Tables;
 
+use App\Filament\Resources\Venues\VenuesResource;
 use App\Models\Venue;
-use Filament\Tables\Table;
-use Filament\Actions\EditAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
-use Illuminate\Support\Facades\Auth;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
+use Illuminate\Support\Facades\Auth;
 
 class VenuesTable
 {
@@ -18,7 +19,7 @@ class VenuesTable
     {
         return $table
             ->recordAction('view')
-            ->recordUrl(fn ($record) => \App\Filament\Resources\Venues\VenuesResource::getUrl('view', ['record' => $record]))
+            ->recordUrl(fn ($record) => VenuesResource::getUrl('view', ['record' => $record]))
             ->columns([
                 // ✅ Featured Image (Uses Spatie Media Library)
                 SpatieMediaLibraryImageColumn::make('featured_image')
@@ -36,6 +37,12 @@ class VenuesTable
                     ->sortable(),
 
                 TextColumn::make('price')
+                    ->label('Full price')
+                    ->money('PHP', true)
+                    ->sortable(),
+
+                TextColumn::make('seminar_price')
+                    ->label('Seminar')
                     ->money('PHP', true)
                     ->sortable(),
 
@@ -65,7 +72,7 @@ class VenuesTable
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ])
-                ->visible(fn () => Auth::user() && Auth::user()->role === 'admin'),
+                    ->visible(fn () => Auth::user() && Auth::user()->role === 'admin'),
             ]);
     }
 }

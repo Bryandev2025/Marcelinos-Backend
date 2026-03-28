@@ -2,15 +2,13 @@
 
 namespace App\Filament\Resources\Venues\Schemas;
 
-use App\Models\Amenity;
 use App\Models\Venue;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
-use Filament\Schemas\Schema;
-
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Schema;
 
 class VenuesForm
 {
@@ -39,27 +37,37 @@ class VenuesForm
                     })
                     ->helperText(function ($state) {
                         $count = count(array_filter(explode(' ', trim($state ?? ''))));
+
                         return "{$count}/50 words";
                     })
                     ->rules([
                         function ($attribute, $value, $fail) {
-                            if (blank($value)) return;
+                            if (blank($value)) {
+                                return;
+                            }
 
                             $words = array_filter(explode(' ', trim($value)));
                             if (count($words) > 50) {
                                 $fail('Description must not exceed 50 words.');
                             }
-                        }
+                        },
                     ]),
                 TextInput::make('capacity')
                     ->required()
                     ->numeric(),
 
-                // Kept the price prefix to match your local currency style
                 TextInput::make('price')
+                    ->label('Full price (Wedding & Birthday)')
                     ->required()
                     ->numeric()
                     ->prefix('₱'),
+
+                TextInput::make('seminar_price')
+                    ->label('Seminar rate')
+                    ->required()
+                    ->numeric()
+                    ->prefix('₱')
+                    ->default(3000),
 
                 Select::make('status')
                     ->options(Venue::statusOptions())

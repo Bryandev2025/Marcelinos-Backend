@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Bookings\Tables;
 
 use App\Filament\Exports\BookingExporter;
 use App\Models\Booking;
+use App\Support\BookingPricing;
 use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -11,8 +12,8 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Actions\ViewAction;
 use Filament\Actions\ExportAction;
+use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\ToggleButtons;
@@ -89,6 +90,13 @@ class BookingsTable
                     ->label('Venues')
                     ->formatStateUsing(fn ($record) => $record->venues?->pluck('name')->filter()->implode(', ') ?: '—')
                     ->wrap()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('venue_event_type')
+                    ->label('Event type')
+                    ->formatStateUsing(fn (?string $state): string => $state
+                        ? (BookingPricing::venueEventTypeOptions()[$state] ?? ucfirst($state))
+                        : '—')
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('total_price')
@@ -178,6 +186,7 @@ class BookingsTable
 
                         $start = $start?->startOfDay();
                         $end = $end?->endOfDay();
+
                         return $query
                             ->when($start && $end, fn (Builder $q) => $q
                                 ->where('check_in', '<', $end)
@@ -218,7 +227,7 @@ class BookingsTable
                         ->icon('heroicon-o-banknotes')
                         ->color('info')
                         ->requiresConfirmation()
-                        ->visible(fn (Booking $record) => $record->balance > 0 && !in_array($record->status, [Booking::STATUS_CANCELLED]))
+                        ->visible(fn (Booking $record) => $record->balance > 0 && ! in_array($record->status, [Booking::STATUS_CANCELLED]))
                         ->action(function (Booking $record) {
                             $record->payments()->create([
                                 'total_amount' => $record->total_price,
