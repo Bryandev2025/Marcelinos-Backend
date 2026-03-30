@@ -101,7 +101,7 @@ class CreateBooking extends CreateRecord
         } elseif ($this->pendingPaymentAmount >= $totalInt && $totalInt > 0) {
             $data['status'] = Booking::STATUS_PAID;
         } elseif ($this->pendingPaymentAmount > 0) {
-            $data['status'] = Booking::STATUS_UNPAID;
+            $data['status'] = Booking::STATUS_PARTIAL;
         } else {
             $data['status'] = Booking::STATUS_UNPAID;
         }

@@ -83,7 +83,7 @@ class GuestDemographics extends Page
 
     protected function getViewData(): array
     {
-        $unpaidStatuses = [Booking::STATUS_UNPAID];
+        $unpaidStatuses = [Booking::STATUS_UNPAID, Booking::STATUS_PARTIAL];
         $successStatuses = [
             Booking::STATUS_PAID,
             Booking::STATUS_COMPLETED,

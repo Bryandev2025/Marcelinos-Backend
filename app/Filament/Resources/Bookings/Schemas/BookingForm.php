@@ -331,6 +331,7 @@ class BookingForm
                 ->options(Booking::statusOptions())
                 ->descriptions([
                     Booking::STATUS_UNPAID => 'Awaiting payment.',
+                    Booking::STATUS_PARTIAL => 'Partially paid (has balance).',
                     Booking::STATUS_PAID => 'Payment received.',
                     Booking::STATUS_OCCUPIED => 'Guest checked in.',
                     Booking::STATUS_COMPLETED => 'Stay completed.',

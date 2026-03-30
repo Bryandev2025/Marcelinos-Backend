@@ -39,8 +39,8 @@ class BookingStatsOverview extends StatsOverviewWidget
                 ->icon('heroicon-o-banknotes')
                 ->color($revenueDelta >= 0 ? 'success' : 'danger'),
 
-            Stat::make('Active Reservations', Booking::whereIn('status', [Booking::STATUS_UNPAID, Booking::STATUS_PAID, Booking::STATUS_OCCUPIED])->count())
-                ->description('Unpaid, paid, or occupied')
+            Stat::make('Active Reservations', Booking::whereIn('status', [Booking::STATUS_UNPAID, Booking::STATUS_PARTIAL, Booking::STATUS_PAID, Booking::STATUS_OCCUPIED])->count())
+                ->description('Unpaid, partial, paid, or occupied')
                 ->icon('heroicon-o-clock')
                 ->color('warning'),
         ];

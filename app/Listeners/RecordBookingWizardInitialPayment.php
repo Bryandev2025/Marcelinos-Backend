@@ -38,5 +38,19 @@ class RecordBookingWizardInitialPayment
             'partial_amount' => $paid,
             'is_fullypaid' => $totalInt > 0 && $paid >= $totalInt,
         ]);
+
+        if (in_array($record->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true)) {
+            return;
+        }
+
+        if ($totalInt > 0 && $paid >= $totalInt) {
+            $record->update(['status' => Booking::STATUS_PAID]);
+
+            return;
+        }
+
+        if ($paid > 0 && $totalInt > 0 && $paid < $totalInt) {
+            $record->update(['status' => Booking::STATUS_PARTIAL]);
+        }
     }
 }

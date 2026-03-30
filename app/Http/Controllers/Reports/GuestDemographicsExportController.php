@@ -18,7 +18,7 @@ class GuestDemographicsExportController extends Controller
         $period = $request->query('period');
         $period = $period === 'null' ? null : $period;
 
-        $unpaidStatuses = [Booking::STATUS_UNPAID];
+        $unpaidStatuses = [Booking::STATUS_UNPAID, Booking::STATUS_PARTIAL];
         $successfulStatuses = [Booking::STATUS_PAID, Booking::STATUS_COMPLETED, Booking::STATUS_OCCUPIED];
 
         $now = Carbon::now();

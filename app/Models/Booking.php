@@ -169,6 +169,8 @@ class Booking extends Model
 
     const STATUS_UNPAID = 'unpaid';
 
+    const STATUS_PARTIAL = 'partial';
+
     const STATUS_OCCUPIED = 'occupied';
 
     const STATUS_COMPLETED = 'completed';
@@ -183,6 +185,7 @@ class Booking extends Model
     {
         return [
             self::STATUS_UNPAID => 'Unpaid',
+            self::STATUS_PARTIAL => 'Partial',
             self::STATUS_OCCUPIED => 'Occupied',
             self::STATUS_PAID => 'Paid',
             self::STATUS_COMPLETED => 'Completed',
@@ -195,6 +198,7 @@ class Booking extends Model
     {
         return [
             'primary' => self::STATUS_UNPAID,
+            'info' => self::STATUS_PARTIAL,
             'success' => self::STATUS_PAID,
             'warning' => self::STATUS_OCCUPIED,
             'secondary' => self::STATUS_COMPLETED,

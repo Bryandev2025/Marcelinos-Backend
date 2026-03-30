@@ -85,9 +85,18 @@ class PaymentsRelationManager extends RelationManager
                     })
                     ->after(function (array $data, RelationManager $livewire) {
                         $booking = $livewire->getOwnerRecord();
-                        // Update booking status if fully paid
+                        if (in_array($booking->status, [\App\Models\Booking::STATUS_CANCELLED, \App\Models\Booking::STATUS_COMPLETED], true)) {
+                            return;
+                        }
+
                         if ($booking->total_paid >= $booking->total_price) {
                             $booking->update(['status' => \App\Models\Booking::STATUS_PAID]);
+
+                            return;
+                        }
+
+                        if ($booking->total_paid > 0 && $booking->total_paid < $booking->total_price) {
+                            $booking->update(['status' => \App\Models\Booking::STATUS_PARTIAL]);
                         }
                     }),
             ])

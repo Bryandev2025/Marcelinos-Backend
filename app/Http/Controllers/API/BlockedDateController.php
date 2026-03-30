@@ -62,6 +62,7 @@ class BlockedDateController extends Controller
         $bookings = Booking::with(['rooms', 'venues'])
             ->whereIn('status', [
                 Booking::STATUS_PAID,
+                Booking::STATUS_PARTIAL,
                 Booking::STATUS_OCCUPIED,
             ])
             ->get();
