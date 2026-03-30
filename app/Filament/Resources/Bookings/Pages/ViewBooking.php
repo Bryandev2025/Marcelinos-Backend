@@ -3,12 +3,29 @@
 namespace App\Filament\Resources\Bookings\Pages;
 
 use App\Filament\Resources\Bookings\BookingResource;
+use App\Models\Booking;
 use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewBooking extends ViewRecord
 {
     protected static string $resource = BookingResource::class;
+
+    public function getHeading(): string
+    {
+        return 'Booking details';
+    }
+
+    public function getSubheading(): ?string
+    {
+        if (! $this->record instanceof Booking) {
+            return null;
+        }
+
+        $guestName = $this->record->guest?->full_name ?: 'Unknown guest';
+
+        return "{$this->record->reference_number} - {$guestName}";
+    }
 
     protected function getHeaderActions(): array
     {

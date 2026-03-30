@@ -14,9 +14,24 @@ class ListBookings extends ListRecords
 {
     protected static string $resource = BookingResource::class;
 
+    public function getHeading(): string
+    {
+        return 'Bookings list';
+    }
+
+    public function getSubheading(): ?string
+    {
+        return 'Search, filter, and manage reservations in one place.';
+    }
+
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('calendarView')
+                ->label('Room calendar')
+                ->icon('heroicon-o-calendar-days')
+                ->color('gray')
+                ->url(BookingResource::getUrl('roomCalendar')),
             CreateAction::make(),
             Action::make('scanQr')
                 ->label('Scan QR')

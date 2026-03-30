@@ -44,6 +44,9 @@ class BookingsTable
             ->filtersFormMaxHeight('min(75dvh, 32rem)')
             ->columns([
                 TextColumn::make('reference_number')
+                    ->label('Reference')
+                    ->badge()
+                    ->color('primary')
                     ->searchable()
                     ->sortable()
                     ->copyable()
@@ -52,6 +55,7 @@ class BookingsTable
                 TextColumn::make('guest.first_name')
                     ->label('Guest')
                     ->formatStateUsing(fn ($record) => $record->guest?->full_name ?? '—')
+                    ->description(fn ($record) => $record->guest?->email ?: 'No email')
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         return $query->whereHas('guest', function (Builder $guestQuery) use ($search): void {
                             $guestQuery
@@ -77,12 +81,14 @@ class BookingsTable
                 TextColumn::make('check_in')
                     ->label('Check-in')
                     ->dateTime('M d, Y g:i A')
+                    ->description(fn ($record) => 'Check-out: '.($record->check_out?->format('M d, Y g:i A') ?? '—'))
                     ->sortable(),
 
                 TextColumn::make('check_out')
                     ->label('Check-out')
                     ->dateTime('M d, Y g:i A')
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('no_of_days')
                     ->label('Nights')
@@ -103,7 +109,9 @@ class BookingsTable
                             ->implode(', ');
                     })
                     ->wrap()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->limit(70)
+                    ->tooltip(fn (TextColumn $column): ?string => $column->getState())
+                    ->toggleable(),
 
                 TextColumn::make('venues.name')
                     ->label('Venues')
@@ -121,6 +129,7 @@ class BookingsTable
                 TextColumn::make('total_price')
                     ->label('Total')
                     ->money('PHP', true)
+                    ->description(fn ($record) => 'Paid: '.number_format((float) ($record->total_paid ?? 0), 2).' · Balance: '.number_format((float) ($record->balance ?? 0), 2))
                     ->sortable(),
 
                 TextColumn::make('total_paid')
@@ -136,6 +145,7 @@ class BookingsTable
 
                 BadgeColumn::make('status')
                     ->colors(Booking::statusColors())
+                    ->formatStateUsing(fn (?string $state): string => Booking::statusOptions()[$state] ?? (string) $state)
                     ->sortable(),
 
                 TextColumn::make('created_at')

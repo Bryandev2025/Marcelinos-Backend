@@ -5,11 +5,28 @@ namespace App\Filament\Resources\Bookings\Pages;
 use App\Filament\Resources\Bookings\BookingResource;
 use App\Models\Booking;
 use Filament\Actions\DeleteAction;
+use Filament\Actions\ViewAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditBooking extends EditRecord
 {
     protected static string $resource = BookingResource::class;
+
+    public function getHeading(): string
+    {
+        return 'Edit booking';
+    }
+
+    public function getSubheading(): ?string
+    {
+        if (! $this->record instanceof Booking) {
+            return null;
+        }
+
+        $guestName = $this->record->guest?->full_name ?: 'Unknown guest';
+
+        return "{$this->record->reference_number} - {$guestName}";
+    }
 
     /**
      * @param  array<string, mixed>  $data
@@ -36,6 +53,7 @@ class EditBooking extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            ViewAction::make(),
             DeleteAction::make(),
         ];
     }
