@@ -18,9 +18,9 @@ class RoomCalendar extends Page
 {
     protected static string $resource = BookingResource::class;
 
-    protected static ?string $title = 'Room Calendar';
+    protected static ?string $title = 'Booking Calendar';
 
-    protected static ?string $breadcrumb = 'Room calendar';
+    protected static ?string $breadcrumb = 'Booking Calendar';
 
     protected string $view = 'filament.resources.bookings.pages.room-calendar';
 

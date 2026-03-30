@@ -3,6 +3,6 @@
     tag="a"
     icon="heroicon-o-calendar-days"
     color="gray"
-    :label="__('Room calendar')"
-    :tooltip="__('Room calendar')"
+    :label="__('Booking Calendar')"
+    :tooltip="__('Booking Calendar')"
 />
