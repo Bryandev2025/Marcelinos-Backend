@@ -150,12 +150,12 @@
                     </div>
                 </div>
 
-                {{-- Legend: single horizontal row; scroll on narrow screens --}}
+                {{-- Legend: wrap on narrow screens --}}
                 <div
-                    class="legend-strip room-calendar-scroll overflow-x-auto overscroll-x-contain rounded-xl border border-dashed border-gray-200/90 bg-gray-50/50 px-3 py-3 dark:border-white/10 dark:bg-white/[0.03] sm:overflow-visible sm:px-4"
+                    class="legend-strip rounded-xl border border-dashed border-gray-200/90 bg-gray-50/50 px-3 py-3 dark:border-white/10 dark:bg-white/[0.03] sm:px-4"
                 >
                     <div
-                        class="flex w-max flex-nowrap items-center gap-2 sm:w-full sm:min-w-0 sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-2"
+                        class="flex w-full flex-wrap items-center gap-2 sm:min-w-0 sm:gap-x-4 sm:gap-y-2"
                     >
                         <span
                             class="shrink-0 text-xs font-semibold uppercase tracking-wide text-primary-600 dark:text-primary-400"
@@ -164,22 +164,19 @@
                         </span>
                         @foreach ($typeOrder as $type)
                             <x-room-type-badge
-                                class="w-[11.5rem] max-w-[calc(100vw-6rem)] shrink-0 sm:w-auto sm:max-w-[14rem] sm:shrink"
+                                class="w-[calc(50%-0.3rem)] flex-none sm:w-auto sm:max-w-[14rem]"
                                 :type="$type"
                             />
                         @endforeach
                     </div>
                 </div>
 
-                {{-- Calendar grid: horizontal scroll on small screens so cells stay readable --}}
-                <p class="mb-1 px-1 text-center text-[11px] leading-snug text-gray-500 dark:text-gray-400 sm:hidden">
-                    {{ __('Swipe sideways to see all days.') }}
-                </p>
+                {{-- Calendar grid: responsive columns, no horizontal overflow --}}
                 <div
-                    class="room-calendar-scroll -mx-1 overflow-x-auto overscroll-x-contain px-1 pb-1 [-webkit-overflow-scrolling:touch] sm:mx-0 sm:px-0 sm:overflow-x-visible sm:pb-0"
+                    class="-mx-1 px-1 pb-1 sm:mx-0 sm:px-0 sm:pb-0"
                 >
                     <div
-                        class="min-w-[30rem] space-y-1.5 sm:min-w-0 sm:w-full sm:space-y-2"
+                        class="w-full space-y-1.5 sm:space-y-2"
                     >
                         {{-- Weekday strip --}}
                         <div class="grid grid-cols-7 gap-0.5 sm:gap-2">
