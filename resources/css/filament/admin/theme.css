@@ -302,3 +302,23 @@
         opacity: 0;
     }
 }
+
+/* Color the active sidebar tab */
+.fi-sidebar-item-active > a,
+.fi-sidebar-item-active > button {
+    background-color: #83A070 !important;
+}
+
+.fi-sidebar-item-active > a .fi-sidebar-item-label,
+.fi-sidebar-item-active > button .fi-sidebar-item-label,
+.fi-sidebar-item-active > a .fi-icon,
+.fi-sidebar-item-active > button .fi-icon,
+.fi-sidebar-item-active > a svg,
+.fi-sidebar-item-active > button svg {
+    color: #ffffff !important;
+}
+
+.dark .fi-sidebar-item-active > a,
+.dark .fi-sidebar-item-active > button {
+    background-color: #618753 !important;
+}
