@@ -36,13 +36,18 @@ class VenuesTable
                     ->numeric()
                     ->sortable(),
 
-                TextColumn::make('price')
-                    ->label('Full price')
+                TextColumn::make('wedding_price')
+                    ->label('Wedding')
                     ->money('PHP', true)
                     ->sortable(),
 
-                TextColumn::make('seminar_price')
-                    ->label('Seminar')
+                TextColumn::make('birthday_price')
+                    ->label('Birthday')
+                    ->money('PHP', true)
+                    ->sortable(),
+
+                TextColumn::make('meeting_staff_price')
+                    ->label('Meeting/Seminar')
                     ->money('PHP', true)
                     ->sortable(),
 

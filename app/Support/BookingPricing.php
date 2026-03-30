@@ -11,27 +11,42 @@ class BookingPricing
 
     public const VENUE_EVENT_BIRTHDAY = 'birthday';
 
+    /** Meetings and seminars — priced per venue. */
+    public const VENUE_EVENT_MEETING_STAFF = 'meeting_staff';
+
+    /** @deprecated Use VENUE_EVENT_MEETING_STAFF; still accepted for legacy payloads. */
     public const VENUE_EVENT_SEMINAR = 'seminar';
 
     /** @return array<string, string> */
     public static function venueEventTypeOptions(): array
     {
         return [
-            self::VENUE_EVENT_WEDDING => 'Wedding (full price)',
-            self::VENUE_EVENT_BIRTHDAY => 'Birthday (full price)',
-            self::VENUE_EVENT_SEMINAR => 'Seminar (seminar rate)',
+            self::VENUE_EVENT_WEDDING => 'Wedding',
+            self::VENUE_EVENT_BIRTHDAY => 'Birthday',
+            self::VENUE_EVENT_MEETING_STAFF => 'Meeting/Seminar',
         ];
     }
 
-    public static function venueUnitPrice(Venue $venue, ?string $venueEventType): float
+    public static function normalizeVenueEventType(?string $venueEventType): string
     {
         $t = $venueEventType ?? self::VENUE_EVENT_WEDDING;
 
         if ($t === self::VENUE_EVENT_SEMINAR) {
-            return (float) $venue->seminar_price;
+            return self::VENUE_EVENT_MEETING_STAFF;
         }
 
-        return (float) $venue->price;
+        return $t;
+    }
+
+    public static function venueUnitPrice(Venue $venue, ?string $venueEventType): float
+    {
+        $t = self::normalizeVenueEventType($venueEventType);
+
+        return match ($t) {
+            self::VENUE_EVENT_BIRTHDAY => (float) $venue->birthday_price,
+            self::VENUE_EVENT_MEETING_STAFF => (float) $venue->meeting_staff_price,
+            default => (float) $venue->wedding_price,
+        };
     }
 
     /**

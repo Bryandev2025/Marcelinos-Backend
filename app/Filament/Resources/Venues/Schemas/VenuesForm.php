@@ -56,18 +56,26 @@ class VenuesForm
                     ->required()
                     ->numeric(),
 
-                TextInput::make('price')
-                    ->label('Full price (Wedding & Birthday)')
-                    ->required()
-                    ->numeric()
-                    ->prefix('₱'),
-
-                TextInput::make('seminar_price')
-                    ->label('Seminar rate')
+                TextInput::make('wedding_price')
+                    ->label('Wedding (per event)')
                     ->required()
                     ->numeric()
                     ->prefix('₱')
-                    ->default(3000),
+                    ->default(8000),
+
+                TextInput::make('birthday_price')
+                    ->label('Birthday (per event)')
+                    ->required()
+                    ->numeric()
+                    ->prefix('₱')
+                    ->default(8000),
+
+                TextInput::make('meeting_staff_price')
+                    ->label('Meeting/Seminar (per event)')
+                    ->required()
+                    ->numeric()
+                    ->prefix('₱')
+                    ->default(8000),
 
                 Select::make('status')
                     ->options(Venue::statusOptions())
