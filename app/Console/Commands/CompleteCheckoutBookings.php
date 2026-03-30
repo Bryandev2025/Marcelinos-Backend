@@ -6,6 +6,19 @@ use App\Models\Booking;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 
+/**
+ * Console command to automatically mark occupied bookings as completed once their check-out
+ * time has passed. This should be scheduled to run regularly (e.g. via cron) to ensure
+ * that bookings with status 'occupied' are transitioned to 'completed' when appropriate.
+ *
+ * Options:
+ *   --date   Legacy. If provided, process bookings whose check_out is on or before the end of this day (Y-m-d).
+ *   --before If provided, process bookings whose check_out is before or on this datetime (Y-m-d H:i:s),
+ *            defaults to now.
+ *
+ * Use this command to keep the status of bookings up-to-date and automate completion of stays.
+ * Eloquent model events will fire for each status update.
+ */
 class CompleteCheckoutBookings extends Command
 {
     /**

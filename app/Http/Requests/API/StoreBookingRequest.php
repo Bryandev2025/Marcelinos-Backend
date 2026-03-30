@@ -15,6 +15,10 @@ class StoreBookingRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        if ($this->venue_event_type === BookingPricing::VENUE_EVENT_SEMINAR) {
+            $this->merge(['venue_event_type' => BookingPricing::VENUE_EVENT_MEETING_STAFF]);
+        }
+
         if ($this->has('room_lines') && is_array($this->room_lines)) {
             $this->merge([
                 'room_lines' => collect($this->room_lines)
@@ -54,7 +58,7 @@ class StoreBookingRequest extends FormRequest
                 Rule::in([
                     BookingPricing::VENUE_EVENT_WEDDING,
                     BookingPricing::VENUE_EVENT_BIRTHDAY,
-                    BookingPricing::VENUE_EVENT_SEMINAR,
+                    BookingPricing::VENUE_EVENT_MEETING_STAFF,
                 ]),
                 Rule::requiredIf(fn () => is_array($this->venues) && count($this->venues) > 0),
             ],

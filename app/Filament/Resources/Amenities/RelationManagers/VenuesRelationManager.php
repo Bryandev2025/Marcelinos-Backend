@@ -33,8 +33,8 @@ class VenuesRelationManager extends RelationManager
                 TextColumn::make('status')
                     ->badge()
                     ->sortable(),
-                TextColumn::make('price')
-                    ->label('Price')
+                TextColumn::make('wedding_price')
+                    ->label('Wedding')
                     ->money('PHP')
                     ->sortable(),
             ])
