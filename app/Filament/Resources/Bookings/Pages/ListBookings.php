@@ -50,28 +50,46 @@ class ListBookings extends ListRecords
                         ->afterStateUpdated(function (?string $state, $livewire): void {
                             $payload = $state;
 
-                            if (!$payload) {
+                            if (! $payload) {
                                 Notification::make()
                                     ->title('No QR code data found.')
                                     ->danger()
                                     ->send();
+
                                 return;
                             }
 
                             $decoded = json_decode($payload, true);
-                            $reference = is_array($decoded) ? ($decoded['reference'] ?? null) : null;
+
+                            $bookingId = null;
+                            $reference = null;
+
+                            if (is_array($decoded)) {
+                                // Prefer explicit fields from JSON payload
+                                $bookingId = $decoded['booking_id'] ?? null;
+                                $reference = $decoded['reference_number'] ?? ($decoded['reference'] ?? null);
+                            }
+
+                            // Fallback: if no reference in JSON, treat raw payload as reference string
                             $reference = $reference ?: trim($payload);
 
-                            $booking = Booking::query()
-                                ->where('reference_number', $reference)
-                                ->first();
+                            $booking = null;
 
-                            if (!$booking) {
+                            if ($bookingId) {
+                                $booking = Booking::find($bookingId);
+                            }
+
+                            if (! $booking && $reference) {
+                                $booking = Booking::where('reference_number', $reference)->first();
+                            }
+
+                            if (! $booking) {
                                 Notification::make()
                                     ->title('Booking not found.')
                                     ->body('The scanned QR code did not match any booking. Please try again.')
                                     ->danger()
                                     ->send();
+
                                 return;
                             }
 
