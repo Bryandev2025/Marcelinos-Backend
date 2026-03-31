@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -181,6 +182,8 @@ class Booking extends Model
 
     const STATUS_RESCHEDULED = 'rescheduled';
 
+    const UNPAID_EXPIRY_DAYS = 3;
+
     public static function statusOptions(): array
     {
         return [
@@ -192,6 +195,58 @@ class Booking extends Model
             self::STATUS_CANCELLED => 'Cancelled',
             self::STATUS_RESCHEDULED => 'Rescheduled',
         ];
+    }
+
+    /**
+     * The moment an unpaid booking should be auto-cancelled.
+     */
+    public function unpaidExpiresAt(?int $days = null): ?Carbon
+    {
+        if (! $this->created_at) {
+            return null;
+        }
+
+        return $this->created_at->copy()->addDays($days ?? self::UNPAID_EXPIRY_DAYS);
+    }
+
+    /**
+     * True when booking is still unpaid and already past the unpaid expiry window.
+     */
+    public function isExpiredUnpaid(?Carbon $at = null, ?int $days = null): bool
+    {
+        if ($this->status !== self::STATUS_UNPAID) {
+            return false;
+        }
+
+        $expiresAt = $this->unpaidExpiresAt($days);
+        if (! $expiresAt) {
+            return false;
+        }
+
+        return $expiresAt->lte($at ?? now());
+    }
+
+    /**
+     * Cancel this booking if it exceeded the unpaid expiry window.
+     * Returns true when status was changed.
+     */
+    public function expireIfUnpaidExceededRule(?Carbon $at = null, ?int $days = null): bool
+    {
+        if (! $this->isExpiredUnpaid($at, $days)) {
+            return false;
+        }
+
+        return DB::transaction(function () use ($at, $days): bool {
+            $fresh = self::query()->lockForUpdate()->find($this->id);
+            if (! $fresh || ! $fresh->isExpiredUnpaid($at, $days)) {
+                return false;
+            }
+
+            $fresh->update(['status' => self::STATUS_CANCELLED]);
+            $this->refresh();
+
+            return true;
+        });
     }
 
     public static function statusColors(): array

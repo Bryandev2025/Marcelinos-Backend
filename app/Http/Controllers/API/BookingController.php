@@ -32,6 +32,12 @@ class BookingController extends Controller
      */
     public function sendBookingOtp(Request $request, Booking $booking)
     {
+        if ($this->expireIfNeeded($booking)) {
+            return response()->json([
+                'message' => 'Booking expired after 3 days without payment and was cancelled.',
+            ], 422);
+        }
+
         $request->validate([
             'purpose' => 'required|in:cancel,reschedule',
         ]);
@@ -104,6 +110,8 @@ class BookingController extends Controller
                     'message' => 'Booking not found',
                 ], 404);
             }
+
+            $this->expireIfNeeded($booking);
 
             $hasTestimonial = $booking->reviews()->exists();
 
@@ -390,6 +398,8 @@ class BookingController extends Controller
                 ], 404);
             }
 
+            $this->expireIfNeeded($booking);
+
             return response()->json($booking, 200);
         } catch (\Throwable $e) {
             return response()->json([
@@ -408,6 +418,12 @@ class BookingController extends Controller
                 return response()->json([
                     'message' => 'Booking not found',
                 ], 404);
+            }
+
+            if ($this->expireIfNeeded($booking)) {
+                return response()->json([
+                    'message' => 'Booking expired after 3 days without payment and was cancelled.',
+                ], 422);
             }
 
             $validated = $request->validate([
@@ -471,6 +487,12 @@ class BookingController extends Controller
 
     public function cancel(Request $request, Booking $booking)
     {
+        if ($this->expireIfNeeded($booking)) {
+            return response()->json([
+                'message' => 'Booking already expired and has been cancelled automatically.',
+            ], 422);
+        }
+
         $request->validate([
             'otp' => 'required|string',
         ]);
@@ -528,6 +550,12 @@ class BookingController extends Controller
         ]);
 
         $booking = Booking::where('reference_number', $reference)->firstOrFail();
+
+        if ($this->expireIfNeeded($booking)) {
+            return response()->json([
+                'message' => 'Booking expired after 3 days without payment and cannot be rescheduled.',
+            ], 422);
+        }
 
         if (in_array($booking->status, ['cancelled', 'completed'], true)) {
             return response()->json([
@@ -646,5 +674,10 @@ class BookingController extends Controller
         }
 
         return $path;
+    }
+
+    private function expireIfNeeded(Booking $booking): bool
+    {
+        return $booking->expireIfUnpaidExceededRule();
     }
 }

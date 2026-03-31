@@ -14,14 +14,15 @@ class CancelPendingBookings extends Command
      * @var string
      */
     protected $signature = 'bookings:cancel-unpaid
-                            {--date= : The date (Y-m-d) to process; defaults to today}';
+                            {--days=3 : Auto-cancel unpaid bookings older than this many days}
+                            {--before= : Optional cutoff datetime; defaults to now}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Cancel unpaid bookings whose check-in date is today (no payment by check-in)';
+    protected $description = 'Auto-cancel unpaid bookings that exceed the unpaid time window';
 
     /**
      * Execute the console command.
@@ -29,25 +30,28 @@ class CancelPendingBookings extends Command
      */
     public function handle(): int
     {
-        $date = $this->option('date')
-            ? Carbon::parse($this->option('date'))->toDateString()
-            : Carbon::today()->toDateString();
+        $days = max(1, (int) $this->option('days'));
+        $before = $this->option('before')
+            ? Carbon::parse($this->option('before'))
+            : now();
+        $cutoff = $before->copy()->subDays($days);
 
         $bookings = Booking::query()
-            ->whereDate('check_in', $date)
             ->where('status', Booking::STATUS_UNPAID)
+            ->where('created_at', '<=', $cutoff)
             ->get();
 
         $count = 0;
         foreach ($bookings as $booking) {
-            $booking->update(['status' => Booking::STATUS_CANCELLED]);
-            $count++;
+            if ($booking->expireIfUnpaidExceededRule($before, $days)) {
+                $count++;
+            }
         }
 
         if ($count > 0) {
-            $this->info("Cancelled {$count} unpaid booking(s) for check-in date {$date}.");
+            $this->info("Cancelled {$count} unpaid booking(s) older than {$days} day(s).");
         } else {
-            $this->comment("No unpaid bookings with check-in on {$date}.");
+            $this->comment("No unpaid bookings older than {$days} day(s).");
         }
 
         return self::SUCCESS;

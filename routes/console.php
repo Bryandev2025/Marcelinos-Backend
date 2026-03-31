@@ -39,12 +39,11 @@ Schedule::command('bookings:complete-checkouts')
 |--------------------------------------------------------------------------
 | Daily at 12:00 — Manila
 |--------------------------------------------------------------------------
-| bookings:cancel-unpaid      — unpaid, due to check in today → cancelled
+| bookings:cancel-unpaid      — unpaid beyond grace window (default: 3 days) → cancelled
 | bookings:send-reminders     — reminder email one day before check-in
 */
 foreach ([
     'bookings:activate-checkins' => true,
-    'bookings:cancel-unpaid' => true,
     'bookings:send-reminders' => true,
 ] as $signature => $withoutOverlapping) {
     $event = Schedule::command($signature)
@@ -54,3 +53,14 @@ foreach ([
         $event->withoutOverlapping();
     }
 }
+
+/*
+|--------------------------------------------------------------------------
+| Every 15 minutes — Manila
+|--------------------------------------------------------------------------
+| Enforce unpaid expiry policy so stale bookings are cancelled quickly.
+*/
+Schedule::command('bookings:cancel-unpaid')
+    ->everyFifteenMinutes()
+    ->timezone($manila)
+    ->withoutOverlapping();
