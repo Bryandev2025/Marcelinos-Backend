@@ -502,11 +502,12 @@
                                                         Edit
                                                     </a>
 
-                                                    @if (($row['status'] ?? null) !== Booking::STATUS_CANCELLED)
+                                                    @if (($row['can_pay_balance'] ?? false) === true)
                                                         <button
                                                             type="button"
                                                             wire:click="payBalance({{ $row['id'] }})"
                                                             @click="open = false"
+                                                            onclick="return confirm('Are you sure you want to pay the remaining balance for this booking?')"
                                                             class="block w-full whitespace-nowrap px-3 py-1.5 text-left text-[13px] font-medium leading-5 text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-sky-500/10"
                                                         >
                                                             Pay Balance

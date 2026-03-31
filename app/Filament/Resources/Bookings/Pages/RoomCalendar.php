@@ -86,7 +86,7 @@ class RoomCalendar extends Page
                                 return;
                             }
 
-                            $livewire->redirect(BookingResource::getUrl('view', ['record' => $booking]));
+                            $livewire->redirect(BookingResource::getUrl('edit', ['record' => $booking]));
                         }),
                 ])
                 ->action(fn () => null),
@@ -308,7 +308,7 @@ class RoomCalendar extends Page
     }
 
     /**
-     * @return list<array{id: int, reference_number: string, guest_name: string, check_in: string, check_out: string, rooms: string, venues: string, status: string}>
+     * @return list<array{id: int, reference_number: string, guest_name: string, check_in: string, check_out: string, rooms: string, venues: string, status: string, has_assigned_rooms: bool, can_pay_balance: bool}>
      */
     #[Computed]
     public function modalBookingRows(): array
@@ -336,6 +336,8 @@ class RoomCalendar extends Page
             ->orderBy('check_in')
             ->get()
             ->map(function (Booking $b) {
+                $hasAssignedRooms = $b->rooms->isNotEmpty();
+
                 return [
                     'id' => $b->id,
                     'reference_number' => $b->reference_number,
@@ -345,10 +347,31 @@ class RoomCalendar extends Page
                     'rooms' => $b->rooms->pluck('name')->filter()->implode(', ') ?: '—',
                     'venues' => $b->venues->pluck('name')->filter()->implode(', ') ?: '—',
                     'status' => $b->status,
+                    'has_assigned_rooms' => $hasAssignedRooms,
+                    'can_pay_balance' => $this->canPayBalanceForBooking($b, $hasAssignedRooms),
                 ];
             })
             ->values()
             ->all();
+    }
+
+    protected function canPayBalanceForBooking(Booking $booking, ?bool $hasAssignedRooms = null): bool
+    {
+        $hasAssignedRooms = $hasAssignedRooms ?? $booking->rooms()->exists();
+
+        if (! $hasAssignedRooms) {
+            return false;
+        }
+
+        if (in_array($booking->status, [
+            Booking::STATUS_CANCELLED,
+            Booking::STATUS_COMPLETED,
+            Booking::STATUS_PAID,
+        ], true)) {
+            return false;
+        }
+
+        return (float) $booking->balance > 0;
     }
 
     public function modalHeadingLabel(): string
@@ -401,7 +424,7 @@ class RoomCalendar extends Page
             return;
         }
 
-        if ($booking->balance <= 0 || $booking->status === Booking::STATUS_CANCELLED) {
+        if (! $this->canPayBalanceForBooking($booking)) {
             return;
         }
 
