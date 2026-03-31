@@ -322,3 +322,9 @@
 .dark .fi-sidebar-item-active > button {
     background-color: #618753 !important;
 }
+/* Remove background highlight for unread database notifications */
+.fi-no-notification-unread-ctn,
+.fi-no-notification-unread-ctn > div,
+.fi-no-notification-unread-ctn .fi-no-notification {
+    background-color: transparent !important;
+}

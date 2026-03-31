@@ -43,9 +43,12 @@ class BookingObserver
                     ->color('success')
                     ->actions([
                         Action::make('view')
-                            ->label('View Booking')
-                            ->button()
-                            ->url($bookingViewUrl)
+                            ->label('View')
+                            ->button()->size('sm')
+                            ->color('success')
+                            ->markAsRead()
+                            ->url(BookingResource::getUrl('view', ['record' => $booking]))
+                            
                     ])
                     ->sendToDatabase($user)
                     ->broadcast($user);
@@ -74,23 +77,48 @@ class BookingObserver
     {
         if ($booking->wasChanged('status')) {
 
-            if ($booking->status === 'cancelled') {
+$statusConfig = [
+                'cancelled' => [
+                    'title' => 'Booking Cancelled',
+                    'body'  => "Booking {$booking->reference_number} has been cancelled.",
+                    'icon'  => 'heroicon-o-x-circle',
+                    'color' => 'danger',
+                ],
+                'completed' => [
+                    'title' => 'Booking Completed',
+                    'body'  => "Booking {$booking->reference_number} has been completed.",
+                    'icon'  => 'heroicon-o-check-circle',
+                    'color' => 'success',
+                ],
+                'rescheduled' => [
+                    'title' => 'Booking Rescheduled',
+                    'body'  => "Booking {$booking->reference_number} has been rescheduled.",
+                    'icon'  => 'heroicon-o-arrow-path',
+                    'color' => 'warning',
+                ],
+            ];
+
+            if (array_key_exists($booking->status, $statusConfig)) {
                 $users = User::whereIn('role', ['admin', 'staff'])
                     ->where('is_active', true)
                     ->get();
-                
+
+                $config = $statusConfig[$booking->status];
+
                 foreach ($users as $user) {
                     Notification::make()
-                        ->title('Booking Cancelled')
-                        ->body("Booking {$booking->reference_number} has been cancelled.")
-                        ->icon('heroicon-o-x-circle')
-                        ->color('danger')
+                        ->title($config['title'])
+                        ->body($config['body'])
+                        ->icon($config['icon'])
+                        ->color($config['color'])
                         ->actions([
                             Action::make('view')
-                                ->label('View Booking')
-                                ->button()
-                                ->color('danger')
+                                ->label('View')
+                                ->button()->size('sm')
+                                ->color($config['color'])
+                                ->markAsRead()
                                 ->url(BookingResource::getUrl('view', ['record' => $booking]))
+                                
                         ])
                         ->sendToDatabase($user)
                         ->broadcast($user);
