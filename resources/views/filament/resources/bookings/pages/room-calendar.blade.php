@@ -1,8 +1,6 @@
 @php
     use App\Models\Booking;
-    use App\Models\Room;
-
-    $typeOrder = [Room::TYPE_STANDARD, Room::TYPE_FAMILY, Room::TYPE_DELUXE];
+    $legendItems = $this->calendarLegendItems;
     $statusPill = [
         Booking::STATUS_UNPAID => 'bg-violet-100 text-violet-800 ring-1 ring-inset ring-violet-600/15 dark:bg-violet-500/15 dark:text-violet-200 dark:ring-violet-400/25',
         Booking::STATUS_PAID => 'bg-emerald-100 text-emerald-800 ring-1 ring-inset ring-emerald-600/15 dark:bg-emerald-500/15 dark:text-emerald-200 dark:ring-emerald-400/25',
@@ -48,7 +46,11 @@
                                 {{ __('Booking Calendar') }}
                             </h1>
                             <p class="text-sm text-gray-600 dark:text-gray-400">
-                                {{ __('Overlapping stays by room category (assigned rooms, or guest selection until rooms are assigned). Cancelled reservations are excluded.') }}
+                                @if ($this->isVenueMode())
+                                    {{ __('Overlapping bookings by venue. Cancelled reservations are excluded.') }}
+                                @else
+                                    {{ __('Overlapping stays by room category (assigned rooms, or guest selection until rooms are assigned). Cancelled reservations are excluded.') }}
+                                @endif
                             </p>
                         </div>
                     </div>
@@ -78,7 +80,9 @@
             icon="heroicon-o-squares-2x2"
             icon-color="primary"
             :heading="$this->currentPeriodLabel()"
-            :description="__('Use the controls to change month. Each badge is a room category; the number is how many bookings overlap that day.')"
+            :description="$this->isVenueMode()
+                ? __('Use the controls to change month. Each badge is a venue; the number is how many bookings overlap that day.')
+                : __('Use the controls to change month. Each badge is a room category; the number is how many bookings overlap that day.')"
         >
             <div class="space-y-6">
                 {{-- Toolbar: prev/next aligned with select controls (bottom edge) --}}
@@ -148,6 +152,31 @@
                             </x-filament::input.wrapper>
                         </div>
                     </div>
+
+                    <div class="grid w-full grid-cols-2 gap-2 sm:w-auto sm:min-w-[14rem]">
+                        <button
+                            type="button"
+                            wire:click="switchInventory('rooms')"
+                            @class([
+                                'inline-flex items-center justify-center rounded-lg px-3 py-2 text-xs font-semibold transition',
+                                'bg-primary-600 text-white shadow-sm dark:bg-primary-500' => ! $this->isVenueMode(),
+                                'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-white/5' => $this->isVenueMode(),
+                            ])
+                        >
+                            {{ __('Rooms') }}
+                        </button>
+                        <button
+                            type="button"
+                            wire:click="switchInventory('venues')"
+                            @class([
+                                'inline-flex items-center justify-center rounded-lg px-3 py-2 text-xs font-semibold transition',
+                                'bg-primary-600 text-white shadow-sm dark:bg-primary-500' => $this->isVenueMode(),
+                                'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-white/5' => ! $this->isVenueMode(),
+                            ])
+                        >
+                            {{ __('Venues') }}
+                        </button>
+                    </div>
                 </div>
 
                 {{-- Legend: wrap on narrow screens --}}
@@ -162,11 +191,20 @@
                         >
                             {{ __('Legend') }}
                         </span>
-                        @foreach ($typeOrder as $type)
-                            <x-room-type-badge
-                                class="w-[calc(50%-0.3rem)] flex-none sm:w-auto sm:max-w-[14rem]"
-                                :type="$type"
-                            />
+                        @foreach ($legendItems as $type => $label)
+                            @if ($this->isVenueMode())
+                                <span
+                                    class="inline-flex w-[calc(50%-0.3rem)] flex-none items-center gap-1.5 rounded-full bg-gradient-to-r from-sky-100 to-cyan-100 px-2.5 py-1 text-[11px] font-semibold text-sky-800 ring-1 ring-inset ring-sky-600/20 dark:from-sky-500/15 dark:to-cyan-400/10 dark:text-sky-200 dark:ring-sky-400/25 sm:w-auto sm:max-w-[14rem]"
+                                >
+                                    <span class="h-1.5 w-1.5 rounded-full bg-sky-500/90 dark:bg-sky-300"></span>
+                                    <span class="truncate">{{ $label }}</span>
+                                </span>
+                            @else
+                                <x-room-type-badge
+                                    class="w-[calc(50%-0.3rem)] flex-none sm:w-auto sm:max-w-[14rem]"
+                                    :type="$type"
+                                />
+                            @endif
                         @endforeach
                     </div>
                 </div>
@@ -227,20 +265,50 @@
                                         </div>
                                     </div>
                                     <div class="grid grid-cols-3 gap-1.5 sm:flex sm:min-h-0 sm:flex-1 sm:flex-col sm:gap-1">
-                                        @foreach ($typeOrder as $type)
+                                        @foreach ($legendItems as $type => $label)
                                             @php $cnt = $cell['typeCounts'][$type] ?? 0; @endphp
                                             <button
                                                 type="button"
                                                 wire:click="openDayType('{{ $cell['dateStr'] }}', '{{ $type }}')"
                                                 class="group w-full cursor-pointer appearance-none rounded-lg border-0 bg-transparent p-0 text-left shadow-none transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-gray-900"
                                             >
-                                                <x-room-type-badge
-                                                    class="w-full"
-                                                    :type="$type"
-                                                    :muted="$cnt === 0"
-                                                    :count="$cnt"
-                                                    compact
-                                                />
+                                                @if ($this->isVenueMode())
+                                                    <span
+                                                        @class([
+                                                            'inline-flex w-full items-center justify-between rounded-lg px-2 py-1 text-[11px] font-medium ring-1 ring-inset transition',
+                                                            'bg-gray-100 text-gray-500 ring-gray-300/50 dark:bg-white/[0.06] dark:text-gray-400 dark:ring-white/10' => $cnt === 0,
+                                                            'bg-gradient-to-r from-sky-100 to-cyan-100 text-sky-900 ring-sky-600/25 shadow-sm dark:from-sky-500/20 dark:to-cyan-400/10 dark:text-sky-100 dark:ring-sky-400/30' => $cnt > 0,
+                                                        ])
+                                                    >
+                                                        <span class="inline-flex min-w-0 items-center gap-1.5 pe-2">
+                                                            <span
+                                                                @class([
+                                                                    'h-1.5 w-1.5 rounded-full',
+                                                                    'bg-gray-400 dark:bg-gray-500' => $cnt === 0,
+                                                                    'bg-sky-500 dark:bg-sky-300' => $cnt > 0,
+                                                                ])
+                                                            ></span>
+                                                            <span class="truncate">{{ $label }}</span>
+                                                        </span>
+                                                        <span
+                                                            @class([
+                                                                'inline-flex h-4 min-w-[1.1rem] items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums',
+                                                                'bg-gray-200 text-gray-600 dark:bg-white/10 dark:text-gray-400' => $cnt === 0,
+                                                                'bg-white/80 text-sky-800 ring-1 ring-sky-700/10 dark:bg-sky-900/50 dark:text-sky-100 dark:ring-sky-300/20' => $cnt > 0,
+                                                            ])
+                                                        >
+                                                            {{ $cnt }}
+                                                        </span>
+                                                    </span>
+                                                @else
+                                                    <x-room-type-badge
+                                                        class="w-full"
+                                                        :type="$type"
+                                                        :muted="$cnt === 0"
+                                                        :count="$cnt"
+                                                        compact
+                                                    />
+                                                @endif
                                             </button>
                                         @endforeach
                                     </div>
@@ -292,7 +360,11 @@
                                 </p>
                             </div>
                             <p class="text-xs text-gray-500 dark:text-gray-400">
-                                {{ __('Bookings that include this room type on the selected night.') }}
+                                @if ($this->isVenueMode())
+                                    {{ __('Bookings that include this venue on the selected night.') }}
+                                @else
+                                    {{ __('Bookings that include this room type on the selected night.') }}
+                                @endif
                             </p>
                         </div>
                         <x-filament::icon-button
@@ -312,11 +384,30 @@
 
                     <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                         <div class="min-w-0 max-w-full sm:max-w-md">
-                            <x-room-type-badge
-                                class="w-full sm:w-auto sm:min-w-[14rem]"
-                                :type="$modalType"
-                                :muted="$count === 0"
-                            />
+                            @if ($this->isVenueMode())
+                                <span
+                                    @class([
+                                        'inline-flex w-full items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ring-inset sm:w-auto sm:min-w-[14rem]',
+                                        'bg-gray-100 text-gray-500 ring-gray-300/60 dark:bg-white/[0.06] dark:text-gray-400 dark:ring-white/10' => $count === 0,
+                                        'bg-gradient-to-r from-sky-100 to-cyan-100 text-sky-900 ring-sky-600/25 dark:from-sky-500/20 dark:to-cyan-400/10 dark:text-sky-100 dark:ring-sky-400/30' => $count > 0,
+                                    ])
+                                >
+                                    <span
+                                        @class([
+                                            'h-2 w-2 rounded-full',
+                                            'bg-gray-400 dark:bg-gray-500' => $count === 0,
+                                            'bg-sky-500 dark:bg-sky-300' => $count > 0,
+                                        ])
+                                    ></span>
+                                    {{ $this->modalTypeLabel() }}
+                                </span>
+                            @else
+                                <x-room-type-badge
+                                    class="w-full sm:w-auto sm:min-w-[14rem]"
+                                    :type="$modalType"
+                                    :muted="$count === 0"
+                                />
+                            @endif
                         </div>
                         <span
                             class="inline-flex w-fit items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 ring-1 ring-gray-950/5 dark:bg-white/10 dark:text-gray-200 dark:ring-white/10"
@@ -492,6 +583,16 @@
                                             <div>
                                                 <span class="font-medium text-gray-700 dark:text-gray-300">{{ __('Rooms') }}</span>
                                                 <span class="mt-0.5 block text-gray-600 dark:text-gray-400">{{ $row['rooms'] }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-2">
+                                            <x-filament::icon
+                                                icon="heroicon-m-building-office-2"
+                                                class="mt-0.5 h-4 w-4 shrink-0 text-gray-400"
+                                            />
+                                            <div>
+                                                <span class="font-medium text-gray-700 dark:text-gray-300">{{ __('Venues') }}</span>
+                                                <span class="mt-0.5 block text-gray-600 dark:text-gray-400">{{ $row['venues'] }}</span>
                                             </div>
                                         </div>
                                     </div>

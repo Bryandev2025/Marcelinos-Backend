@@ -36,6 +36,29 @@ class User extends Authenticatable implements FilamentUser
         ];
     }   
 
+    public function setPermissionsAttribute($value): void
+    {
+        // Normalize to a simple list of enabled permission keys.
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            $value = is_array($decoded) ? $decoded : [];
+        }
+
+        if (! is_array($value)) {
+            $this->attributes['permissions'] = json_encode([]);
+
+            return;
+        }
+
+        $isAssoc = array_keys($value) !== range(0, count($value) - 1);
+
+        $selectedKeys = $isAssoc
+            ? array_keys(array_filter($value, fn ($enabled) => (bool) $enabled))
+            : array_values(array_filter($value, fn ($key) => is_string($key) && trim($key) !== ''));
+
+        $this->attributes['permissions'] = json_encode(array_values(array_unique($selectedKeys)));
+    }
+
     /**
      * Central list used by admin UI when assigning staff permissions.
      *

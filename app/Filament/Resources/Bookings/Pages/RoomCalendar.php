@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Bookings\Pages;
 use App\Filament\Resources\Bookings\BookingResource;
 use App\Models\Booking;
 use App\Models\Room;
+use App\Models\Venue;
 use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
@@ -16,6 +17,9 @@ use JeffersonGoncalves\Filament\QrCodeField\Forms\Components\QrCodeInput;
 
 class RoomCalendar extends Page
 {
+    public const INVENTORY_ROOMS = 'rooms';
+
+    public const INVENTORY_VENUES = 'venues';
     protected static string $resource = BookingResource::class;
 
     protected static ?string $title = 'Booking Calendar';
@@ -29,8 +33,8 @@ class RoomCalendar extends Page
         return [
             Action::make('venueCalendar')
                 ->label('Venue calendar')
-                ->icon('heroicon-o-calendar')
-                ->color('info')
+                ->icon('heroicon-o-building-office-2')
+                ->color('gray')
                 ->url(BookingResource::getUrl('venueCalendar')),
             Action::make('listView')
                 ->label('List view')
@@ -105,6 +109,9 @@ class RoomCalendar extends Page
     #[Url]
     public int $year = 0;
 
+    #[Url]
+    public string $inventory = self::INVENTORY_ROOMS;
+
     public ?string $modalDate = null;
 
     public ?string $modalType = null;
@@ -117,6 +124,19 @@ class RoomCalendar extends Page
         if ($this->year < 2000 || $this->year > 2100) {
             $this->year = (int) now()->year;
         }
+        if (! in_array($this->inventory, [self::INVENTORY_ROOMS, self::INVENTORY_VENUES], true)) {
+            $this->inventory = self::INVENTORY_ROOMS;
+        }
+    }
+
+    public function switchInventory(string $inventory): void
+    {
+        if (! in_array($inventory, [self::INVENTORY_ROOMS, self::INVENTORY_VENUES], true)) {
+            return;
+        }
+
+        $this->inventory = $inventory;
+        $this->closeModal();
     }
 
     public function previousMonth(): void
@@ -183,13 +203,15 @@ class RoomCalendar extends Page
             ->whereNotIn('status', [Booking::STATUS_CANCELLED])
             ->where('check_in', '<=', $monthEnd)
             ->where('check_out', '>', $monthStart)
-            ->with(['rooms:id,type', 'roomLines'])
+            ->with(['rooms:id,type', 'roomLines', 'venues:id,name'])
             ->get();
 
         $map = [];
 
         foreach ($bookings as $booking) {
-            $incrementsPerType = $this->roomTypeIncrementsForCalendar($booking);
+            $incrementsPerType = $this->inventory === self::INVENTORY_VENUES
+                ? $this->venueIncrementsForCalendar($booking)
+                : $this->roomTypeIncrementsForCalendar($booking);
             if ($incrementsPerType === []) {
                 continue;
             }
@@ -217,6 +239,38 @@ class RoomCalendar extends Page
         }
 
         return $map;
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    protected function venueIncrementsForCalendar(Booking $booking): array
+    {
+        $increments = [];
+
+        foreach ($booking->venues as $venue) {
+            $key = (string) $venue->id;
+            $increments[$key] = ($increments[$key] ?? 0) + 1;
+        }
+
+        return $increments;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    #[Computed]
+    public function calendarLegendItems(): array
+    {
+        if ($this->inventory === self::INVENTORY_VENUES) {
+            return Venue::query()
+                ->orderBy('name')
+                ->pluck('name', 'id')
+                ->mapWithKeys(fn (string $name, int|string $id) => [(string) $id => $name])
+                ->all();
+        }
+
+        return Room::typeOptions();
     }
 
     /**
@@ -254,7 +308,7 @@ class RoomCalendar extends Page
     }
 
     /**
-     * @return list<array{id: int, reference_number: string, guest_name: string, check_in: string, check_out: string, rooms: string, status: string}>
+     * @return list<array{id: int, reference_number: string, guest_name: string, check_in: string, check_out: string, rooms: string, venues: string, status: string}>
      */
     #[Computed]
     public function modalBookingRows(): array
@@ -269,10 +323,16 @@ class RoomCalendar extends Page
             ->overlappingLodgingNight($date)
             ->where(function ($q) {
                 $type = $this->modalType;
+                if ($this->inventory === self::INVENTORY_VENUES) {
+                    $q->whereHas('venues', fn ($q2) => $q2->where('venues.id', (int) $type));
+
+                    return;
+                }
+
                 $q->whereHas('rooms', fn ($q2) => $q2->where('type', $type))
                     ->orWhereHas('roomLines', fn ($q2) => $q2->where('room_type', $type));
             })
-            ->with(['guest', 'rooms', 'roomLines'])
+            ->with(['guest', 'rooms', 'roomLines', 'venues'])
             ->orderBy('check_in')
             ->get()
             ->map(function (Booking $b) {
@@ -283,6 +343,7 @@ class RoomCalendar extends Page
                     'check_in' => $b->check_in?->format('M j, Y g:i A') ?? '—',
                     'check_out' => $b->check_out?->format('M j, Y g:i A') ?? '—',
                     'rooms' => $b->rooms->pluck('name')->filter()->implode(', ') ?: '—',
+                    'venues' => $b->venues->pluck('name')->filter()->implode(', ') ?: '—',
                     'status' => $b->status,
                 ];
             })
@@ -305,7 +366,16 @@ class RoomCalendar extends Page
             return '';
         }
 
+        if ($this->inventory === self::INVENTORY_VENUES) {
+            return Venue::query()->whereKey((int) $this->modalType)->value('name') ?? 'Venue';
+        }
+
         return Room::typeOptions()[$this->modalType] ?? ucfirst($this->modalType);
+    }
+
+    public function isVenueMode(): bool
+    {
+        return $this->inventory === self::INVENTORY_VENUES;
     }
 
     /**

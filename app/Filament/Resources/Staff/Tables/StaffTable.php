@@ -47,17 +47,38 @@ class StaffTable
 
                 TextColumn::make('permissions')
                     ->label('Privileges')
-                    ->badge()
-                    ->formatStateUsing(function ($state): string {
-                        if (is_string($state)) {
-                            $state = json_decode($state, true);
+                    ->getStateUsing(function (User $record): string {
+                        if ($record->role === 'admin') {
+                            return 'All privileges';
                         }
-                        if (! is_array($state) || empty($state)) {
+
+                        $permissions = $record->permissions;
+                        if (is_string($permissions)) {
+                            $decoded = json_decode($permissions, true);
+                            $permissions = is_array($decoded) ? $decoded : [];
+                        }
+
+                        if (! is_array($permissions) || $permissions === []) {
                             return 'No privileges';
                         }
 
-                        return (string) count($state) . ' selected';
-                    }),
+                        // CheckboxList can persist as:
+                        // 1) list of selected keys: ['manage_rooms', 'manage_bookings']
+                        // 2) map of key => bool: ['manage_rooms' => true, 'manage_bookings' => false]
+                        $isAssoc = array_keys($permissions) !== range(0, count($permissions) - 1);
+
+                        $selectedKeys = $isAssoc
+                            ? array_keys(array_filter($permissions, fn ($enabled) => (bool) $enabled))
+                            : array_values(array_filter($permissions, fn ($key) => is_string($key) && $key !== ''));
+
+                        if ($selectedKeys === []) {
+                            return 'No privileges';
+                        }
+
+                        return (string) count($selectedKeys) . ' selected';
+                    })
+                    ->badge()
+                    ->color(fn (string $state) => $state === 'No privileges' ? 'gray' : 'success'),
 
                 TextColumn::make('created_at')
                     ->label('Created')
