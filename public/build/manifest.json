@@ -1,10 +1,6 @@
 {
   "resources/css/app.css": {
-<<<<<<< Updated upstream
-    "file": "assets/app-_wCNf7N8.css",
-=======
-    "file": "assets/app-D-EuHXR2.css",
->>>>>>> Stashed changes
+    "file": "assets/app-ZqwZsC9H.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -13,7 +9,7 @@
     ]
   },
   "resources/css/filament/admin/theme.css": {
-    "file": "assets/theme-CWXpWpSA.css",
+    "file": "assets/theme-DbXXxBpZ.css",
     "src": "resources/css/filament/admin/theme.css",
     "isEntry": true,
     "name": "theme",

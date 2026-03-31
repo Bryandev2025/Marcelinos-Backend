@@ -61,9 +61,11 @@ class RoomForm
                     ->label('Bed Specifications')
                     ->relationship('bedSpecifications', 'specification')
                     ->multiple()
+                    ->required()
+                    ->minItems(1)
                     ->searchable()
                     ->preload()
-                    ->helperText('Optional. Add options under Bed specifications & modifiers → Specifications, or leave empty and rely on description for display.'),
+                    ->helperText('Required. Add options under Bed specifications & modifiers -> Specifications.'),
                 Select::make('bedModifiers')
                     ->label('Bed Modifiers')
                     ->relationship('bedModifiers', 'name')
