@@ -5,19 +5,20 @@ namespace App\Filament\Resources\Staff\Tables;
 use App\Models\User;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
+use Illuminate\Database\Eloquent\Builder;
 
 class StaffTable
 {
     public static function configure(Table $table): Table
     {
         return $table
+            ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('id')
                     ->label('ID')
@@ -82,10 +83,10 @@ class StaffTable
 
                 TextColumn::make('created_at')
                     ->label('Created')
-                    ->dateTime()
+                    ->dateTime('M j, Y H:i')
                     ->sortable(),
 
-                    TextColumn::make('is_active')
+                TextColumn::make('is_active')
                     ->label('Status')
                     ->badge()
                     ->formatStateUsing(fn ($state) => $state ? 'Active' : 'Inactive')
@@ -98,7 +99,24 @@ class StaffTable
                     ->options([
                         'staff' => 'Staff',
                         'admin' => 'Admin',
-                    ]),
+                    ])
+                    ->native(false),
+
+                SelectFilter::make('permission')
+                    ->label('Privilege')
+                    ->options(User::staffPrivilegeOptions())
+                    ->searchable()
+                    ->placeholder('All privileges')
+                    ->native(false)
+                    ->query(function (Builder $query, array $data): Builder {
+                        $value = $data['value'] ?? null;
+
+                        if (! $value) {
+                            return $query;
+                        }
+
+                        return $query->whereJsonContains('permissions', $value);
+                    }),
 
                 TernaryFilter::make('is_active')
                     ->label('Active')
