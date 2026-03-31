@@ -7,6 +7,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Str;
 
 class ActivityLogsTable
 {
@@ -45,21 +46,24 @@ class ActivityLogsTable
             ])
             ->filters([
                 SelectFilter::make('category')
-                    ->options([
-                        'auth' => 'Auth',
-                        'booking' => 'Booking',
-                        'review' => 'Review',
-                        'resource' => 'Resource',
-                        'report' => 'Report',
-                    ]),
+                    ->options(fn (): array => ActivityLog::query()
+                        ->select('category')
+                        ->whereNotNull('category')
+                        ->distinct()
+                        ->orderBy('category')
+                        ->pluck('category')
+                        ->filter()
+                        ->mapWithKeys(fn (string $category): array => [
+                            $category => Str::headline($category),
+                        ])
+                        ->all()),
             ])
             ->modifyQueryUsing(fn (Builder $query) => $query->with('user:id,name'));
     }
 
     private static function displayMessage(ActivityLog $record): string
     {
-        $message = trim((string) $record->description);
-        $actor = trim((string) ($record->user?->name ?? ''));
+        $message = self::stripActorPrefix($record);
 
         if ($record->category === 'auth' && $record->event === 'user.login') {
             return 'logged in.';
@@ -74,34 +78,50 @@ class ActivityLogsTable
         }
 
         if ($record->category === 'resource') {
-            $model = class_basename((string) data_get($record->meta, 'model', ''));
-
-            return match ([$record->event, $model]) {
-                ['resource.created', 'BlockedDate'] => 'created a blocked date.',
-                ['resource.updated', 'BlockedDate'] => 'updated a blocked date.',
-                ['resource.deleted', 'BlockedDate'] => 'deleted a blocked date.',
-                ['resource.created', 'Gallery'] => 'uploaded gallery media.',
-                ['resource.updated', 'Gallery'] => 'updated gallery media.',
-                ['resource.deleted', 'Gallery'] => 'deleted gallery media.',
-                ['resource.created', 'User'] => 'created a new user.',
-                ['resource.updated', 'User'] => 'updated a user.',
-                ['resource.deleted', 'User'] => 'deleted a user.',
-                ['resource.created', 'Room'] => 'created a room.',
-                ['resource.updated', 'Room'] => 'updated a room.',
-                ['resource.deleted', 'Room'] => 'deleted a room.',
-                ['resource.created', 'Amenity'] => 'created an amenity.',
-                ['resource.updated', 'Amenity'] => 'updated an amenity.',
-                ['resource.deleted', 'Amenity'] => 'deleted an amenity.',
-                default => $message,
-            };
-        }
-
-        if ($actor !== '' && str_starts_with($message, $actor . ' ')) {
-            $message = ltrim(substr($message, strlen($actor)));
+            return self::resourceMessage($record, $message);
         }
 
         if (str_starts_with($message, 'Unknown user ')) {
             $message = ltrim(substr($message, strlen('Unknown user')));
+        }
+
+        return $message;
+    }
+
+    private static function resourceMessage(ActivityLog $record, string $message): string
+    {
+        if (preg_match('/^([A-Za-z0-9_\\\\]+)\s(created|updated|deleted):\s(.+)\.$/i', $message, $matches) !== 1) {
+            return $message;
+        }
+
+        $modelName = self::humanizeModelName((string) $matches[1]);
+        $verb = strtolower((string) $matches[2]);
+        $subject = trim((string) $matches[3]);
+
+        if ($modelName === 'gallery') {
+            return match ($verb) {
+                'created' => 'added gallery media.',
+                'updated' => 'updated gallery media.',
+                'deleted' => 'deleted gallery media.',
+                default => sprintf('%s %s: %s.', $verb, $modelName, $subject),
+            };
+        }
+
+        return sprintf('%s %s: %s.', $verb, $modelName, $subject);
+    }
+
+    private static function humanizeModelName(string $model): string
+    {
+        return strtolower(Str::headline(class_basename($model)));
+    }
+
+    private static function stripActorPrefix(ActivityLog $record): string
+    {
+        $message = trim((string) $record->description);
+        $actor = trim((string) ($record->user?->name ?? ''));
+
+        if ($actor !== '' && str_starts_with($message, $actor . ' ')) {
+            return ltrim(substr($message, strlen($actor)));
         }
 
         return $message;

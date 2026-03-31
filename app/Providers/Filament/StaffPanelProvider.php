@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Pages\AdminDashboard;
+use App\Http\Middleware\LogStaffPanelActions;
 use App\Filament\Widgets\SessionsByCountryChart;
 use App\Filament\Widgets\SessionsByDeviceChart;
 use Filament\Http\Middleware\Authenticate;
@@ -67,6 +68,7 @@ class StaffPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+                LogStaffPanelActions::class,
             ]);
     }
 }

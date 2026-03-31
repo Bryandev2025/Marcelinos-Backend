@@ -7,6 +7,7 @@ use Filament\Pages\Page;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 class ActivityHistory extends Page
 {
@@ -134,8 +135,24 @@ class ActivityHistory extends Page
             return 'heroicon-o-calendar-days';
         }
 
+        if ($category === 'room') {
+            return 'heroicon-o-home-modern';
+        }
+
+        if ($category === 'venue') {
+            return 'heroicon-o-building-office-2';
+        }
+
         if ($category === 'report') {
             return 'heroicon-o-document-arrow-down';
+        }
+
+        if (str_contains($event, 'photo.uploaded')) {
+            return 'heroicon-o-arrow-up-tray';
+        }
+
+        if (str_contains($event, 'photo.replaced')) {
+            return 'heroicon-o-photo';
         }
 
         if (str_contains($event, 'created')) {
@@ -167,8 +184,16 @@ class ActivityHistory extends Page
             return 'text-warning-600';
         }
 
+        if ($category === 'room' || $category === 'venue') {
+            return 'text-info-600';
+        }
+
         if ($category === 'report') {
             return 'text-info-600';
+        }
+
+        if (str_contains($event, 'photo.uploaded') || str_contains($event, 'photo.replaced')) {
+            return 'text-primary-600';
         }
 
         if (str_contains($event, 'created')) {
@@ -200,7 +225,7 @@ class ActivityHistory extends Page
     public function getCategoryLabel(ActivityLog $log): string
     {
         if ($log->category !== 'resource') {
-            return ucfirst((string) $log->category);
+            return Str::headline((string) $log->category);
         }
 
         $model = (string) data_get($log->meta, 'model', 'resource');

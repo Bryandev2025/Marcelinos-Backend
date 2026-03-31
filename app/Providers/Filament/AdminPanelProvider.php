@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Http\Middleware\LogStaffPanelActions;
 use App\Http\Middleware\EnsureAdminUser;
 use App\Filament\Pages\AdminDashboard;
 use Filament\Panel;
@@ -66,6 +67,7 @@ class AdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
                 EnsureAdminUser::class,
+                LogStaffPanelActions::class,
             ]);
             
     }
