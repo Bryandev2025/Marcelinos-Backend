@@ -21,6 +21,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Support\HtmlString;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\ValidationException;
 
 class BookingForm
@@ -34,24 +35,51 @@ class BookingForm
      */
     public static function disabledCalendarDateStringsForWizard(array $roomIds): array
     {
-        $dates = collect();
-
-        foreach (BlockedDate::query()->get(['date']) as $row) {
-            $d = $row->date;
-            $dates->push($d instanceof \Carbon\CarbonInterface ? $d->format('Y-m-d') : Carbon::parse($d)->format('Y-m-d'));
-        }
-
         $roomIds = array_values(array_filter(array_map('intval', $roomIds)));
-        if ($roomIds !== []) {
-            RoomBlockedDate::query()
-                ->whereIn('room_id', $roomIds)
-                ->get(['blocked_on'])
-                ->each(function ($row) use ($dates): void {
-                    $dates->push(Carbon::parse($row->blocked_on)->format('Y-m-d'));
-                });
+        sort($roomIds);
+        $cacheKey = 'booking.disabled_dates.wizard.v'.self::disabledDatesCacheVersion().'.'.md5(json_encode($roomIds));
+
+        return Cache::remember($cacheKey, 300, function () use ($roomIds): array {
+            $dates = collect();
+
+            foreach (BlockedDate::query()->get(['date']) as $row) {
+                $d = $row->date;
+                $dates->push($d instanceof \Carbon\CarbonInterface ? $d->format('Y-m-d') : Carbon::parse($d)->format('Y-m-d'));
+            }
+
+            if ($roomIds !== []) {
+                RoomBlockedDate::query()
+                    ->whereIn('room_id', $roomIds)
+                    ->get(['blocked_on'])
+                    ->each(function ($row) use ($dates): void {
+                        $dates->push(Carbon::parse($row->blocked_on)->format('Y-m-d'));
+                    });
+            }
+
+            return $dates->unique()->sort()->values()->all();
+        });
+    }
+
+    public static function bumpDisabledDatesCacheVersion(): void
+    {
+        $key = 'booking.disabled_dates.version';
+
+        if (! Cache::has($key)) {
+            Cache::forever($key, 1);
         }
 
-        return $dates->unique()->sort()->values()->all();
+        Cache::increment($key);
+    }
+
+    private static function disabledDatesCacheVersion(): int
+    {
+        $key = 'booking.disabled_dates.version';
+
+        if (! Cache::has($key)) {
+            Cache::forever($key, 1);
+        }
+
+        return max(1, (int) Cache::get($key, 1));
     }
 
     /**
@@ -94,258 +122,270 @@ class BookingForm
     public static function configure(Schema $schema): Schema
     {
         return $schema->components([
-            Select::make('guest_id')
-                ->label('Guest')
-                ->relationship('guest', 'first_name')
-                ->getOptionLabelFromRecordUsing(fn (Guest $record) => $record->full_name)
-                ->searchable()
-                ->preload()
-                ->required(),
-
-            Section::make('Guest booking (billing summary)')
-                ->description(function (?Booking $record): ?HtmlString {
-                    if (! $record || $record->roomLines->isEmpty()) {
-                        return null;
-                    }
-                    $record->loadMissing('roomLines');
-                    $html = '<ul class="list-disc ms-5 space-y-1 text-sm">';
-                    foreach ($record->roomLines as $line) {
-                        $html .= '<li>'.e($line->displayLabel()).' × '.(int) $line->quantity.'</li>';
-                    }
-                    $total = (int) $record->roomLines->sum('quantity');
-                    $html .= '</ul>';
-                    $html .= '<p class="mt-3 text-sm text-gray-500 dark:text-gray-400">Assign exactly <strong>'.$total.'</strong> physical room(s) under “Assigned rooms” so each line matches. You cannot save until this matches the guest request.</p>';
-
-                    return new HtmlString($html);
-                })
-                ->visible(fn (?Booking $record) => $record?->roomLines?->isNotEmpty())
+            Section::make('Booking details')
+                ->description('Guest, room allocation, and venue assignment.')
+                ->columns(2)
                 ->schema([
-                    Hidden::make('guest_booking_section_placeholder')->dehydrated(false),
-                ]),
+                    Select::make('guest_id')
+                        ->label('Guest')
+                        ->relationship('guest', 'first_name')
+                        ->getOptionLabelFromRecordUsing(fn (Guest $record) => $record->full_name)
+                        ->searchable()
+                        ->preload()
+                        ->required()
+                        ->columnSpanFull(),
 
-            Select::make('rooms')
-                ->label('Assigned rooms')
-                ->relationship(
-                    'rooms',
-                    'name',
-                    modifyQueryUsing: function ($query, ?string $search, ?Booking $record = null): void {
-                        $booking = $record ?? (request()->route('record') instanceof Booking ? request()->route('record') : null);
-                        $roomTableKey = $query->getModel()->getQualifiedKeyName();
-                        $roomStatusCol = $query->getModel()->qualifyColumn('status');
-                        if ($booking instanceof Booking) {
-                            $eligible = Room::idsEligibleForBookingAssignment($booking);
-                            if ($eligible !== null) {
-                                if ($eligible === []) {
-                                    $query->whereRaw('0 = 1');
-                                } else {
-                                    $query->whereIn($roomTableKey, $eligible);
+                    Section::make('Guest booking (billing summary)')
+                        ->description(function (?Booking $record): ?HtmlString {
+                            if (! $record || $record->roomLines->isEmpty()) {
+                                return null;
+                            }
+                            $record->loadMissing('roomLines');
+                            $html = '<ul class="list-disc ms-5 space-y-1 text-sm">';
+                            foreach ($record->roomLines as $line) {
+                                $html .= '<li>'.e($line->displayLabel()).' × '.(int) $line->quantity.'</li>';
+                            }
+                            $total = (int) $record->roomLines->sum('quantity');
+                            $html .= '</ul>';
+                            $html .= '<p class="mt-3 text-sm text-gray-500 dark:text-gray-400">Assign exactly <strong>'.$total.'</strong> physical room(s) in “Assigned rooms” so each line matches.</p>';
+
+                            return new HtmlString($html);
+                        })
+                        ->visible(fn (?Booking $record) => $record?->roomLines?->isNotEmpty())
+                        ->schema([
+                            Hidden::make('guest_booking_section_placeholder')->dehydrated(false),
+                        ])
+                        ->columnSpanFull(),
+
+                    Select::make('rooms')
+                        ->label('Assigned rooms')
+                        ->relationship(
+                            'rooms',
+                            'name',
+                            modifyQueryUsing: function ($query, ?string $search, ?Booking $record = null): void {
+                                $booking = $record ?? (request()->route('record') instanceof Booking ? request()->route('record') : null);
+                                $roomTableKey = $query->getModel()->getQualifiedKeyName();
+                                $roomStatusCol = $query->getModel()->qualifyColumn('status');
+                                if ($booking instanceof Booking) {
+                                    $eligible = Room::idsEligibleForBookingAssignment($booking);
+                                    if ($eligible !== null) {
+                                        if ($eligible === []) {
+                                            $query->whereRaw('0 = 1');
+                                        } else {
+                                            $query->whereIn($roomTableKey, $eligible);
+                                        }
+                                        $query->with(['bedSpecifications']);
+                                        $typeCol = $query->getModel()->qualifyColumn('type');
+                                        $nameCol = $query->getModel()->qualifyColumn('name');
+                                        $query->orderBy($typeCol)->orderBy($nameCol);
+
+                                        return;
+                                    }
                                 }
-                                $query->with(['bedSpecifications']);
+                                $query->where($roomStatusCol, '!=', Room::STATUS_MAINTENANCE)
+                                    ->with(['bedSpecifications']);
                                 $typeCol = $query->getModel()->qualifyColumn('type');
                                 $nameCol = $query->getModel()->qualifyColumn('name');
                                 $query->orderBy($typeCol)->orderBy($nameCol);
+                            },
+                        )
+                        ->multiple()
+                        ->searchable()
+                        ->preload()
+                        ->allowHtml()
+                        ->getOptionLabelFromRecordUsing(function (Room $record): string {
+                            $booking = request()->route('record');
+                            $booking = $booking instanceof Booking ? $booking : null;
 
-                                return;
+                            return self::assignedRoomOptionHtml($record, $booking);
+                        })
+                        ->live()
+                        ->maxItems(function (?Booking $record): ?int {
+                            if (! $record instanceof Booking) {
+                                return null;
                             }
-                        }
-                        $query->where($roomStatusCol, '!=', Room::STATUS_MAINTENANCE)
-                            ->with(['bedSpecifications']);
-                        $typeCol = $query->getModel()->qualifyColumn('type');
-                        $nameCol = $query->getModel()->qualifyColumn('name');
-                        $query->orderBy($typeCol)->orderBy($nameCol);
-                    },
-                )
-                ->multiple()
-                ->searchable()
-                ->preload()
-                ->allowHtml()
-                ->getOptionLabelFromRecordUsing(function (Room $record): string {
-                    $booking = request()->route('record');
-                    $booking = $booking instanceof Booking ? $booking : null;
+                            $record->loadMissing('roomLines');
+                            if ($record->roomLines->isEmpty()) {
+                                return null;
+                            }
+                            $total = (int) $record->roomLines->sum('quantity');
 
-                    return self::assignedRoomOptionHtml($record, $booking);
-                })
-                ->live()
-                ->maxItems(function (?Booking $record): ?int {
-                    if (! $record instanceof Booking) {
-                        return null;
-                    }
-                    $record->loadMissing('roomLines');
-                    if ($record->roomLines->isEmpty()) {
-                        return null;
-                    }
-                    $total = (int) $record->roomLines->sum('quantity');
+                            return $total > 0 ? $total : null;
+                        })
+                        ->helperText('Color-coded by room type and bed specification. Totals update as selections change.')
+                        ->rules([
+                            fn (Get $get, ?Booking $record) => function (string $attribute, $value, $fail) use ($get, $record): void {
+                                $roomIds = array_filter((array) ($get('rooms') ?? []));
+                                $venueIds = array_filter((array) ($get('venues') ?? []));
+                                if ($roomIds === [] && $venueIds === []) {
+                                    $fail('Select at least one room or one venue.');
+                                }
+                            },
+                            fn (Get $get, ?Booking $record) => function (string $attribute, $value, $fail) use ($get, $record): void {
+                                if (self::hasRoomConflicts($value, $get('check_in'), $get('check_out'), $record)) {
+                                    $fail('One or more selected rooms are not available for the chosen dates.');
+                                }
+                            },
+                            fn (Get $get, ?Booking $record) => function (string $attribute, $value, $fail) use ($record): void {
+                                if (! $record instanceof Booking) {
+                                    return;
+                                }
+                                try {
+                                    Booking::validateAssignedRoomsFulfillRoomLines($record, is_array($value) ? $value : []);
+                                } catch (ValidationException $e) {
+                                    $msg = $e->errors()['rooms'][0] ?? $e->getMessage();
+                                    $fail($msg);
+                                }
+                            },
+                        ])
+                        ->afterStateUpdated(function (Get $get, Set $set): void {
+                            $routeRecord = request()->route('record');
+                            $booking = $routeRecord instanceof Booking ? $routeRecord : null;
+                            $rooms = $get('rooms');
+                            $roomIds = is_array($rooms) ? $rooms : [];
+                            if ($booking instanceof Booking) {
+                                $clamped = self::clampAssignedRoomsToRoomLines($booking, $roomIds);
+                                $before = self::normalizeRoomIdList($roomIds);
+                                if ($clamped !== $before) {
+                                    $set('rooms', $clamped);
+                                }
+                            }
+                            self::updatePricing($get, $set);
+                        })
+                        ->columnSpanFull(),
 
-                    return $total > 0 ? $total : null;
-                })
-                ->helperText('Options are color-coded by room type + bed specification (same colors as the billing summary lines when this booking has room lines). You can pick at most as many rooms as billing lines require; extra picks for the same type/bed group are dropped. Totals update when you select rooms.')
-                ->rules([
-                    fn (Get $get, ?Booking $record) => function (string $attribute, $value, $fail) use ($get, $record): void {
-                        $roomIds = array_filter((array) ($get('rooms') ?? []));
-                        $venueIds = array_filter((array) ($get('venues') ?? []));
-                        if ($roomIds === [] && $venueIds === []) {
-                            $fail('Select at least one room or one venue.');
-                        }
-                    },
-                    fn (Get $get, ?Booking $record) => function (string $attribute, $value, $fail) use ($get, $record): void {
-                        if (self::hasRoomConflicts($value, $get('check_in'), $get('check_out'), $record)) {
-                            $fail('One or more selected rooms are not available for the chosen dates.');
-                        }
-                    },
-                    fn (Get $get, ?Booking $record) => function (string $attribute, $value, $fail) use ($record): void {
-                        if (! $record instanceof Booking) {
-                            return;
-                        }
-                        try {
-                            Booking::validateAssignedRoomsFulfillRoomLines($record, is_array($value) ? $value : []);
-                        } catch (ValidationException $e) {
-                            $msg = $e->errors()['rooms'][0] ?? $e->getMessage();
-                            $fail($msg);
-                        }
-                    },
-                ])
-                ->afterStateUpdated(function (Get $get, Set $set): void {
-                    $routeRecord = request()->route('record');
-                    $booking = $routeRecord instanceof Booking ? $routeRecord : null;
-                    $rooms = $get('rooms');
-                    $roomIds = is_array($rooms) ? $rooms : [];
-                    if ($booking instanceof Booking) {
-                        $clamped = self::clampAssignedRoomsToRoomLines($booking, $roomIds);
-                        $before = self::normalizeRoomIdList($roomIds);
-                        if ($clamped !== $before) {
-                            $set('rooms', $clamped);
-                        }
-                    }
-                    self::updatePricing($get, $set);
-                }),
+                    Select::make('venues')
+                        ->label('Venues')
+                        ->relationship('venues', 'name')
+                        ->multiple()
+                        ->searchable()
+                        ->preload()
+                        ->live()
+                        ->helperText('Optional. Uses the same date-range availability checks.')
+                        ->rules([
+                            fn (Get $get) => function (string $attribute, $value, $fail) use ($get): void {
+                                $roomIds = array_filter((array) ($get('rooms') ?? []));
+                                $venueIds = array_filter((array) ($get('venues') ?? []));
+                                if ($roomIds === [] && $venueIds === []) {
+                                    $fail('Select at least one room or one venue.');
+                                }
+                            },
+                            fn (Get $get, ?Booking $record) => function (string $attribute, $value, $fail) use ($get, $record): void {
+                                if (self::hasVenueConflicts($value, $get('check_in'), $get('check_out'), $record)) {
+                                    $fail('One or more selected venues are not available for the chosen dates.');
+                                }
+                            },
+                        ])
+                        ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePricing($get, $set)),
 
-            Select::make('venues')
-                ->label('Venues')
-                ->relationship('venues', 'name')
-                ->multiple()
-                ->searchable()
-                ->preload()
-                ->live()
-                ->helperText('Optional. Venues are validated against the same date range.')
-                ->rules([
-                    fn (Get $get) => function (string $attribute, $value, $fail) use ($get): void {
-                        $roomIds = array_filter((array) ($get('rooms') ?? []));
-                        $venueIds = array_filter((array) ($get('venues') ?? []));
-                        if ($roomIds === [] && $venueIds === []) {
-                            $fail('Select at least one room or one venue.');
-                        }
-                    },
-                    fn (Get $get, ?Booking $record) => function (string $attribute, $value, $fail) use ($get, $record): void {
-                        if (self::hasVenueConflicts($value, $get('check_in'), $get('check_out'), $record)) {
-                            $fail('One or more selected venues are not available for the chosen dates.');
-                        }
-                    },
-                ])
-                ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePricing($get, $set)),
+                    Radio::make('venue_event_type')
+                        ->label('Venue event type')
+                        ->options(BookingPricing::venueEventTypeOptions())
+                        ->default(BookingPricing::VENUE_EVENT_WEDDING)
+                        ->visible(fn (Get $get) => ! empty(array_filter((array) ($get('venues') ?? []))))
+                        ->live()
+                        ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePricing($get, $set)),
+                ]),
 
-            Radio::make('venue_event_type')
-                ->label('Venue event type')
-                ->options(BookingPricing::venueEventTypeOptions())
-                ->default(BookingPricing::VENUE_EVENT_WEDDING)
-                ->visible(fn (Get $get) => ! empty(array_filter((array) ($get('venues') ?? []))))
-                ->live()
-                ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePricing($get, $set)),
-
-            DateTimePicker::make('check_in')
-                ->required()
-                ->native(false)
-                ->live()
-                ->seconds(false)
-                ->minDate(now()->startOfDay())
-                ->disabledDates(fn (Get $get): array => array_values(array_unique(array_merge(
-                    self::pastCalendarDateStrings(),
-                    self::disabledCalendarDateStringsForWizard(array_filter((array) ($get('rooms') ?? []))),
-                ))))
-                ->helperText('Check-in date & time. Used for availability and pricing.')
-                ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePricing($get, $set)),
-
-            DateTimePicker::make('check_out')
-                ->required()
-                ->native(false)
-                ->live()
-                ->seconds(false)
-                ->minDate(fn (Get $get) => filled($get('check_in'))
-                    ? Carbon::parse($get('check_in'))->startOfDay()->addDay()
-                    : now())
-                ->disabledDates(function (Get $get): array {
-                    $disabled = array_merge(
-                        self::pastCalendarDateStrings(),
-                        self::disabledCalendarDateStringsForWizard(array_filter((array) ($get('rooms') ?? []))),
-                    );
-
-                    $checkIn = $get('check_in');
-                    if (filled($checkIn)) {
-                        try {
-                            $disabled[] = Carbon::parse($checkIn)->format('Y-m-d');
-                        } catch (\Exception $e) {
-                            // ignore invalid date
-                        }
-                    }
-
-                    return array_values(array_unique($disabled));
-                })
-                ->helperText('Must be after check-in.')
-                ->rules([
-                    fn (Get $get) => function (string $attribute, $value, $fail) use ($get): void {
-                        $checkIn = $get('check_in');
-                        if (! $checkIn || ! $value) {
-                            return;
-                        }
-
-                        try {
-                            $start = Carbon::parse($checkIn);
-                            $end = Carbon::parse($value);
-                        } catch (\Exception $e) {
-                            return;
-                        }
-
-                        if ($end->lessThanOrEqualTo($start) || $end->isSameDay($start)) {
-                            $fail('Check-out must be at least the next day after check-in.');
-                        }
-                    },
-                ])
-                ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePricing($get, $set)),
-
-            TextInput::make('no_of_days')
-                ->label('Nights')
-                ->numeric()
-                ->suffix(' nights')
-                ->readOnly()
-                ->dehydrated(),
-
-            TextInput::make('total_price')
-                ->default(0)
-                ->readOnly()
-                ->dehydrated()
-                ->numeric()
-                ->prefix('₱')
-                ->helperText('Auto-calculated from selected rooms/venues × nights.'),
-
-            Radio::make('status')
-                ->label('Booking Status')
-                ->options(Booking::statusOptions())
-                ->descriptions([
-                    Booking::STATUS_UNPAID => 'Awaiting payment.',
-                    Booking::STATUS_PARTIAL => 'Partially paid (has balance).',
-                    Booking::STATUS_PAID => 'Payment received.',
-                    Booking::STATUS_OCCUPIED => 'Guest checked in.',
-                    Booking::STATUS_COMPLETED => 'Stay completed.',
-                    Booking::STATUS_CANCELLED => 'Booking cancelled.',
-                ])
+            Section::make('Schedule and pricing')
+                ->description('Set stay dates and review auto-computed totals.')
                 ->columns(2)
-                ->default(Booking::STATUS_UNPAID)
-                ->required()
-                ->helperText('Select the current status for this booking.'),
+                ->schema([
+                    DateTimePicker::make('check_in')
+                        ->required()
+                        ->native(false)
+                        ->live(onBlur: true)
+                        ->seconds(false)
+                        ->minDate(now()->startOfDay())
+                        ->disabledDates(fn (Get $get): array => self::disabledCalendarDateStringsForWizard(array_filter((array) ($get('rooms') ?? []))))
+                        ->helperText('Check-in date and time.')
+                        ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePricing($get, $set)),
 
-            TextInput::make('reference_number')
-                ->label('Reference Number')
-                ->disabled()
-                ->dehydrated(false),
+                    DateTimePicker::make('check_out')
+                        ->required()
+                        ->native(false)
+                        ->live(onBlur: true)
+                        ->seconds(false)
+                        ->minDate(fn (Get $get) => filled($get('check_in'))
+                            ? Carbon::parse($get('check_in'))->startOfDay()->addDay()
+                            : now())
+                        ->disabledDates(function (Get $get): array {
+                            $disabled = self::disabledCalendarDateStringsForWizard(array_filter((array) ($get('rooms') ?? [])));
+
+                            $checkIn = $get('check_in');
+                            if (filled($checkIn)) {
+                                try {
+                                    $disabled[] = Carbon::parse($checkIn)->format('Y-m-d');
+                                } catch (\Exception $e) {
+                                    // ignore invalid date
+                                }
+                            }
+
+                            return array_values(array_unique($disabled));
+                        })
+                        ->helperText('Must be at least the next day after check-in.')
+                        ->rules([
+                            fn (Get $get) => function (string $attribute, $value, $fail) use ($get): void {
+                                $checkIn = $get('check_in');
+                                if (! $checkIn || ! $value) {
+                                    return;
+                                }
+
+                                try {
+                                    $start = Carbon::parse($checkIn);
+                                    $end = Carbon::parse($value);
+                                } catch (\Exception $e) {
+                                    return;
+                                }
+
+                                if ($end->lessThanOrEqualTo($start) || $end->isSameDay($start)) {
+                                    $fail('Check-out must be at least the next day after check-in.');
+                                }
+                            },
+                        ])
+                        ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePricing($get, $set)),
+
+                    TextInput::make('no_of_days')
+                        ->label('Nights')
+                        ->numeric()
+                        ->suffix(' nights')
+                        ->readOnly()
+                        ->dehydrated(),
+
+                    TextInput::make('total_price')
+                        ->default(0)
+                        ->readOnly()
+                        ->dehydrated()
+                        ->numeric()
+                        ->prefix('₱')
+                        ->helperText('Auto-calculated from selected rooms/venues and nights.'),
+                ]),
+
+            Section::make('Status and reference')
+                ->columns(2)
+                ->schema([
+                    Radio::make('status')
+                        ->label('Booking status')
+                        ->options(Booking::statusOptions())
+                        ->descriptions([
+                            Booking::STATUS_UNPAID => 'Awaiting payment.',
+                            Booking::STATUS_PARTIAL => 'Partially paid (has balance).',
+                            Booking::STATUS_PAID => 'Payment received.',
+                            Booking::STATUS_OCCUPIED => 'Guest checked in.',
+                            Booking::STATUS_COMPLETED => 'Stay completed.',
+                            Booking::STATUS_CANCELLED => 'Booking cancelled.',
+                        ])
+                        ->columns(2)
+                        ->default(Booking::STATUS_UNPAID)
+                        ->required()
+                        ->helperText('Select the current status for this booking.')
+                        ->columnSpanFull(),
+
+                    TextInput::make('reference_number')
+                        ->label('Reference number')
+                        ->disabled()
+                        ->dehydrated(false),
+                ]),
         ]);
     }
 

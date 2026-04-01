@@ -36,13 +36,10 @@ class BookingCreateWizard
                         ->label('Check-in')
                         ->required()
                         ->native(false)
-                        ->live()
+                        ->live(onBlur: true)
                         ->seconds(false)
                         ->minDate(now()->startOfDay())
-                        ->disabledDates(fn (Get $get): array => array_values(array_unique(array_merge(
-                            BookingForm::pastCalendarDateStrings(),
-                            BookingForm::disabledCalendarDateStringsForWizard(array_filter((array) ($get('rooms') ?? []))),
-                        ))))
+                        ->disabledDates(fn (Get $get): array => BookingForm::disabledCalendarDateStringsForWizard(array_filter((array) ($get('rooms') ?? []))))
                         ->helperText('Blocked days (maintenance / closed) show in red on the calendar and cannot be picked.')
                         ->rules([
                             fn (Get $get) => self::roomAvailabilityRuleForCheckIn($get),
@@ -53,13 +50,10 @@ class BookingCreateWizard
                         ->label('Check-out')
                         ->required()
                         ->native(false)
-                        ->live()
+                        ->live(onBlur: true)
                         ->seconds(false)
                         ->disabledDates(function (Get $get): array {
-                            $disabled = array_merge(
-                                BookingForm::pastCalendarDateStrings(),
-                                BookingForm::disabledCalendarDateStringsForWizard(array_filter((array) ($get('rooms') ?? []))),
-                            );
+                            $disabled = BookingForm::disabledCalendarDateStringsForWizard(array_filter((array) ($get('rooms') ?? [])));
 
                             $checkIn = $get('check_in');
                             if (filled($checkIn)) {

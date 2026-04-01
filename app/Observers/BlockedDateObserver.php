@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Events\BlockedDatesUpdated;
+use App\Filament\Resources\Bookings\Schemas\BookingForm;
 use App\Models\BlockedDate;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -11,11 +12,13 @@ class BlockedDateObserver
 {
     public function saved(BlockedDate $blockedDate): void
     {
+        BookingForm::bumpDisabledDatesCacheVersion();
         $this->safeBroadcast($blockedDate, 'saved');
     }
 
     public function deleted(BlockedDate $blockedDate): void
     {
+        BookingForm::bumpDisabledDatesCacheVersion();
         $this->safeBroadcast($blockedDate, 'deleted');
     }
 

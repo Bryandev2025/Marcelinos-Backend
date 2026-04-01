@@ -42,7 +42,7 @@ final class PhAddressFields
 
                         return;
                     }
-                    $set('region', PsgcApi::regionLabel($state));
+                    $set('region', PsgcApi::regionOptions()[$state] ?? null);
                     $set('province', null);
                     $set('municipality', null);
                     $set('barangay', null);
@@ -67,10 +67,12 @@ final class PhAddressFields
                 })
                 ->required(fn (Get $get): bool => ! (bool) $get('is_international') && ! PsgcApi::isNcr((string) ($get('ph_region_code') ?? '')))
                 ->disabled(fn (Get $get): bool => (string) ($get('ph_region_code') ?? '') === '')
-                ->afterStateUpdated(function (Set $set, ?string $state): void {
+                ->afterStateUpdated(function (Get $get, Set $set, ?string $state): void {
                     $set('ph_municipality_code', null);
                     $set('ph_barangay_code', null);
-                    $set('province', $state ? PsgcApi::provinceLabel($state) : null);
+                    $regionCode = (string) ($get('ph_region_code') ?? '');
+                    $options = $regionCode !== '' ? PsgcApi::provinceOptions($regionCode) : [];
+                    $set('province', $state ? ($options[$state] ?? null) : null);
                     $set('municipality', null);
                     $set('barangay', null);
                 }),
@@ -99,9 +101,13 @@ final class PhAddressFields
 
                     return (string) ($get('ph_province_code') ?? '') === '';
                 })
-                ->afterStateUpdated(function (Set $set, ?string $state): void {
+                ->afterStateUpdated(function (Get $get, Set $set, ?string $state): void {
                     $set('ph_barangay_code', null);
-                    $set('municipality', $state ? PsgcApi::municipalityLabel($state) : null);
+                    $options = PsgcApi::municipalityOptions(
+                        $get('ph_region_code'),
+                        $get('ph_province_code'),
+                    );
+                    $set('municipality', $state ? ($options[$state] ?? null) : null);
                     $set('barangay', null);
                 }),
 
@@ -115,8 +121,10 @@ final class PhAddressFields
                 ->required(fn (Get $get): bool => ! (bool) $get('is_international'))
                 ->visible(fn (Get $get): bool => ! (bool) $get('is_international'))
                 ->disabled(fn (Get $get): bool => (string) ($get('ph_municipality_code') ?? '') === '')
-                ->afterStateUpdated(function (Set $set, ?string $state): void {
-                    $set('barangay', $state ? PsgcApi::barangayLabel($state) : null);
+                ->afterStateUpdated(function (Get $get, Set $set, ?string $state): void {
+                    $municipalityCode = (string) ($get('ph_municipality_code') ?? '');
+                    $options = $municipalityCode !== '' ? PsgcApi::barangayOptions($municipalityCode) : [];
+                    $set('barangay', $state ? ($options[$state] ?? null) : null);
                 }),
 
             Hidden::make('region'),
