@@ -366,15 +366,33 @@ class BookingForm
                 ->schema([
                     Radio::make('status')
                         ->label('Booking status')
-                        ->options(Booking::statusOptions())
-                        ->descriptions([
-                            Booking::STATUS_UNPAID => 'Awaiting payment.',
-                            Booking::STATUS_PARTIAL => 'Partially paid (has balance).',
-                            Booking::STATUS_PAID => 'Payment received.',
-                            Booking::STATUS_OCCUPIED => 'Guest checked in.',
-                            Booking::STATUS_COMPLETED => 'Stay completed.',
-                            Booking::STATUS_CANCELLED => 'Booking cancelled.',
-                        ])
+                        ->options(function (?Booking $record): array {
+                            $options = Booking::statusOptions();
+
+                            // Partial status is system-managed via payment records.
+                            if ($record?->status !== Booking::STATUS_PARTIAL) {
+                                unset($options[Booking::STATUS_PARTIAL]);
+                            }
+
+                            return $options;
+                        })
+                        ->descriptions(function (?Booking $record): array {
+                            $descriptions = [
+                                Booking::STATUS_UNPAID => 'Awaiting payment.',
+                                Booking::STATUS_PARTIAL => 'Partially paid (has balance).',
+                                Booking::STATUS_PAID => 'Payment received.',
+                                Booking::STATUS_OCCUPIED => 'Guest checked in.',
+                                Booking::STATUS_COMPLETED => 'Stay completed.',
+                                Booking::STATUS_CANCELLED => 'Booking cancelled.',
+                            ];
+
+                            if ($record?->status !== Booking::STATUS_PARTIAL) {
+                                unset($descriptions[Booking::STATUS_PARTIAL]);
+                            }
+
+                            return $descriptions;
+                        })
+                        ->disableOptionWhen(fn (string $value): bool => $value === Booking::STATUS_PARTIAL)
                         ->columns(2)
                         ->default(Booking::STATUS_UNPAID)
                         ->required()
