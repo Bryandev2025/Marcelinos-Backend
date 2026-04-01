@@ -20,6 +20,7 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\TextSize;
+use Illuminate\Support\Str;
 
 class BookingCreateWizard
 {
@@ -35,6 +36,7 @@ class BookingCreateWizard
                     DateTimePicker::make('check_in')
                         ->label('Check-in')
                         ->required()
+                        ->default(fn () => now()->startOfDay()->addHours(12))
                         ->native(false)
                         ->live(onBlur: true)
                         ->seconds(false)
@@ -49,6 +51,7 @@ class BookingCreateWizard
                     DateTimePicker::make('check_out')
                         ->label('Check-out')
                         ->required()
+                        ->default(fn () => now()->startOfDay()->addDay()->addHours(10))
                         ->native(false)
                         ->live(onBlur: true)
                         ->seconds(false)
@@ -135,11 +138,20 @@ class BookingCreateWizard
                 ->schema([
                     TextInput::make('first_name')
                         ->required()
+                        ->live(onBlur: true)
+                        ->afterStateUpdated(fn (Set $set, ?string $state) => $set('first_name', Str::title((string) $state)))
+                        ->dehydrateStateUsing(fn (?string $state): string => Str::title(trim((string) $state)))
                         ->maxLength(100),
                     TextInput::make('middle_name')
+                        ->live(onBlur: true)
+                        ->afterStateUpdated(fn (Set $set, ?string $state) => $set('middle_name', Str::title((string) $state)))
+                        ->dehydrateStateUsing(fn (?string $state): string => Str::title(trim((string) $state)))
                         ->maxLength(100),
                     TextInput::make('last_name')
                         ->required()
+                        ->live(onBlur: true)
+                        ->afterStateUpdated(fn (Set $set, ?string $state) => $set('last_name', Str::title((string) $state)))
+                        ->dehydrateStateUsing(fn (?string $state): string => Str::title(trim((string) $state)))
                         ->maxLength(100),
                     Select::make('gender')
                         ->options(Guest::genderOptions())
