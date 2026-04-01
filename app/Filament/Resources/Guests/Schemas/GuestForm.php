@@ -10,6 +10,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Str;
 
 class GuestForm
 {
@@ -17,9 +18,20 @@ class GuestForm
     {
         return $schema
             ->components([
-                TextInput::make('first_name')->required(),
-                TextInput::make('middle_name'),
-                TextInput::make('last_name')->required(),
+                TextInput::make('first_name')
+                    ->required()
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(fn (Set $set, ?string $state) => $set('first_name', Str::title((string) $state)))
+                    ->dehydrateStateUsing(fn (?string $state): string => Str::title(trim((string) $state))),
+                TextInput::make('middle_name')
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(fn (Set $set, ?string $state) => $set('middle_name', Str::title((string) $state)))
+                    ->dehydrateStateUsing(fn (?string $state): string => Str::title(trim((string) $state))),
+                TextInput::make('last_name')
+                    ->required()
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(fn (Set $set, ?string $state) => $set('last_name', Str::title((string) $state)))
+                    ->dehydrateStateUsing(fn (?string $state): string => Str::title(trim((string) $state))),
                 TextInput::make('contact_num')->required(),
                 TextInput::make('email')
                     ->required()
