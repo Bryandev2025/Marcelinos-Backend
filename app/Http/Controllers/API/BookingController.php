@@ -669,7 +669,9 @@ class BookingController extends Controller
     {
         $payload = json_encode([
             'booking_id' => $booking->id,
+            // Keep both key names for backward compatibility with existing scanners.
             'reference_number' => $booking->reference_number,
+            'reference' => $booking->reference_number,
             'guest_id' => $booking->guest_id,
         ]);
 

@@ -68,9 +68,29 @@ class RoomCalendar extends Page
                                 return;
                             }
 
-                            $decoded = json_decode($payload, true);
-                            $reference = is_array($decoded) ? ($decoded['reference'] ?? null) : null;
-                            $reference = $reference ?: trim($payload);
+                            $cleanPayload = trim($payload);
+                            $cleanPayload = preg_replace('/^\xEF\xBB\xBF/', '', $cleanPayload) ?? $cleanPayload;
+
+                            $decoded = json_decode($cleanPayload, true);
+                            if (! is_array($decoded) && is_string($decoded)) {
+                                $inner = json_decode($decoded, true);
+                                if (is_array($inner)) {
+                                    $decoded = $inner;
+                                }
+                            }
+
+                            $reference = is_array($decoded)
+                                ? ($decoded['reference_number'] ?? $decoded['reference'] ?? null)
+                                : null;
+
+                            if (! is_string($reference) || trim($reference) === '') {
+                                // Fallback: extract booking reference from arbitrary text/URL.
+                                if (preg_match('/\bMWA-\d{4}-\d{6}\b/', $cleanPayload, $matches) === 1) {
+                                    $reference = $matches[0];
+                                } else {
+                                    $reference = trim($cleanPayload);
+                                }
+                            }
 
                             $booking = Booking::query()
                                 ->where('reference_number', $reference)

@@ -99,6 +99,16 @@ class ListBookings extends ListRecords
         $decoded = json_decode($cleanPayload, true);
 
         if (! is_array($decoded)) {
+            // Some QR generators / decoders wrap JSON as a JSON string (e.g. "\"{...}\"").
+            if (is_string($decoded)) {
+                $inner = json_decode($decoded, true);
+                if (is_array($inner)) {
+                    $decoded = $inner;
+                }
+            }
+        }
+
+        if (! is_array($decoded)) {
             $base64Decoded = base64_decode($cleanPayload, true);
             if (is_string($base64Decoded) && $base64Decoded !== '') {
                 $decoded = json_decode($base64Decoded, true);

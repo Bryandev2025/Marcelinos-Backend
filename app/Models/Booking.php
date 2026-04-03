@@ -437,12 +437,23 @@ class Booking extends Model
     public function generateQrCode(): void
     {
         if (! empty($this->qr_code)) {
-            return;
+            // Older QR files may exist but not be valid SVG. If the stored file doesn't
+            // look like an SVG, regenerate it.
+            if (Storage::disk('public')->exists($this->qr_code)) {
+                $existing = (string) Storage::disk('public')->get($this->qr_code);
+                if (str_contains($existing, '<svg')) {
+                    return;
+                }
+            } else {
+                return;
+            }
         }
 
         $qrData = json_encode([
+            // Keep both key names for backward compatibility with any existing scanners.
             'booking_id' => $this->id,
             'reference' => $this->reference_number,
+            'reference_number' => $this->reference_number,
             'guest_id' => $this->guest_id,
         ]);
 
@@ -450,7 +461,7 @@ class Booking extends Model
 
         Storage::disk('public')->put(
             $path,
-            QrCode::size(300)->generate($qrData)
+            QrCode::format('svg')->size(300)->generate($qrData)
         );
 
         $this->updateQuietly([
