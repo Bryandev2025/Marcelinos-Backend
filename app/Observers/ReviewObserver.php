@@ -47,7 +47,7 @@ class ReviewObserver
 
             // Prevent logging huge HTML error pages
             if (str_contains($message, '<!DOCTYPE html>')) {
-                $message = 'Received HTML response instead of broadcast server response (likely wrong Reverb endpoint).';
+                $message = 'Received HTML response instead of broadcast server response (likely wrong Pusher endpoint).';
             }
 
             Log::warning('ReviewsUpdated broadcast failed', [

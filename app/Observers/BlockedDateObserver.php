@@ -41,7 +41,7 @@ class BlockedDateObserver
         $message = trim($exception->getMessage());
 
         if (str_contains($message, '<!DOCTYPE html>')) {
-            return 'Received HTML response instead of broadcast server response (likely Reverb endpoint misconfiguration).';
+            return 'Received HTML response instead of broadcast server response (likely Pusher endpoint misconfiguration).';
         }
 
         return $message;

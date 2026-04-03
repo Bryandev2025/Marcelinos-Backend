@@ -8,12 +8,12 @@ return [
     |--------------------------------------------------------------------------
     |
     | This option controls the default broadcaster that will be used by the
-    | framework when an event needs to be broadcast. Set to "reverb" for
-    | real-time WebSocket delivery via Laravel Reverb.
+    | framework when an event needs to be broadcast. Set to "pusher" for
+    | real-time delivery via the Pusher broadcast driver.
     |
     */
 
-    'default' => env('BROADCAST_CONNECTION', 'reverb'),
+    'default' => env('BROADCAST_CONNECTION', 'pusher'),
 
     /*
     |--------------------------------------------------------------------------
@@ -23,19 +23,17 @@ return [
 
     'connections' => [
 
-        'reverb' => [
-            'driver' => 'reverb',
-            'key' => env('REVERB_APP_KEY', ''),
-            'secret' => env('REVERB_APP_SECRET', ''),
-            'app_id' => env('REVERB_APP_ID', ''),
+        'pusher' => [
+            'driver' => 'pusher',
+            'key' => env('PUSHER_APP_KEY', ''),
+            'secret' => env('PUSHER_APP_SECRET', ''),
+            'app_id' => env('PUSHER_APP_ID', ''),
             'options' => [
-                'host' => env('REVERB_HOST', 'localhost'),
-                'port' => env('REVERB_PORT', 8080),
-                'scheme' => env('REVERB_SCHEME', 'http'),
-                'useTLS' => env('REVERB_SCHEME', 'http') === 'https',
-            ],
-            'client_options' => [
-                // Guzzle HTTP client options: timeout, etc.
+                'cluster' => env('PUSHER_APP_CLUSTER', 'mt1'),
+                'host' => env('PUSHER_HOST', null),
+                'port' => env('PUSHER_PORT', 443),
+                'scheme' => env('PUSHER_SCHEME', 'https'),
+                'useTLS' => env('PUSHER_SCHEME', 'https') === 'https',
             ],
         ],
 

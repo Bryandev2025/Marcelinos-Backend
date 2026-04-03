@@ -8,8 +8,8 @@ The notification system uses the following stack to accomplish real-time pushes:
 
 - **Filament Admin Actions**: Handles UI generation for toasts, database persistence, and Notification Bells inside the backend dashboard.
 - **Laravel Observers**: Listens for silent changes at the Database/Eloquent model level (e.g., watching `Booking`).
-- **Laravel Reverb**: Handles the real-time active WebSocket persistence.
-- **Laravel Echo**: The pre-built JavaScript client embedded in Filament used to listen to Reverb.
+- **Pusher (websocket persistence)**: Handles the real-time active WebSocket delivery.
+- **Laravel Echo**: The pre-built JavaScript client embedded in Filament used to listen over the Pusher protocol.
 
 ---
 
@@ -22,9 +22,9 @@ The order of operations from a customer's click to the admin's screen:
 3. **Observer Intercept:** The `BookingObserver` hooks into the `created` or `updated` Eloquent event dynamically.
 4. **Target Users:** The observer gathers `User` models that have `admin` or `staff` roles with an active account status.
 5. **Database Notification Engine:** The system logs an internal persistent notification inside the database through Filament.
-6. **Broadcaster / Reverb:** After persistence, the notification is immediately handed to the `->broadcast()` pipe. The Event payload queues and gets forwarded directly into Laravel Reverb.
+6. **Broadcaster / Pusher:** After persistence, the notification is immediately handed to the `->broadcast()` pipe. The Event payload queues and gets forwarded into Pusher.
 7. **Filament Subscriptions:** Every logged-in Staff or Admin is already subscribed actively to a Private WebSocket channel named `App.Models.User.{id}`.
-8. **UI Appearance:** Reverb routes the message exclusively to their private personal channel, rendering a clickable live toast pop-up on their screen without needing to refresh.
+8. **UI Appearance:** Pusher routes the message exclusively to their private personal channel, rendering a clickable live toast pop-up on their screen without needing to refresh.
 
 ---
 
@@ -78,7 +78,7 @@ public function panel(Panel $panel): Panel
         // ...
         ->databaseNotifications()
         ->databaseNotificationsPolling('30s') // Fallback polling
-        ->broadcastNotifications();           // Actively listen to Echo/Reverb
+        ->broadcastNotifications();           // Actively listen to Echo/Pusher
 }
 ```
 
@@ -92,6 +92,6 @@ To spin it up, execute these listeners:
 
 1. **Serve the Main App:** `php artisan serve`
 2. **Serve the Queues:** Broadcasted jobs inherently need an active queue worker since WebSocket push isn't instant in native PHP contexts. Run `php artisan queue:listen` or `php artisan queue:work`.
-3. **Serve Reverb WebSockets:** `php artisan reverb:start`
+3. **Serve Pusher-compatible WebSockets:** ensure your Pusher endpoint (managed Pusher.com or a self-hosted compatible server) is reachable.
 
 As soon as a booking's status switches to `'cancelled'` or a new record appears through an API trigger, the backend dashboard UI will immediately show an interactive Toast Notification linking deeply into the newly created asset view.

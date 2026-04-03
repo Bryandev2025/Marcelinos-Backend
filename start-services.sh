@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Start all Laravel long-running services (Reverb, queue worker, scheduler).
+# Start all Laravel long-running services (queue worker, scheduler).
 # Use for local dev or on cPanel: run once or via cron @reboot.
 # Stop with: ./stop-services.sh  (or php artisan services:stop)
 #
@@ -19,12 +19,7 @@ mkdir -p "$(dirname "$PID_FILE")" "$LOG_DIR"
 
 echo "Starting Laravel services..."
 
-# 1. Reverb (WebSocket)
-nohup php artisan reverb:start >> "$LOG_DIR/reverb.log" 2>&1 &
-echo $! >> "$PID_FILE"
-echo "  - Reverb (WebSocket) started (PID $(tail -1 "$PID_FILE"))"
-
-# 2. Queue worker (jobs: mail, broadcasts, etc.)
+# 1. Queue worker (jobs: mail, broadcasts, etc.)
 nohup php artisan queue:work --sleep=3 --tries=3 >> "$LOG_DIR/queue.log" 2>&1 &
 echo $! >> "$PID_FILE"
 echo "  - Queue worker started (PID $(tail -1 "$PID_FILE"))"
@@ -36,5 +31,5 @@ echo "  - Scheduler (schedule:work) started (PID $(tail -1 "$PID_FILE"))"
 
 echo ""
 echo "All services started. PIDs saved to $PID_FILE"
-echo "Logs: $LOG_DIR/reverb.log, $LOG_DIR/queue.log, $LOG_DIR/schedule.log"
+echo "Logs: $LOG_DIR/queue.log, $LOG_DIR/schedule.log"
 echo "To stop: ./stop-services.sh  or  php artisan services:stop"

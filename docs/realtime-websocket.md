@@ -1,4 +1,4 @@
-# Real-Time WebSocket (Laravel Reverb + Laravel Echo)
+# Real-Time WebSocket (Pusher + Laravel Echo)
 
 This document describes the real-time architecture, how to use it, and senior-level practices for scaling and maintaining it.
 
@@ -8,7 +8,7 @@ This document describes the real-time architecture, how to use it, and senior-le
 
 ```
 ┌─────────────────┐     HTTP/WS      ┌──────────────────┐     WebSocket      ┌─────────────────┐
-│  React Client   │ ◄──────────────► │  Laravel Reverb  │ ◄────────────────► │  Browser Tab     │
+│  React Client   │ ◄──────────────► │  Pusher           │ ◄────────────────► │  Browser Tab     │
 │  (Laravel Echo) │   /broadcasting  │  (WS Server)     │   Pusher protocol  │  (same client)   │
 └────────┬────────┘     /auth        └────────┬─────────┘                    └─────────────────┘
          │                                    │
@@ -21,9 +21,9 @@ This document describes the real-time architecture, how to use it, and senior-le
                                      └──────────────────┘
 ```
 
-- **Laravel** dispatches broadcast events (e.g. `BookingStatusUpdated`). Events are queued and sent to **Reverb**.
-- **Reverb** holds WebSocket connections and pushes events to subscribed clients using the Pusher protocol.
-- **Laravel Echo** (in the React app) connects to Reverb, subscribes to channels, and listens for events.
+- **Laravel** dispatches broadcast events (e.g. `BookingStatusUpdated`). Events are queued and sent to **Pusher**.
+- **Pusher** holds WebSocket connections and pushes events to subscribed clients using the Pusher protocol.
+- **Laravel Echo** (in the React app) connects to your Pusher-compatible websocket endpoint, subscribes to channels, and listens for events.
 
 **Conventions used in this project:**
 
@@ -37,36 +37,34 @@ This document describes the real-time architecture, how to use it, and senior-le
 
 ### 2.1 Environment (.env)
 
-**Required for real-time sync:** `BROADCAST_CONNECTION` must be `reverb`. If it is `log`, events are only written to the log and the React client never receives them.
+**Required for real-time sync:** `BROADCAST_CONNECTION` must be `pusher`. If it is `log`, events are only written to the log and the React client never receives them.
 
 ```env
-BROADCAST_CONNECTION=reverb
+BROADCAST_CONNECTION=pusher
 
-REVERB_APP_ID=marcelinos-app
-REVERB_APP_KEY=local-key
-REVERB_APP_SECRET=local-secret
-REVERB_HOST=localhost
-REVERB_PORT=8080
-REVERB_SCHEME=http
-REVERB_SERVER_HOST=0.0.0.0
-REVERB_SERVER_PORT=8080
-REVERB_ALLOWED_ORIGINS=*
+PUSHER_APP_ID=marcelinos-app
+PUSHER_APP_KEY=local-key
+PUSHER_APP_SECRET=local-secret
+PUSHER_APP_CLUSTER=ap1
+PUSHER_HOST=
+PUSHER_PORT=443
+PUSHER_SCHEME=https
 ```
 
-- **Development:** Use `REVERB_ALLOWED_ORIGINS=*` or comma-separated origins (e.g. `http://localhost:5173`).
-- **Production:** Set `REVERB_SCHEME=https`, a proper host, and restrict `REVERB_ALLOWED_ORIGINS`.
+- **Development:** Configure the Pusher endpoint values (`PUSHER_*`) for your environment.
+- **Production:** Ensure your `PUSHER_SCHEME` and endpoint values match your websocket transport (TLS vs non-TLS).
 
-### 2.2 Running Reverb and queue worker
+### 2.2 Running queue worker (and Pusher endpoint)
 
 For the React client to receive updates **without a page reload**, two processes must be running:
 
 | Process | Command | Purpose |
 |--------|---------|--------|
-| **Reverb** | `php artisan reverb:start` | WebSocket server; delivers events to the browser |
-| **Queue worker** | `php artisan queue:work` | Runs queued jobs; broadcast events are queued, so this sends them to Reverb |
+| **Pusher** | (managed/self-hosted) | WebSocket server; delivers events to the browser |
+| **Queue worker** | `php artisan queue:work` | Runs queued jobs; broadcast events are queued, so this sends them to Pusher |
 
-- **Manual:** Run both in separate terminals (or use `composer run dev` if it starts server, Reverb, and queue).
-- **Single command (Linux/cPanel):** Use `php artisan services:start` to start Reverb, queue worker, and the scheduler together. See **`documentation/deployment-services.md`**.
+- **Manual:** Run the queue worker in a terminal (Pusher is either managed or already running).
+- **Single command (Linux/cPanel):** Use `php artisan services:start` to start the queue worker and the scheduler together. See **`documentation/deployment-services.md`**.
 - If the queue worker is not running, events are never broadcast and the frontend will not refetch until the user reloads.
 
 ---
@@ -271,26 +269,25 @@ When adding a channel, update both and keep naming consistent (e.g. `booking.{re
 
 `BaseBroadcastEvent` uses Laravel’s `ShouldBroadcast`, so events are queued by default. This keeps request latency low and allows horizontal scaling of workers. Do not broadcast synchronously in hot paths.
 
-### 7.4 Scaling Reverb
+### 7.4 Scaling Pusher / websocket endpoint
 
-- **Single server:** Running `php artisan reverb:start` on the app server is fine for moderate traffic.
-- **Multiple servers:** Use a Redis adapter so Reverb instances share state. See [Laravel Reverb docs](https://laravel.com/docs/reverb) for Redis configuration.
-- **High availability:** Put Reverb behind a load balancer with sticky sessions (or use Redis adapter and scale Reverb horizontally).
+- If you're using Pusher.com: scaling is handled by Pusher.
+- If you're using a self-hosted Pusher-compatible websocket server: scale it according to that server’s documentation (load balancing, sticky sessions if required, shared state if required).
 
 ### 7.5 Security
 
 - **Private channels:** Always authorize in `routes/channels.php`. Do not return `true` for channels that should be restricted.
-- **CORS:** In production, set `REVERB_ALLOWED_ORIGINS` to your frontend origin(s) only.
-- **Secrets:** Keep `REVERB_APP_SECRET` and app keys out of the frontend; only the key (e.g. `REVERB_APP_KEY`) is public for the client.
+- **CORS/auth:** Ensure the `/broadcasting/auth` endpoint accepts requests from your frontend origin (Laravel CORS configuration).
+- **Secrets:** Keep `PUSHER_APP_SECRET` and app credentials out of the frontend; only the public key is safe to expose.
 
 ### 7.6 Testing
 
-- **Backend:** Dispatch the event and assert it is broadcast (e.g. `Event::fake()` and assert the event was pushed to the queue or use Reverb testing utilities if available).
+- **Backend:** Dispatch the event and assert it is broadcast (e.g. `Event::fake()` and assert the event was pushed to the queue).
 - **Frontend:** Mock `getEcho()` and assert that the component invalidates queries or updates state when the mock triggers the event.
 
 ### 7.7 Disabling realtime
 
-- **Backend:** Set `BROADCAST_CONNECTION=log` or `null` in `.env`. Events will be logged or dropped; no Reverb needed.
+- **Backend:** Set `BROADCAST_CONNECTION=log` or `null` in `.env`. Events will be logged or dropped; no realtime websocket delivery occurs.
 - **Frontend:** If `VITE_WS_KEY` (or host) is unset, `getEcho()` returns `null` and hooks no-op. No need to change component code.
 
 ---
@@ -299,7 +296,7 @@ When adding a channel, update both and keep naming consistent (e.g. `booking.{re
 
 | Layer   | File / location |
 |--------|-------------------|
-| Backend | `config/broadcasting.php`, `config/reverb.php` |
+| Backend | `config/broadcasting.php` |
 | Backend | `routes/channels.php` – channel authorization |
 | Backend | `app/Providers/BroadcastServiceProvider.php` – auth route + load channels |
 | Backend | `app/Broadcasting/BroadcastChannelNames.php` – channel name constants |
@@ -318,9 +315,9 @@ When adding a channel, update both and keep naming consistent (e.g. `booking.{re
 
 | Issue | Check |
 |-------|--------|
-| No events received / UI doesn’t update without reload | **`BROADCAST_CONNECTION=reverb`** (not `log`). Reverb running? **Queue worker running** (`php artisan queue:work`)? Frontend has `VITE_WS_HOST`, `VITE_WS_KEY` (and optionally `VITE_WS_PORT`, `VITE_WS_SCHEME`) so `getEcho()` is not null. |
+| No events received / UI doesn’t update without reload | **`BROADCAST_CONNECTION=pusher`** (not `log`). **Queue worker running** (`php artisan queue:work`)? Frontend has `VITE_WS_HOST`, `VITE_WS_KEY` (and optionally `VITE_WS_PORT`, `VITE_WS_SCHEME`) so `getEcho()` is not null. |
 | 403 on private channel | User authenticated? Token sent to `/broadcasting/auth`? Channel callback in `channels.php` returns true for that user? |
-| CORS errors | `REVERB_ALLOWED_ORIGINS` includes the frontend origin. |
+| CORS/auth errors | `/broadcasting/auth` is reachable from the frontend and Laravel CORS allows your origin. |
 | Wrong payload in React | Ensure `broadcastWith()` and `RealtimeEventMap` in `realtime.types.ts` match. |
 
 ---
@@ -361,8 +358,8 @@ Use this checklist when you want a new resource (e.g. “promos” or “ameniti
    - **Model changes:** Create an Observer for the model (e.g. `app/Observers/PromoObserver.php`) and in `saved()` and `deleted()` call `YourEvent::dispatch()`. Register the observer in `App\Providers\AppServiceProvider` with `YourModel::observe(YourObserver::class)`.
    - **One-off actions:** Dispatch from a controller or Filament action after create/update/delete.
 
-4. **Config**  
-   Ensure `BROADCAST_CONNECTION=reverb` in `.env`, and that **Reverb** and **queue worker** are running (see §2.2).
+4. **Config**
+   Ensure `BROADCAST_CONNECTION=pusher` in `.env`, and that **queue worker** is running (see §2.2).
 
 ### 11.2 Frontend
 
@@ -389,6 +386,6 @@ Use this checklist when you want a new resource (e.g. “promos” or “ameniti
 | 3 | Dispatch event (Observer, controller, or Filament) | — |
 | 4 | — | Add `queryKeys.*.all` in `endpoints.ts`; use in queries |
 | 5 | — | Add channel + event + queryKey in `useRealtimeGlobalSubscriber` |
-| 6 | Run Reverb + queue worker | Ensure WS env vars (e.g. `VITE_WS_*`) so Echo connects |
+| 6 | Run queue worker | Ensure WS env vars (e.g. `VITE_WS_*`) so Echo connects |
 
-If the frontend still does not update, verify: `BROADCAST_CONNECTION=reverb`, queue worker running, Reverb running, and frontend env (e.g. `VITE_WS_KEY`, `VITE_WS_HOST`) set so `getEcho()` is not null.
+If the frontend still does not update, verify: `BROADCAST_CONNECTION=pusher`, queue worker running, and frontend env (e.g. `VITE_WS_KEY`, `VITE_WS_HOST`) set so `getEcho()` is not null.
