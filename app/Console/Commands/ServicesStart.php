@@ -8,7 +8,7 @@ class ServicesStart extends Command
 {
     protected $signature = 'services:start';
 
-    protected $description = 'Start all long-running services (Reverb, queue worker, scheduler). Uses start-services.sh on Linux/macOS.';
+    protected $description = 'Start all long-running services (queue worker, scheduler). Uses start-services.sh on Linux/macOS.';
 
     public function handle(): int
     {
@@ -17,14 +17,13 @@ class ServicesStart extends Command
         if (PHP_OS_FAMILY === 'Windows') {
             $bat = base_path('start-services.bat');
             if (is_file($bat)) {
-                $this->info('Starting Reverb, Queue, and Scheduler...');
+                $this->info('Starting Queue Worker and Scheduler...');
                 passthru('"' . $bat . '"', $exitCode);
                 return $exitCode === 0 ? self::SUCCESS : self::FAILURE;
             }
             $this->warn('On Windows, run these in separate terminals (or run start-services.bat):');
-            $this->line('  Terminal 1: php artisan reverb:start');
-            $this->line('  Terminal 2: php artisan queue:work');
-            $this->line('  Terminal 3: php artisan schedule:work');
+            $this->line('  Terminal 1: php artisan queue:work');
+            $this->line('  Terminal 2: php artisan schedule:work');
             return self::SUCCESS;
         }
 

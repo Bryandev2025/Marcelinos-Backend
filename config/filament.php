@@ -15,23 +15,22 @@ return [
     */
 
     /*
-    | Filament uses the same Reverb/Pusher config as the React app.
-    | Falls back to VITE_PUSHER_* for compatibility; REVERB_* takes precedence.
-    */
+     | Filament uses the same Pusher/Echo config as the React app.
+     */
     'broadcasting' => [
 
         'echo' => [
             'broadcaster' => 'pusher',
-            'key' => env('REVERB_APP_KEY', env('VITE_PUSHER_APP_KEY')),
-            'cluster' => env('VITE_PUSHER_APP_CLUSTER', 'mt1'),
-            'wsHost' => env('REVERB_HOST', env('VITE_PUSHER_HOST')),
+            'key' => env('PUSHER_APP_KEY', ''),
+            'cluster' => env('PUSHER_APP_CLUSTER', 'mt1'),
+            'wsHost' => env('PUSHER_HOST'),
             // wsPort/wssPort: client-facing port. Local=8080. Production behind proxy=443.
-            'wsPort' => (int) env('REVERB_PORT', env('VITE_PUSHER_PORT', 8080)),
-            'wssPort' => (int) env('REVERB_WSS_PORT', env('REVERB_PORT', env('VITE_PUSHER_PORT', 443))),
+            'wsPort' => (int) env('PUSHER_PORT', 443),
+            'wssPort' => (int) env('PUSHER_WSS_PORT', env('PUSHER_PORT', 443)),
             'authEndpoint' => '/broadcasting/auth',
             'disableStats' => true,
-            'encrypted' => env('REVERB_SCHEME', 'http') === 'https',
-            'forceTLS' => env('REVERB_SCHEME', 'http') === 'https',
+            'encrypted' => env('PUSHER_SCHEME', 'https') === 'https',
+            'forceTLS' => env('PUSHER_SCHEME', 'https') === 'https',
         ],
 
     ],
