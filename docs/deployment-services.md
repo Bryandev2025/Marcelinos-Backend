@@ -1,6 +1,6 @@
 # Running Laravel Services (Single Command)
 
-This document describes how to run all long-running Laravel processes with **one command**: WebSocket (Reverb), queue worker (mail, broadcasts), and scheduler (booking tasks). Use this on **cPanel** or any server where you want to avoid managing multiple commands.
+This document describes how to run all long-running Laravel processes with **one command**: queue worker (mail, broadcasts), and scheduler (booking tasks). The WebSocket endpoint is provided by your configured Pusher service (managed or self-hosted).
 
 ---
 
@@ -8,7 +8,7 @@ This document describes how to run all long-running Laravel processes with **one
 
 | Service | Command | Purpose |
 |--------|---------|--------|
-| **Reverb** | `php artisan reverb:start` | WebSocket server for real-time updates (rooms, venues, etc.) |
+| **Pusher** | (managed or self-hosted) | WebSocket server for real-time updates (rooms, venues, etc.) |
 | **Queue worker** | `php artisan queue:work` | Processes queued jobs (emails, broadcast events) |
 | **Scheduler** | `php artisan schedule:work` | Runs scheduled tasks every minute (booking status updates) |
 
@@ -31,9 +31,8 @@ Or run the script directly (make it executable once: `chmod +x start-services.sh
 ./start-services.sh
 ```
 
-This starts Reverb, queue worker, and scheduler in the background. PIDs are saved to `storage/app/services.pids`. Logs go to:
+This starts the queue worker and scheduler in the background. PIDs are saved to `storage/app/services.pids`. Logs go to:
 
-- `storage/logs/reverb.log`
 - `storage/logs/queue.log`
 - `storage/logs/schedule.log`
 
@@ -68,7 +67,7 @@ chmod +x /home/youruser/be-marcelinos/start-services.sh
 chmod +x /home/youruser/be-marcelinos/stop-services.sh
 ```
 
-After a server reboot, Reverb, queue, and scheduler will start automatically. You do **not** need a separate “every minute” cron for the scheduler.
+After a server reboot, the queue worker and scheduler will start automatically. You do **not** need a separate “every minute” cron for the scheduler.
 
 ### Option 2: No @reboot (e.g. cPanel doesn’t support it)
 
@@ -92,24 +91,21 @@ Note: running `start-services.sh` again while processes are already running will
 
 - **PHP** with `php` in PATH when cron runs (or use full path to `php`, e.g. `/usr/local/bin/php`).
 - **.env** must have:
-  - `BROADCAST_CONNECTION=reverb` (for WebSocket)
+  - `BROADCAST_CONNECTION=pusher` (for WebSocket events)
   - `QUEUE_CONNECTION=database` (or `redis`) and migrations run for `jobs` table if using database queue.
-- **Reverb config** in `.env`: `REVERB_APP_ID`, `REVERB_APP_KEY`, `REVERB_APP_SECRET`, `REVERB_HOST`, `REVERB_PORT`, etc. (see `documentation/realtime-websocket.md`).
+- **Pusher config** in `.env`: `PUSHER_APP_ID`, `PUSHER_APP_KEY`, `PUSHER_APP_SECRET`, `PUSHER_APP_CLUSTER`, `PUSHER_HOST`/`PUSHER_PORT`, etc. (see `documentation/realtime-websocket.md`).
 
 ---
 
 ## Windows (local dev)
 
-On Windows, `services:start` does not run the shell script. Run these in **three separate terminals**:
+On Windows, `services:start` does not run the shell script. Run these in **two separate terminals** (Pusher is managed or already running):
 
 ```bash
 # Terminal 1
-php artisan reverb:start
-
-# Terminal 2
 php artisan queue:work
 
-# Terminal 3
+# Terminal 2
 php artisan schedule:work
 ```
 
@@ -120,7 +116,7 @@ Or use WSL and run `./start-services.sh` or `php artisan services:start`.
 ## Relation to other docs
 
 - **Scheduler / booking tasks:** `documentation/cron-job.md` — when you use `schedule:work` (via `services:start`), you do **not** need the “every minute” cron entry described there; `schedule:work` replaces it.
-- **WebSocket / Reverb:** `documentation/realtime-websocket.md` — config and troubleshooting for Reverb and the React client.
+- **WebSocket / Pusher:** `documentation/realtime-websocket.md` — config and troubleshooting for Pusher and the React client.
 
 ---
 
@@ -128,7 +124,7 @@ Or use WSL and run `./start-services.sh` or `php artisan services:start`.
 
 | File | Purpose |
 |------|--------|
-| `start-services.sh` | Starts Reverb, queue worker, scheduler in background; saves PIDs to `storage/app/services.pids` |
+| `start-services.sh` | Starts queue worker and scheduler in background; saves PIDs to `storage/app/services.pids` |
 | `stop-services.sh` | Stops processes using saved PIDs |
 | `app/Console/Commands/ServicesStart.php` | Artisan command: `php artisan services:start` |
 | `app/Console/Commands/ServicesStop.php` | Artisan command: `php artisan services:stop` |

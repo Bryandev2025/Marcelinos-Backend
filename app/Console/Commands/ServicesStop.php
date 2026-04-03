@@ -8,7 +8,7 @@ class ServicesStop extends Command
 {
     protected $signature = 'services:stop';
 
-    protected $description = 'Stop services started by services:start (Reverb, queue worker, scheduler). Uses stop-services.sh on Linux/macOS.';
+    protected $description = 'Stop services started by services:start (queue worker, scheduler). Uses stop-services.sh on Linux/macOS.';
 
     public function handle(): int
     {

@@ -27,7 +27,7 @@ class GalleryObserver
 
             // Prevent huge HTML 404 responses from flooding the logs
             if (str_contains($message, '<!DOCTYPE html>')) {
-                $message = 'Received HTML response instead of broadcast server response (likely Reverb endpoint misconfiguration).';
+                $message = 'Received HTML response instead of broadcast server response (likely Pusher endpoint misconfiguration).';
             }
 
             Log::warning('GalleryUpdated broadcast failed', [

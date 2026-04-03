@@ -57,7 +57,7 @@ class VenueObserver
 
             // Prevent huge HTML 404 pages from flooding logs.
             if (str_contains($message, '<!DOCTYPE html>')) {
-                $message = 'Received HTML error page instead of broadcast response (likely wrong Reverb/Pusher endpoint).';
+                $message = 'Received HTML error page instead of broadcast response (likely wrong Pusher endpoint).';
             }
 
             Log::warning('VenuesUpdated broadcast failed', [
