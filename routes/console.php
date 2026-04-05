@@ -39,8 +39,10 @@ Schedule::command('bookings:complete-checkouts')
 |--------------------------------------------------------------------------
 | Daily at 12:00 — Manila
 |--------------------------------------------------------------------------
-| bookings:cancel-unpaid      — unpaid beyond grace window (default: 3 days) → cancelled
+| bookings:activate-checkins  — paid/partial with check-in today → occupied
 | bookings:send-reminders     — reminder email one day before check-in
+|
+| bookings:cancel-unpaid is scheduled separately every 15 minutes (see below).
 */
 foreach ([
     'bookings:activate-checkins' => true,
