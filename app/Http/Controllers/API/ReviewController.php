@@ -38,9 +38,7 @@ class ReviewController extends Controller
      */
     public function storeByReceiptToken(Request $request, string $token): JsonResponse
     {
-        $booking = Booking::with('guest')
-            ->where('receipt_token', $token)
-            ->first();
+        $booking = $this->findBookingByPublicIdentifier($token);
 
         if (! $booking) {
             return response()->json(['message' => 'Booking not found.'], 404);
@@ -55,9 +53,7 @@ class ReviewController extends Controller
      */
     public function storeByBookingReference(Request $request, string $reference): JsonResponse
     {
-        $booking = Booking::with('guest')
-            ->where('reference_number', $reference)
-            ->first();
+        $booking = $this->findBookingByPublicIdentifier($reference);
 
         if (! $booking) {
             return response()->json(['message' => 'Booking not found.'], 404);
@@ -130,5 +126,17 @@ class ReviewController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Resolve a public booking identifier used by testimonial forms.
+     * Supports both receipt token (UUID) and legacy reference number.
+     */
+    private function findBookingByPublicIdentifier(string $identifier): ?Booking
+    {
+        return Booking::with('guest')
+            ->where('receipt_token', $identifier)
+            ->orWhere('reference_number', $identifier)
+            ->first();
     }
 }

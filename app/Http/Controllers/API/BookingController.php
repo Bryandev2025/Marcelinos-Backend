@@ -102,9 +102,7 @@ class BookingController extends Controller
     public function showByReceiptToken(string $token)
     {
         try {
-            $booking = Booking::with(['guest', 'rooms', 'venues', 'roomLines'])
-                ->where('receipt_token', $token)
-                ->first();
+            $booking = $this->findReceiptBooking($token);
 
             if (! $booking) {
                 return response()->json([
@@ -127,9 +125,7 @@ class BookingController extends Controller
     public function showByReferenceNumber(string $reference)
     {
         try {
-            $booking = Booking::with(['guest', 'rooms', 'venues', 'roomLines'])
-                ->where('reference_number', $reference)
-                ->first();
+            $booking = $this->findReceiptBooking($reference);
 
             if (! $booking) {
                 return response()->json([
@@ -167,6 +163,18 @@ class BookingController extends Controller
             'qr_code_url' => $filename ? url("/qr-image/{$filename}") : null,
             'has_testimonial' => $hasTestimonial,
         ], 200);
+    }
+
+    /**
+     * Resolve a public booking identifier used by receipt pages.
+     * Supports both receipt token (UUID) and legacy reference number.
+     */
+    private function findReceiptBooking(string $identifier): ?Booking
+    {
+        return Booking::with(['guest', 'rooms', 'venues', 'roomLines'])
+            ->where('receipt_token', $identifier)
+            ->orWhere('reference_number', $identifier)
+            ->first();
     }
 
     public function store(StoreBookingRequest $request)
