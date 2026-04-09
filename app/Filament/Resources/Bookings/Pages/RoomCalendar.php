@@ -32,11 +32,6 @@ class RoomCalendar extends Page
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('venueCalendar')
-                ->label('Venue calendar')
-                ->icon('heroicon-o-building-office-2')
-                ->color('gray')
-                ->url(BookingResource::getUrl('venueCalendar')),
             Action::make('listView')
                 ->label('List view')
                 ->icon('heroicon-o-table-cells')

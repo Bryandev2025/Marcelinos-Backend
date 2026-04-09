@@ -33,6 +33,7 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
+use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 
 class BookingsTable
@@ -104,43 +105,217 @@ class BookingsTable
 
                 TextColumn::make('rooms.name')
                     ->label('Rooms')
-                    ->formatStateUsing(function ($record) {
+                    ->formatStateUsing(function ($record): string {
                         $rooms = $record->rooms;
-                        if (! $rooms || $rooms->isEmpty()) {
+                        if ($rooms && $rooms->isNotEmpty()) {
+                            $count = $rooms->count();
+
+                            return $count === 1 ? '1 room' : "{$count} rooms";
+                        }
+
+                        $lines = $record->roomLines;
+                        if ($lines && $lines->isNotEmpty()) {
+                            $count = (int) $lines->sum(fn ($l) => max(1, (int) ($l->quantity ?? 1)));
+
+                            return $count === 1 ? '1 room (unassigned)' : "{$count} rooms (unassigned)";
+                        }
+
+                        $venues = $record->venues;
+                        if ($venues && $venues->isNotEmpty()) {
                             return '—';
                         }
 
-                        return $rooms
-                            ->map(fn (Room $room) => $room->adminSelectLabel())
-                            ->implode(', ');
+                        return '—';
                     })
-                    ->wrap()
-                    ->limit(70)
-                    ->tooltip(function (TextColumn $column): ?string {
-                        $state = $column->getState();
+                    ->description(function ($record): ?string {
+                        $rooms = $record->rooms;
+                        if ($rooms && $rooms->isNotEmpty()) {
+                            $counts = $rooms
+                                ->groupBy('type')
+                                ->map(fn ($g) => $g->count())
+                                ->sortDesc();
 
-                        if (is_iterable($state)) {
-                            $state = collect($state)
-                                ->map(fn ($value): string => is_scalar($value) ? (string) $value : '')
-                                ->filter()
-                                ->implode(', ');
+                            $labels = $counts->map(function (int $n, $type): string {
+                                $type = (string) $type;
+                                $typeLabel = Room::typeOptions()[$type] ?? ucfirst($type);
+
+                                return "{$typeLabel}×{$n}";
+                            })->values();
+
+                            return $labels->take(2)->implode(' · ').($labels->count() > 2 ? ' · …' : '');
                         }
 
-                        if (! is_scalar($state)) {
+                        $lines = $record->roomLines;
+                        if ($lines && $lines->isNotEmpty()) {
+                            $counts = $lines
+                                ->groupBy('room_type')
+                                ->map(fn ($g) => (int) $g->sum(fn ($l) => max(1, (int) ($l->quantity ?? 1))))
+                                ->sortDesc();
+
+                            $labels = $counts->map(function (int $n, $type): string {
+                                $type = (string) $type;
+                                $typeLabel = Room::typeOptions()[$type] ?? ucfirst($type);
+
+                                return "{$typeLabel}×{$n}";
+                            })->values();
+
+                            return $labels->take(2)->implode(' · ').($labels->count() > 2 ? ' · …' : '');
+                        }
+
+                        return null;
+                    })
+                    ->extraAttributes(['class' => 'cursor-pointer'])
+                    ->action(
+                        Action::make('viewRooms')
+                            ->modalHeading('Rooms')
+                            ->modalCancelActionLabel('Close')
+                            ->modalSubmitAction(false)
+                            ->modalContent(function ($record): View {
+                                $items = [];
+                                $subtitle = null;
+
+                                $rooms = $record->rooms;
+                                if ($rooms && $rooms->isNotEmpty()) {
+                                    $items = $rooms
+                                        ->map(fn (Room $room) => trim($room->adminSelectLabel()))
+                                        ->filter()
+                                        ->values()
+                                        ->all();
+                                    $subtitle = 'Assigned rooms';
+                                } else {
+                                    $lines = $record->roomLines;
+                                    if ($lines && $lines->isNotEmpty()) {
+                                        $items = $lines
+                                            ->map(function ($l): string {
+                                                $type = (string) ($l->room_type ?? '');
+                                                $typeLabel = Room::typeOptions()[$type] ?? ($type !== '' ? ucfirst($type) : 'Room');
+                                                $qty = max(1, (int) ($l->quantity ?? 1));
+
+                                                return "{$typeLabel} × {$qty}";
+                                            })
+                                            ->filter()
+                                            ->values()
+                                            ->all();
+                                        $subtitle = 'Guest-selected (unassigned)';
+                                    }
+                                }
+
+                                return view('filament.bookings.inventory-modal', [
+                                    'title' => 'Rooms',
+                                    'subtitle' => $subtitle,
+                                    'items' => $items,
+                                ]);
+                            })
+                    )
+                    ->wrap()
+                    ->limit(30)
+                    ->tooltip(function (TextColumn $column): ?string {
+                        $record = $column->getRecord();
+                        if (! $record) {
                             return null;
                         }
 
-                        $state = trim((string) $state);
+                        $rooms = $record->rooms;
+                        if ($rooms && $rooms->isNotEmpty()) {
+                            $full = $rooms
+                                ->map(fn (Room $room) => trim($room->adminSelectLabel()))
+                                ->filter()
+                                ->values()
+                                ->implode("\n");
 
-                        return $state !== '' ? $state : null;
+                            return $full !== '' ? $full : null;
+                        }
+
+                        $lines = $record->roomLines;
+                        if ($lines && $lines->isNotEmpty()) {
+                            $full = $lines
+                                ->map(function ($l): string {
+                                    $type = (string) ($l->room_type ?? '');
+                                    $typeLabel = Room::typeOptions()[$type] ?? ($type !== '' ? ucfirst($type) : 'Room');
+                                    $qty = max(1, (int) ($l->quantity ?? 1));
+
+                                    return "{$typeLabel} × {$qty}";
+                                })
+                                ->filter()
+                                ->values()
+                                ->implode("\n");
+
+                            return $full !== '' ? $full : null;
+                        }
+
+                        return null;
                     })
                     ->toggleable(),
 
                 TextColumn::make('venues.name')
-                    ->label('Venues')
-                    ->formatStateUsing(fn ($record) => $record->venues?->pluck('name')->filter()->implode(', ') ?: '—')
+                    ->label('Venue')
+                    ->formatStateUsing(function ($record): string {
+                        $venues = $record->venues;
+                        if (! $venues || $venues->isEmpty()) {
+                            return '—';
+                        }
+
+                        $names = $venues->pluck('name')->filter()->values();
+                        if ($names->isEmpty()) {
+                            return '—';
+                        }
+
+                        $shown = $names->take(1);
+                        $remaining = $names->count() - $shown->count();
+
+                        return $shown->implode(', ').($remaining > 0 ? " +{$remaining}" : '');
+                    })
+                    ->description(function ($record): ?string {
+                        $venues = $record->venues;
+                        if (! $venues || $venues->isEmpty()) {
+                            return null;
+                        }
+
+                        $names = $venues->pluck('name')->filter()->values();
+                        if ($names->isEmpty()) {
+                            return null;
+                        }
+
+                        $count = $names->count();
+
+                        return $count === 1 ? '1 venue' : "{$count} venues";
+                    })
+                    ->extraAttributes(['class' => 'cursor-pointer'])
+                    ->action(
+                        Action::make('viewVenues')
+                            ->modalHeading('Venues')
+                            ->modalCancelActionLabel('Close')
+                            ->modalSubmitAction(false)
+                            ->modalContent(function ($record): View {
+                                $venues = $record->venues;
+                                $items = $venues
+                                    ? $venues->pluck('name')->filter()->values()->all()
+                                    : [];
+
+                                return view('filament.bookings.inventory-modal', [
+                                    'title' => 'Venues',
+                                    'subtitle' => $venues && $venues->isNotEmpty() ? 'Included venues' : null,
+                                    'items' => $items,
+                                ]);
+                            })
+                    )
+                    ->tooltip(function (TextColumn $column): ?string {
+                        $record = $column->getRecord();
+                        if (! $record) {
+                            return null;
+                        }
+
+                        $venues = $record->venues;
+                        if (! $venues || $venues->isEmpty()) {
+                            return null;
+                        }
+
+                        $full = $venues->pluck('name')->filter()->values()->implode("\n");
+
+                        return $full !== '' ? $full : null;
+                    })
                     ->wrap()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(false),
 
                 TextColumn::make('venue_event_type')
                     ->label('Event type')

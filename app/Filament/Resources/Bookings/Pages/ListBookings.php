@@ -29,7 +29,6 @@ class ListBookings extends ListRecords
         return [
             Action::make('calendarView')
                 ->label('Booking Calendar')
-                ->icon('heroicon-o-calendar-days')
                 ->color('gray')
                 ->url(BookingResource::getUrl('roomCalendar')),
             CreateAction::make(),

@@ -55,6 +55,7 @@ class BookingResource extends Resource
             ->with([
                 'guest:id,first_name,middle_name,last_name,email',
                 'rooms' => fn ($q) => $q->with(['bedSpecifications']),
+                'roomLines',
                 'venues:id,name',
             ]);
     }

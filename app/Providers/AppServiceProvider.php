@@ -78,7 +78,6 @@ class AppServiceProvider extends ServiceProvider
 
         $this->configureRateLimiting();
         $this->registerTableTotalsHooks();
-        $this->registerRoomCalendarToolbarButton();
         $this->registerFilamentNotificationSoundHook();
 
         Booking::observe(BookingObserver::class);
