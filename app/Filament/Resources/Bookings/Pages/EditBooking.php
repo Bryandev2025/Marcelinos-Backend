@@ -43,7 +43,7 @@ class EditBooking extends EditRecord
 
         $record = $this->record;
         if ($record instanceof Booking) {
-            $nextStatus = (string) ($data['status'] ?? $record->status);
+            $nextStatus = (string) $record->status;
             $rooms = is_array($data['rooms'] ?? null) ? $data['rooms'] : [];
             $requiresAssignedRooms = in_array($nextStatus, [
                 Booking::STATUS_OCCUPIED,

@@ -11,6 +11,15 @@ class ViewBooking extends ViewRecord
 {
     protected static string $resource = BookingResource::class;
 
+    public function mount(int|string $record): void
+    {
+        parent::mount($record);
+
+        if ($this->record instanceof Booking) {
+            $this->redirect(BookingResource::calendarUrlForBooking($this->record));
+        }
+    }
+
     public function getHeading(): string
     {
         return 'Booking details';

@@ -17,6 +17,7 @@ use App\Filament\Resources\Concerns\ResolvesTrashedRecordRoutes;
 use App\Filament\Widgets\BookingStatsOverview;
 use App\Models\Booking;
 use BackedEnum;
+use Carbon\Carbon;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
@@ -85,5 +86,37 @@ class BookingResource extends Resource
             'edit' => EditBooking::route('/{record}/edit'),
             'view' => ViewBooking::route('/{record}'),
         ];
+    }
+
+    public static function calendarUrlForBooking(Booking $booking): string
+    {
+        $booking->loadMissing(['rooms:id,type', 'roomLines', 'venues:id']);
+
+        $checkIn = $booking->check_in instanceof \Carbon\CarbonInterface
+            ? $booking->check_in->copy()
+            : Carbon::parse($booking->check_in);
+
+        $month = (int) $checkIn->month;
+        $year = (int) $checkIn->year;
+        $modalDate = $checkIn->toDateString();
+
+        $inventory = RoomCalendar::INVENTORY_ROOMS;
+        $modalType = null;
+
+        $roomType = $booking->rooms->first()?->type ?: $booking->roomLines->first()?->room_type;
+        if (is_string($roomType) && trim($roomType) !== '') {
+            $modalType = $roomType;
+        } elseif ($booking->venues->isNotEmpty()) {
+            $inventory = RoomCalendar::INVENTORY_VENUES;
+            $modalType = (string) $booking->venues->first()->id;
+        }
+
+        return static::getUrl('index', array_filter([
+            'month' => $month,
+            'year' => $year,
+            'inventory' => $inventory,
+            'modalDate' => $modalDate,
+            'modalType' => $modalType,
+        ], fn ($v) => $v !== null && $v !== ''));
     }
 }

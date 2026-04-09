@@ -107,7 +107,7 @@ class RoomCalendar extends Page
                                 return;
                             }
 
-                            $livewire->redirect(BookingResource::getUrl('edit', ['record' => $booking]));
+                            $livewire->redirect(BookingResource::calendarUrlForBooking($booking));
                         }),
                 ])
                 ->action(fn () => null),
@@ -133,8 +133,10 @@ class RoomCalendar extends Page
     #[Url]
     public string $inventory = self::INVENTORY_ROOMS;
 
+    #[Url]
     public ?string $modalDate = null;
 
+    #[Url]
     public ?string $modalType = null;
 
     public function mount(): void
