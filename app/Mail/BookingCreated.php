@@ -28,6 +28,12 @@ class BookingCreated extends Mailable implements ShouldQueue
 
     public function build()
     {
+        $bookingCcAddress = config('mail.booking_cc_address');
+
+        if (filled($bookingCcAddress)) {
+            $this->cc($bookingCcAddress);
+        }
+
         return $this
             ->subject('Marcelino\'s Resort and Hotel - Booking Confirmation')
             ->view('emails.booking-created');
