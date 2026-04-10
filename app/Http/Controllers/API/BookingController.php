@@ -362,15 +362,18 @@ class BookingController extends Controller
                 ->get()
                 ->filter(fn (Room $r) => RoomInventoryGroupKey::forRoom($r) === $key);
 
-            $representative = $candidates->first();
-            if ($representative === null) {
+            if ($candidates->isEmpty()) {
                 return response()->json([
                     'message' => 'One or more room selections do not match available inventory.',
                     'error' => 'invalid_room_line',
                 ], 422);
             }
 
-            if (! BookingPricing::totalsMatch((float) $representative->price, $submittedUnit)) {
+            $unitMatchesAnyCandidate = $candidates->contains(
+                fn (Room $r) => BookingPricing::totalsMatch((float) $r->price, $submittedUnit),
+            );
+
+            if (! $unitMatchesAnyCandidate) {
                 return response()->json([
                     'message' => 'Room line price does not match current rates.',
                     'error' => 'price_mismatch',
