@@ -15,16 +15,6 @@ class AmenitySeeder extends Seeder
         $amenities = [
             'Air Conditioning',
             'Free WiFi',
-            'Smart TV',
-            'Private Bathroom',
-            'Hot and Cold Shower',
-            'Mini Fridge',
-            'Complimentary Toiletries',
-            'Parking Space',
-            'Swimming Pool Access',
-            'Sound System',
-            'Projector',
-            'Catering Area',
         ];
 
         foreach ($amenities as $name) {
