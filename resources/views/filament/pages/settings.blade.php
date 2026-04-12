@@ -329,11 +329,17 @@
                 </div>
 
                 @if (! $this->editingMaintenance)
-                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
                         <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-white/10 dark:bg-gray-900/40">
                             <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Maintenance Mode</p>
                             <p class="mt-1 text-sm font-bold {{ $this->maintenanceModeEnabled ? 'text-success-700 dark:text-success-300' : 'text-gray-700 dark:text-gray-200' }}">
                                 {{ $this->maintenanceModeEnabled ? 'Enabled' : 'Disabled' }}
+                            </p>
+                        </div>
+                        <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-white/10 dark:bg-gray-900/40">
+                            <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Page layout</p>
+                            <p class="mt-1 text-sm font-bold text-gray-900 dark:text-white">
+                                {{ \App\Support\MaintenancePageVariant::labels()[$this->maintenanceVariant] ?? $this->maintenanceVariant }}
                             </p>
                         </div>
                         <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-white/10 dark:bg-gray-900/40">
@@ -366,6 +372,21 @@
                             </label>
                             <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                                 When enabled, website visitors in the frontend will see the maintenance page.
+                            </p>
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Public page layout</label>
+                            <select
+                                wire:model.defer="maintenanceVariant"
+                                class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm dark:border-gray-700 dark:bg-gray-900/70"
+                            >
+                                @foreach (\App\Support\MaintenancePageVariant::labels() as $value => $label)
+                                    <option value="{{ $value }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                Pick how the maintenance screen appears on the website (colors, structure, and motion differ per layout).
                             </p>
                         </div>
 

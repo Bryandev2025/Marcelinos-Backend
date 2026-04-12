@@ -3,9 +3,11 @@
 namespace App\Filament\Pages;
 
 use App\Support\EnvEditor;
+use App\Support\MaintenancePageVariant;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -85,6 +87,8 @@ class Settings extends Page
     public string $maintenanceDescription = '';
 
     public string $maintenanceEta = '';
+
+    public string $maintenanceVariant = MaintenancePageVariant::DEFAULT;
 
     public function mount(): void
     {
@@ -234,6 +238,7 @@ class Settings extends Page
 
         $this->validate([
             'maintenanceModeEnabled' => ['required', 'boolean'],
+            'maintenanceVariant' => ['required', 'string', Rule::in(MaintenancePageVariant::keys())],
             'maintenanceBadge' => ['required', 'string', 'max:100'],
             'maintenanceTitle' => ['required', 'string', 'max:150'],
             'maintenanceDescription' => ['required', 'string', 'max:500'],
@@ -242,6 +247,7 @@ class Settings extends Page
 
         EnvEditor::updateMany([
             'MAINTENANCE_MODE_ENABLED' => $this->maintenanceModeEnabled ? 'true' : 'false',
+            'MAINTENANCE_MODE_VARIANT' => $this->maintenanceVariant,
             'MAINTENANCE_MODE_BADGE' => $this->maintenanceBadge,
             'MAINTENANCE_MODE_TITLE' => $this->maintenanceTitle,
             'MAINTENANCE_MODE_DESCRIPTION' => $this->maintenanceDescription,
@@ -250,6 +256,7 @@ class Settings extends Page
 
         Cache::forever('maintenance_mode_config', [
             'enabled' => $this->maintenanceModeEnabled,
+            'variant' => MaintenancePageVariant::normalize($this->maintenanceVariant),
             'badge' => $this->maintenanceBadge,
             'title' => $this->maintenanceTitle,
             'description' => $this->maintenanceDescription,
@@ -503,6 +510,7 @@ class Settings extends Page
         $this->semaphoreSenderName = (string) env('SEMAPHORE_SENDER_NAME', '');
 
         $this->maintenanceModeEnabled = filter_var(env('MAINTENANCE_MODE_ENABLED', false), FILTER_VALIDATE_BOOLEAN);
+        $this->maintenanceVariant = MaintenancePageVariant::normalize((string) env('MAINTENANCE_MODE_VARIANT', MaintenancePageVariant::DEFAULT));
         $this->maintenanceBadge = (string) env('MAINTENANCE_MODE_BADGE', 'Scheduled Maintenance');
         $this->maintenanceTitle = (string) env('MAINTENANCE_MODE_TITLE', 'We are improving your experience');
         $this->maintenanceDescription = (string) env('MAINTENANCE_MODE_DESCRIPTION', 'Our website is currently under maintenance. Please check back again shortly.');
