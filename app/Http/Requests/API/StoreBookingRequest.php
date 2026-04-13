@@ -45,6 +45,7 @@ class StoreBookingRequest extends FormRequest
     {
         return [
             'reference_number' => 'nullable|string',
+            'payment_method' => ['nullable', 'string', Rule::in(['cash', 'online'])],
             'room_lines' => 'nullable|array|max:32',
             'room_lines.*.room_type' => ['required', 'string', Rule::in(['standard', 'family', 'deluxe'])],
             'room_lines.*.inventory_group_key' => 'required|string|max:512',

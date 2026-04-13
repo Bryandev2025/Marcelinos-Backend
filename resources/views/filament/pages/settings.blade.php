@@ -51,6 +51,7 @@
                     'email' => 'EMAIL CONFIG',
                     'sms' => 'SMS CONFIG',
                     'maintenance' => 'MAINTENANCE',
+                    'payment' => 'ONLINE PAYMENT',
                 ] as $tabKey => $tabLabel)
                     <button type="button"
                         wire:click="setTab('{{ $tabKey }}')"
@@ -155,6 +156,7 @@
                         <div class="mt-2 flex flex-wrap gap-2">
                             <x-filament::button size="sm" color="gray" wire:click="setTab('email')">Open Email Config</x-filament::button>
                             <x-filament::button size="sm" color="gray" wire:click="setTab('sms')">Open SMS Config</x-filament::button>
+                            <x-filament::button size="sm" color="gray" wire:click="setTab('payment')">Open Online Payment</x-filament::button>
                             <x-filament::button size="sm" color="gray" wire:click="setTab('actions')">Open Actions</x-filament::button>
                         </div>
                     </div>
@@ -427,6 +429,71 @@
                         </div>
                     </div>
                 @endif
+            </x-filament::section>
+        @endif
+
+        @if ($this->activeTab === 'payment')
+            <x-filament::section icon="heroicon-m-credit-card" icon-color="warning" heading="Online Payment Configuration (Xendit)">
+                <x-slot name="description">
+                    Toggle online payments and manage Xendit API credentials.
+                </x-slot>
+
+                <div class="mb-4 flex gap-2">
+                    @if (! $this->editingPayment)
+                        <x-filament::button size="sm" wire:click="enablePaymentEdit">Edit Payment Settings</x-filament::button>
+                    @else
+                        <x-filament::button size="sm" color="gray" wire:click="cancelPaymentEdit">Cancel</x-filament::button>
+                        <x-filament::button size="sm" color="success" wire:click="savePaymentSettings">Save Changes</x-filament::button>
+                    @endif
+                </div>
+
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div class="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-white/10 dark:bg-gray-900/40">
+                        <label class="flex items-center gap-3 text-sm font-medium text-gray-800 dark:text-gray-100">
+                            <input
+                                type="checkbox"
+                                wire:model.defer="onlinePaymentEnabled"
+                                class="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                @disabled(! $this->editingPayment)
+                            />
+                            Enable online payment (Xendit)
+                        </label>
+                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            Disable this to hide online payment option in the booking flow.
+                        </p>
+                        @error('onlinePaymentEnabled')
+                            <p class="mt-2 text-xs text-danger-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    @foreach ([
+                        ['key' => 'xenditSecretKey', 'label' => 'XENDIT_SECRET_KEY', 'type' => 'password'],
+                        ['key' => 'xenditPublicKey', 'label' => 'XENDIT_PUBLIC_KEY', 'type' => 'text'],
+                        ['key' => 'xenditWebhookVerificationToken', 'label' => 'XENDIT_WEBHOOK_VERIFICATION_TOKEN', 'type' => 'text'],
+                    ] as $field)
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ $field['label'] }}</label>
+                            <div class="relative">
+                                <input type="{{ $field['key'] === 'xenditSecretKey' ? ($this->showXenditSecretKey ? 'text' : 'password') : $field['type'] }}" wire:model.defer="{{ $field['key'] }}"
+                                class="w-full rounded-xl border px-3 py-2.5 {{ $field['key'] === 'xenditSecretKey' ? 'pr-12' : '' }} text-sm {{ $this->editingPayment ? 'border-gray-300 bg-white dark:border-gray-700 dark:bg-gray-900/70' : 'cursor-not-allowed border-gray-200 bg-gray-100 text-gray-500 dark:border-gray-800 dark:bg-gray-900/40 dark:text-gray-400' }}"
+                                @disabled(! $this->editingPayment) />
+                                @if ($field['key'] === 'xenditSecretKey')
+                                    <button
+                                        type="button"
+                                        class="absolute inset-y-0 right-0 flex items-center pr-3 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white"
+                                        wire:click="toggleXenditSecretKeyVisibility"
+                                        title="{{ $this->showXenditSecretKey ? 'Hide secret key' : 'Show secret key' }}"
+                                    >
+                                        <x-filament::icon :icon="$this->showXenditSecretKey ? 'heroicon-m-eye-slash' : 'heroicon-m-eye'" class="h-4 w-4" />
+                                    </button>
+                                @endif
+                            </div>
+                            @error($field['key'])
+                                <p class="mt-1 text-xs text-danger-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    @endforeach
+                </div>
             </x-filament::section>
         @endif
     </div>

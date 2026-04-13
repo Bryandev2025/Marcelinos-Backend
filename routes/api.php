@@ -7,6 +7,7 @@ use App\Http\Controllers\API\BubbleChatFaqController;
 use App\Http\Controllers\API\ContactController;
 use App\Http\Controllers\API\GalleryController;
 use App\Http\Controllers\API\MaintenanceModeController;
+use App\Http\Controllers\API\OnlinePaymentConfigController;
 use App\Http\Controllers\API\ReviewController;
 use App\Http\Controllers\API\RoomController;
 use App\Http\Controllers\API\VenueController;
@@ -30,6 +31,7 @@ Route::get('/health', function () {
 });
 
 Route::get('/maintenance-mode', [MaintenanceModeController::class, 'show']);
+Route::get('/online-payment-config', [OnlinePaymentConfigController::class, 'show']);
 
 Route::middleware([EnsureApiKeyIsValid::class])->group(function () {
     Route::middleware('throttle:api')->group(function () {

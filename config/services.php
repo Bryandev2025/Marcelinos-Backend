@@ -53,4 +53,11 @@ return [
         'sender_name' => env('SEMAPHORE_SENDER_NAME'),
     ],
 
+    'xendit' => [
+        'enabled' => filter_var(env('ONLINE_PAYMENT_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        'secret_key' => env('XENDIT_SECRET_KEY'),
+        'public_key' => env('XENDIT_PUBLIC_KEY'),
+        'webhook_verification_token' => env('XENDIT_WEBHOOK_VERIFICATION_TOKEN'),
+    ],
+
 ];

@@ -18,6 +18,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -182,6 +184,7 @@ class BookingController extends Controller
     public function store(StoreBookingRequest $request)
     {
         $validated = $request->validated();
+        $paymentMethod = (string) $request->input('payment_method', 'cash');
 
         $roomLines = isset($validated['room_lines']) && is_array($validated['room_lines'])
             ? $validated['room_lines']
@@ -273,6 +276,7 @@ class BookingController extends Controller
             $booking = DB::transaction(function () use (
                 $guest,
                 $validated,
+                $paymentMethod,
                 $checkIn,
                 $checkOut,
                 $roomLines,
@@ -309,11 +313,33 @@ class BookingController extends Controller
                 return $booking->fresh(['guest', 'rooms', 'venues', 'roomLines']);
             });
 
+            $paymentUrl = null;
+            if ($paymentMethod === 'online') {
+                $paymentResult = $this->createXenditInvoiceForBooking($booking, $guest);
+                $paymentUrl = $paymentResult['payment_url'];
+
+                if (! $paymentResult['ok']) {
+                    // Do not keep orphan unpaid bookings when online payment setup/invoice fails.
+                    $booking->delete();
+
+                    return response()->json([
+                        'message' => (string) ($paymentResult['message'] ?? 'Online payment is currently unavailable. Please try again or use cash payment.'),
+                        'error' => 'online_payment_unavailable',
+                        'meta' => [
+                            'provider' => 'xendit',
+                            'status' => $paymentResult['status'] ?? null,
+                            'code' => $paymentResult['code'] ?? null,
+                        ],
+                    ], 422);
+                }
+            }
+
             return response()->json([
                 'message' => 'Booking created successfully',
                 'guest' => $guest,
                 'booking' => $booking,
                 'total_price' => $expectedTotal,
+                'payment_url' => $paymentUrl,
             ], 201);
         } catch (\Throwable $e) {
             return response()->json([
@@ -737,5 +763,91 @@ class BookingController extends Controller
     private function expireIfNeeded(Booking $booking): bool
     {
         return $booking->expireIfUnpaidExceededRule();
+    }
+
+    /**
+     * @return array{ok: bool, payment_url: ?string, message?: string, status?: int, code?: string}
+     */
+    private function createXenditInvoiceForBooking(Booking $booking, Guest $guest): array
+    {
+        $enabled = filter_var(env('ONLINE_PAYMENT_ENABLED', false), FILTER_VALIDATE_BOOLEAN);
+        $secretKey = trim((string) env('XENDIT_SECRET_KEY', ''));
+
+        if (! $enabled || $secretKey === '') {
+            return [
+                'ok' => false,
+                'payment_url' => null,
+                'message' => 'Online payment is disabled or Xendit secret key is missing.',
+                'code' => 'CONFIG_MISSING',
+            ];
+        }
+
+        $frontendBase = rtrim((string) config('app.frontend_url', ''), '/');
+        $receiptToken = (string) ($booking->receipt_token ?? $booking->reference_number);
+
+        $payload = [
+            'external_id' => 'booking-'.$booking->reference_number.'-'.time(),
+            'amount' => (float) $booking->total_price,
+            'payer_email' => (string) ($guest->email ?? ''),
+            'description' => 'Booking payment for '.$booking->reference_number,
+        ];
+
+        if ($frontendBase !== '' && $receiptToken !== '') {
+            $payload['success_redirect_url'] = $frontendBase.'/booking-receipt/'.$receiptToken;
+            $payload['failure_redirect_url'] = $frontendBase.'/create-booking';
+        }
+
+        try {
+            $response = Http::withBasicAuth($secretKey, '')
+                ->timeout(15)
+                ->post('https://api.xendit.co/v2/invoices', $payload);
+
+            if (! $response->successful()) {
+                $errorCode = (string) data_get($response->json(), 'error_code', '');
+                $errorMessage = (string) data_get($response->json(), 'message', 'Xendit invoice creation failed.');
+
+                Log::warning('Xendit invoice creation failed', [
+                    'booking_id' => $booking->id,
+                    'status' => $response->status(),
+                    'body' => $response->json(),
+                ]);
+
+                return [
+                    'ok' => false,
+                    'payment_url' => null,
+                    'message' => $errorMessage,
+                    'status' => $response->status(),
+                    'code' => $errorCode !== '' ? $errorCode : 'XENDIT_REQUEST_FAILED',
+                ];
+            }
+
+            $invoiceUrl = (string) data_get($response->json(), 'invoice_url', '');
+
+            if ($invoiceUrl === '') {
+                return [
+                    'ok' => false,
+                    'payment_url' => null,
+                    'message' => 'Xendit did not return an invoice URL.',
+                    'code' => 'MISSING_INVOICE_URL',
+                ];
+            }
+
+            return [
+                'ok' => true,
+                'payment_url' => $invoiceUrl,
+            ];
+        } catch (\Throwable $exception) {
+            Log::warning('Xendit invoice creation exception', [
+                'booking_id' => $booking->id,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return [
+                'ok' => false,
+                'payment_url' => null,
+                'message' => 'Xendit request error: '.$exception->getMessage(),
+                'code' => 'XENDIT_EXCEPTION',
+            ];
+        }
     }
 }
