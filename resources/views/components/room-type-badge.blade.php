@@ -55,7 +55,7 @@
         ])
     >
         @if ($type === Room::TYPE_STANDARD)
-            {{-- Bed (outline, tabler-style) --}}
+            {{-- BedDouble (Lucide-style outline) --}}
             <svg
                 @class([$compact ? 'h-3.5 w-3.5' : 'h-4 w-4', 'text-white'])
                 viewBox="0 0 24 24"
@@ -66,9 +66,11 @@
                 stroke-linejoin="round"
                 aria-hidden="true"
             >
-                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                <path d="M7 9m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
-                <path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16" />
+                <path d="M3 20v-8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8" />
+                <path d="M3 20h18" />
+                <path d="M3 16h18" />
+                <path d="M7 10V6a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v4" />
+                <path d="M12 10V6a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v4" />
             </svg>
         @elseif ($type === Room::TYPE_FAMILY)
             <x-filament::icon

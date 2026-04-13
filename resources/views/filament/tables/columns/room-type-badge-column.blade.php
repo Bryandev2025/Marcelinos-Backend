@@ -55,13 +55,23 @@
                 ])
             >
                 @if ($type === Room::TYPE_STANDARD)
-                <x-filament::icon
-                        icon="heroicon-o-building-office"
-                        @class([
-                            'text-white',
-                            $compact ? 'h-3.5 w-3.5' : 'h-4 w-4',
-                        ])
-                    />
+                    {{-- BedDouble (Lucide-style outline) --}}
+                    <svg
+                        @class([$compact ? 'h-3.5 w-3.5' : 'h-4 w-4', 'text-white'])
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                    >
+                        <path d="M3 20v-8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v8" />
+                        <path d="M3 20h18" />
+                        <path d="M3 16h18" />
+                        <path d="M7 10V6a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v4" />
+                        <path d="M12 10V6a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v4" />
+                    </svg>
                 @elseif ($type === Room::TYPE_FAMILY)
                     <x-filament::icon
                         icon="heroicon-o-users"
