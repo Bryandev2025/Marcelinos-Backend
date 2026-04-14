@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
+use App\Models\ActivityLog;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -64,5 +65,20 @@ foreach ([
 */
 Schedule::command('bookings:cancel-unpaid')
     ->everyFifteenMinutes()
+    ->timezone($manila)
+    ->withoutOverlapping();
+
+/*
+|--------------------------------------------------------------------------
+| Daily activity-log retention cleanup
+|--------------------------------------------------------------------------
+| Keep only the latest 60 days of audit records.
+*/
+Schedule::call(function (): void {
+    ActivityLog::query()
+        ->where('created_at', '<', now()->subDays(60))
+        ->delete();
+})
+    ->daily()
     ->timezone($manila)
     ->withoutOverlapping();

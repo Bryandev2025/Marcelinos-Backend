@@ -100,6 +100,7 @@ class ActivityHistory extends Page
 
         return ActivityLog::query()
             ->with('user:id,name')
+            ->where('event', '!=', 'panel_action.page_viewed')
             ->when(
                 $this->dateMode === 'custom_date' && $selectedDate !== '',
                 fn (Builder $query): Builder => $query->whereDate('created_at', $selectedDate)

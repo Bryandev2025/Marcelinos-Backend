@@ -12,6 +12,7 @@ use App\Support\ActivityLogger;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class BookingObserver
 {
@@ -95,6 +96,34 @@ class BookingObserver
 
     public function updated(Booking $booking): void
     {
+        $user = auth()->user();
+        $isStaffOrAdmin = $user && in_array($user->role, ['admin', 'staff'], true);
+
+        if ($isStaffOrAdmin) {
+            $changes = $this->collectBookingChanges($booking);
+
+            if (! empty($changes)) {
+                ActivityLogger::log(
+                    category: 'booking',
+                    event: 'booking.updated',
+                    description: sprintf(
+                        '%s updated booking %s (%s).',
+                        $user->name,
+                        $booking->reference_number,
+                        $this->formatBookingChangesForDescription($changes),
+                    ),
+                    subject: $booking,
+                    meta: [
+                        'reference_number' => $booking->reference_number,
+                        'changed_by_user_id' => (int) $user->id,
+                        'changed_by_user_name' => (string) $user->name,
+                        'changes' => $changes,
+                    ],
+                    userId: (int) $user->id,
+                );
+            }
+        }
+
         if ($booking->wasChanged('status')) {
 
             $statusConfig = [
@@ -148,13 +177,13 @@ class BookingObserver
             }
 
             // Only log if an authenticated user with staff/admin role is present
-            $user = auth()->user();
-            if ($user && in_array($user->role, ['admin', 'staff'])) {
+            if ($isStaffOrAdmin) {
                 ActivityLogger::log(
                     category: 'booking',
                     event: 'booking.status_changed',
                     description: sprintf(
-                        'Booking %s status changed from %s to %s.',
+                        '%s changed booking %s status from %s to %s.',
+                        $user->name,
                         $booking->reference_number,
                         (string) $booking->getOriginal('status'),
                         (string) $booking->status,
@@ -162,6 +191,8 @@ class BookingObserver
                     subject: $booking,
                     meta: [
                         'reference_number' => $booking->reference_number,
+                        'changed_by_user_id' => (int) $user->id,
+                        'changed_by_user_name' => (string) $user->name,
                         'old_status' => (string) $booking->getOriginal('status'),
                         'new_status' => (string) $booking->status,
                     ],
@@ -176,6 +207,67 @@ class BookingObserver
             $booking,
             'updated'
         );
+    }
+
+    private function collectBookingChanges(Booking $booking): array
+    {
+        $changes = [];
+
+        foreach ($booking->getChanges() as $field => $newValue) {
+            if (in_array($field, ['updated_at', 'created_at'], true)) {
+                continue;
+            }
+
+            $oldValue = $booking->getOriginal($field);
+
+            if ((string) $oldValue === (string) $newValue) {
+                continue;
+            }
+
+            $changes[$field] = [
+                'old' => $oldValue,
+                'new' => $newValue,
+            ];
+        }
+
+        return $changes;
+    }
+
+    private function formatBookingChangesForDescription(array $changes): string
+    {
+        $parts = [];
+
+        foreach ($changes as $field => $values) {
+            $parts[] = sprintf(
+                '%s: %s -> %s',
+                Str::headline((string) $field),
+                $this->stringifyChangeValue($values['old'] ?? null),
+                $this->stringifyChangeValue($values['new'] ?? null),
+            );
+        }
+
+        return implode('; ', array_slice($parts, 0, 3));
+    }
+
+    private function stringifyChangeValue(mixed $value): string
+    {
+        if ($value === null) {
+            return 'null';
+        }
+
+        if (is_bool($value)) {
+            return $value ? 'true' : 'false';
+        }
+
+        if (is_scalar($value)) {
+            $text = trim((string) $value);
+
+            return $text === '' ? 'empty' : $text;
+        }
+
+        $encoded = json_encode($value);
+
+        return $encoded === false ? 'value' : $encoded;
     }
 
     public function deleted(Booking $booking): void
