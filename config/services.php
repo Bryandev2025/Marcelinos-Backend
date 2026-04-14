@@ -53,4 +53,10 @@ return [
         'sender_name' => env('SEMAPHORE_SENDER_NAME'),
     ],
 
+    'xendit' => [
+        'secret_key' => env('XENDIT_SECRET_KEY'),
+        'webhook_token' => env('XENDIT_WEBHOOK_TOKEN'),
+        'invoice_url' => env('XENDIT_INVOICE_URL', 'https://api.xendit.co/v2/invoices'),
+    ],
+
 ];

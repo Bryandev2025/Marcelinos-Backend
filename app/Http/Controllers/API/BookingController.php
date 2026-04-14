@@ -17,7 +17,9 @@ use App\Support\RoomInventoryGroupKey;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -143,6 +145,54 @@ class BookingController extends Controller
         }
     }
 
+    /**
+     * Confirm a successful online payment from receipt return flow.
+     * Uses opaque receipt token only and updates booking status to paid/partial.
+     */
+    public function confirmReceiptPayment(Request $request, string $token): JsonResponse
+    {
+        if (! Str::isUuid($token)) {
+            return response()->json([
+                'message' => 'Invalid receipt token.',
+            ], 422);
+        }
+
+        $booking = Booking::with(['guest', 'rooms', 'venues', 'roomLines'])
+            ->where('receipt_token', $token)
+            ->first();
+
+        if (! $booking) {
+            return response()->json([
+                'message' => 'Booking not found',
+            ], 404);
+        }
+
+        $validated = $request->validate([
+            'payment_mode' => ['nullable', 'string', 'in:full,partial_30'],
+        ]);
+
+        if (in_array($booking->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true)) {
+            return response()->json([
+                'message' => 'Booking cannot be updated for payment in its current state.',
+            ], 422);
+        }
+
+        $paymentMode = (string) ($validated['payment_mode'] ?? 'full');
+        $nextStatus = $paymentMode === 'partial_30'
+            ? Booking::STATUS_PARTIAL
+            : Booking::STATUS_PAID;
+
+        if ($booking->status !== $nextStatus) {
+            $booking->update(['status' => $nextStatus]);
+        }
+        Cache::forget($this->pendingOnlinePaymentCacheKey((int) $booking->id));
+
+        return response()->json([
+            'success' => true,
+            'booking' => $booking->fresh(['guest', 'rooms', 'venues', 'roomLines']),
+        ]);
+    }
+
     private function jsonReceiptForBooking(Booking $booking): JsonResponse
     {
         $this->expireIfNeeded($booking);
@@ -157,6 +207,13 @@ class BookingController extends Controller
 
         return response()->json([
             'booking' => $bookingPayload,
+            'payment' => [
+                'method' => (string) ($bookingPayload->payment_method ?? 'cash'),
+                'plan' => (string) ($bookingPayload->online_payment_plan ?? ''),
+                'invoice_id' => (string) ($bookingPayload->xendit_invoice_id ?? ''),
+                'invoice_url' => (string) ($bookingPayload->xendit_invoice_url ?? ''),
+                'can_retry' => $this->canRetryOnlinePayment($bookingPayload),
+            ],
             'unpaid_expires_at' => $bookingPayload->unpaidExpiresAt()?->toIso8601String(),
             'unpaid_expiry_days' => Booking::UNPAID_EXPIRY_DAYS,
             'use_messenger_deposit_instructions' => $bookingPayload->useMessengerDepositInstructions(),
@@ -289,6 +346,8 @@ class BookingController extends Controller
                     'venue_event_type' => $venueEventType,
                     'total_price' => $expectedTotal,
                     'status' => Booking::STATUS_UNPAID,
+                    'payment_method' => (string) ($validated['payment_method'] ?? 'cash'),
+                    'online_payment_plan' => (string) ($validated['online_payment_plan'] ?? ''),
                 ]);
 
                 $this->generateBookingQr($booking);
@@ -309,11 +368,45 @@ class BookingController extends Controller
                 return $booking->fresh(['guest', 'rooms', 'venues', 'roomLines']);
             });
 
+            $paymentMethod = (string) ($validated['payment_method'] ?? 'cash');
+            $onlinePaymentPlan = (string) ($validated['online_payment_plan'] ?? 'full');
+            $paymentUrl = null;
+
+            if ($paymentMethod === 'online') {
+                $paymentConfigEnabled = filter_var(env('PAYMENT_ONLINE_ENABLED', false), FILTER_VALIDATE_BOOLEAN);
+                if (! $paymentConfigEnabled) {
+                    $booking->delete();
+                    return response()->json([
+                        'message' => 'Online payment is currently disabled by admin settings.',
+                        'error' => 'online_payment_disabled',
+                    ], 422);
+                }
+
+                $invoice = $this->createXenditInvoiceForBooking($booking, $guest, $onlinePaymentPlan);
+                $paymentUrl = $invoice['invoice_url'] ?? null;
+
+                if (! is_string($paymentUrl) || trim($paymentUrl) === '') {
+                    $booking->delete();
+                    return response()->json([
+                        'message' => 'Unable to create Xendit payment invoice.',
+                        'error' => 'xendit_invoice_failed',
+                    ], 502);
+                }
+
+                $booking->update([
+                    'xendit_invoice_id' => (string) ($invoice['id'] ?? ''),
+                    'xendit_invoice_url' => $paymentUrl,
+                ]);
+
+                Cache::put($this->pendingOnlinePaymentCacheKey((int) $booking->id), true, now()->addHours(2));
+            }
+
             return response()->json([
                 'message' => 'Booking created successfully',
                 'guest' => $guest,
                 'booking' => $booking,
                 'total_price' => $expectedTotal,
+                'payment_url' => $paymentUrl,
             ], 201);
         } catch (\Throwable $e) {
             return response()->json([
@@ -699,6 +792,89 @@ class BookingController extends Controller
         ]);
     }
 
+    public function paymentStatusByReceiptToken(string $token): JsonResponse
+    {
+        if (! Str::isUuid($token)) {
+            return response()->json([
+                'message' => 'Invalid receipt token.',
+            ], 422);
+        }
+
+        $booking = Booking::query()->where('receipt_token', $token)->first();
+
+        if (! $booking) {
+            return response()->json([
+                'message' => 'Booking not found',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'status' => (string) $booking->status,
+                'payment_method' => (string) ($booking->payment_method ?? 'cash'),
+                'online_payment_plan' => (string) ($booking->online_payment_plan ?? ''),
+                'invoice_id' => (string) ($booking->xendit_invoice_id ?? ''),
+                'invoice_url' => (string) ($booking->xendit_invoice_url ?? ''),
+                'can_retry' => $this->canRetryOnlinePayment($booking),
+            ],
+        ]);
+    }
+
+    public function retryOnlinePaymentByReceiptToken(string $token): JsonResponse
+    {
+        if (! Str::isUuid($token)) {
+            return response()->json([
+                'message' => 'Invalid receipt token.',
+            ], 422);
+        }
+
+        $booking = Booking::with('guest')->where('receipt_token', $token)->first();
+
+        if (! $booking) {
+            return response()->json([
+                'message' => 'Booking not found',
+            ], 404);
+        }
+
+        if (! $this->canRetryOnlinePayment($booking)) {
+            return response()->json([
+                'message' => 'Payment retry is not allowed for this booking state.',
+            ], 422);
+        }
+
+        $plan = (string) ($booking->online_payment_plan ?: 'full');
+        $guest = $booking->guest;
+        if (! $guest) {
+            return response()->json([
+                'message' => 'Guest not found for this booking.',
+            ], 422);
+        }
+
+        $invoice = $this->createXenditInvoiceForBooking($booking, $guest, $plan);
+        $paymentUrl = $invoice['invoice_url'] ?? null;
+
+        if (! is_string($paymentUrl) || trim($paymentUrl) === '') {
+            return response()->json([
+                'message' => 'Unable to create a new payment invoice.',
+            ], 502);
+        }
+
+        $booking->update([
+            'xendit_invoice_id' => (string) ($invoice['id'] ?? ''),
+            'xendit_invoice_url' => $paymentUrl,
+            'payment_method' => 'online',
+        ]);
+
+        Cache::put($this->pendingOnlinePaymentCacheKey((int) $booking->id), true, now()->addHours(2));
+
+        return response()->json([
+            'success' => true,
+            'payment_url' => $paymentUrl,
+            'booking' => $booking->fresh(),
+        ]);
+    }
+
     private function ensureBookingQrExists(Booking $booking): void
     {
         if ($booking->qr_code && Storage::disk('public')->exists($booking->qr_code)) {
@@ -736,6 +912,80 @@ class BookingController extends Controller
 
     private function expireIfNeeded(Booking $booking): bool
     {
+        if (Cache::has($this->pendingOnlinePaymentCacheKey((int) $booking->id))) {
+            return false;
+        }
+
         return $booking->expireIfUnpaidExceededRule();
+    }
+
+    private function pendingOnlinePaymentCacheKey(int $bookingId): string
+    {
+        return "booking_online_payment_pending_{$bookingId}";
+    }
+
+    private function canRetryOnlinePayment(Booking $booking): bool
+    {
+        if ((string) ($booking->payment_method ?? '') !== 'online') {
+            return false;
+        }
+
+        return in_array((string) $booking->status, [
+            Booking::STATUS_UNPAID,
+            Booking::STATUS_PARTIAL,
+        ], true);
+    }
+
+    /**
+     * @return array{invoice_url?: string}
+     */
+    private function createXenditInvoiceForBooking(Booking $booking, Guest $guest, string $paymentPlan): array
+    {
+        $secretKey = trim((string) config('services.xendit.secret_key'));
+        if ($secretKey === '') {
+            return [];
+        }
+
+        $totalAmount = (float) $booking->total_price;
+        $chargeAmount = $paymentPlan === 'partial_30'
+            ? max(1, (float) round($totalAmount * 0.30, 2))
+            : max(1, $totalAmount);
+
+        $frontendBase = rtrim((string) config('app.frontend_url'), '/');
+        $receiptToken = (string) $booking->receipt_token;
+        $successQuery = $paymentPlan === 'partial_30'
+            ? '?payment=success&payment_mode=partial_30'
+            : '?payment=success&payment_mode=full';
+        $failureQuery = '?payment=failed';
+
+        $successRedirect = "{$frontendBase}/booking-receipt/{$receiptToken}{$successQuery}";
+        $failureRedirect = "{$frontendBase}/booking-receipt/{$receiptToken}{$failureQuery}";
+
+        $payload = [
+            'external_id' => $booking->reference_number,
+            'amount' => $chargeAmount,
+            'payer_email' => (string) ($guest->email ?? ''),
+            'description' => "Booking {$booking->reference_number} ({$paymentPlan})",
+            'success_redirect_url' => $successRedirect,
+            'failure_redirect_url' => $failureRedirect,
+            'currency' => 'PHP',
+            'metadata' => [
+                'reference_number' => $booking->reference_number,
+                'receipt_token' => $booking->receipt_token,
+                'payment_mode' => $paymentPlan,
+                'full_amount' => $totalAmount,
+            ],
+        ];
+
+        $response = Http::withBasicAuth($secretKey, '')
+            ->timeout(20)
+            ->post((string) config('services.xendit.invoice_url'), $payload);
+
+        if (! $response->successful()) {
+            return [];
+        }
+
+        $body = $response->json();
+        return is_array($body) ? $body : [];
     }
 }

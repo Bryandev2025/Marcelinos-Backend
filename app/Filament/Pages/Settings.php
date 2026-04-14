@@ -29,6 +29,7 @@ class Settings extends Page
     public bool $editingSms = false;
 
     public bool $editingMaintenance = false;
+    public bool $editingPayment = false;
 
     public string $mailHost = '';
 
@@ -89,6 +90,11 @@ class Settings extends Page
     public string $maintenanceEta = '';
 
     public string $maintenanceVariant = MaintenancePageVariant::DEFAULT;
+    public bool $onlinePaymentEnabled = false;
+    public string $xenditSecretKey = '';
+    public string $xenditPublicKey = '';
+    public string $xenditWebhookToken = '';
+    public ?array $lastXenditWebhookEvent = null;
 
     public function mount(): void
     {
@@ -100,7 +106,7 @@ class Settings extends Page
 
     public function setTab(string $tab): void
     {
-        if (! in_array($tab, ['overview', 'actions', 'email', 'sms', 'maintenance'], true)) {
+        if (! in_array($tab, ['overview', 'actions', 'email', 'sms', 'maintenance', 'payment'], true)) {
             return;
         }
 
@@ -267,6 +273,60 @@ class Settings extends Page
 
         Notification::make()
             ->title('Maintenance settings saved')
+            ->success()
+            ->send();
+    }
+
+    public function enablePaymentEdit(): void
+    {
+        $this->editingPayment = true;
+    }
+
+    public function cancelPaymentEdit(): void
+    {
+        $this->editingPayment = false;
+        $this->loadFromEnv();
+    }
+
+    public function savePaymentSettings(): void
+    {
+        if (! $this->editingPayment) {
+            return;
+        }
+
+        $this->validate([
+            'onlinePaymentEnabled' => ['required', 'boolean'],
+            'xenditSecretKey' => ['nullable', 'string', 'max:255'],
+            'xenditPublicKey' => ['nullable', 'string', 'max:255'],
+            'xenditWebhookToken' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        EnvEditor::updateMany([
+            'PAYMENT_ONLINE_ENABLED' => $this->onlinePaymentEnabled ? 'true' : 'false',
+            'XENDIT_SECRET_KEY' => $this->xenditSecretKey,
+            'XENDIT_PUBLIC_KEY' => $this->xenditPublicKey,
+            'XENDIT_WEBHOOK_TOKEN' => $this->xenditWebhookToken,
+        ]);
+
+        Cache::forever('payment_settings_config', [
+            'online_payment_enabled' => $this->onlinePaymentEnabled,
+        ]);
+
+        $this->editingPayment = false;
+
+        Notification::make()
+            ->title('Payment settings saved')
+            ->success()
+            ->send();
+    }
+
+    public function refreshPaymentDebug(): void
+    {
+        $event = Cache::get('xendit_webhook_last_event');
+        $this->lastXenditWebhookEvent = is_array($event) ? $event : null;
+
+        Notification::make()
+            ->title('Payment diagnostics refreshed')
             ->success()
             ->send();
     }
@@ -515,6 +575,12 @@ class Settings extends Page
         $this->maintenanceTitle = (string) env('MAINTENANCE_MODE_TITLE', 'We are improving your experience');
         $this->maintenanceDescription = (string) env('MAINTENANCE_MODE_DESCRIPTION', 'Our website is currently under maintenance. Please check back again shortly.');
         $this->maintenanceEta = (string) env('MAINTENANCE_MODE_ETA', '');
+        $this->onlinePaymentEnabled = filter_var(env('PAYMENT_ONLINE_ENABLED', false), FILTER_VALIDATE_BOOLEAN);
+        $this->xenditSecretKey = (string) env('XENDIT_SECRET_KEY', '');
+        $this->xenditPublicKey = (string) env('XENDIT_PUBLIC_KEY', '');
+        $this->xenditWebhookToken = (string) env('XENDIT_WEBHOOK_TOKEN', '');
+        $webhookEvent = Cache::get('xendit_webhook_last_event');
+        $this->lastXenditWebhookEvent = is_array($webhookEvent) ? $webhookEvent : null;
     }
 
     private function checkEmailHealth(): string

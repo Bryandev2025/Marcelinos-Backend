@@ -368,6 +368,32 @@ class BookingForm
                         ->label('Reference number')
                         ->disabled()
                         ->dehydrated(false),
+                    TextInput::make('payment_method')
+                        ->label('Payment method')
+                        ->formatStateUsing(fn ($state) => $state ? strtoupper((string) $state) : 'CASH')
+                        ->disabled()
+                        ->dehydrated(false),
+                    TextInput::make('online_payment_plan')
+                        ->label('Online payment plan')
+                        ->formatStateUsing(function ($state): string {
+                            $value = (string) $state;
+                            return match ($value) {
+                                'partial_30' => 'PARTIAL 30%',
+                                'full' => 'FULL',
+                                default => '—',
+                            };
+                        })
+                        ->disabled()
+                        ->dehydrated(false),
+                    TextInput::make('xendit_invoice_id')
+                        ->label('Xendit invoice ID')
+                        ->disabled()
+                        ->dehydrated(false),
+                    TextInput::make('xendit_invoice_url')
+                        ->label('Xendit invoice URL')
+                        ->disabled()
+                        ->dehydrated(false)
+                        ->columnSpanFull(),
                 ]),
         ]);
     }

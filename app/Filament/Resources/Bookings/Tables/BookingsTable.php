@@ -341,6 +341,30 @@ class BookingsTable
                     ->money('PHP', true)
                     ->sortable(),
 
+                BadgeColumn::make('payment_method')
+                    ->label('Payment intent')
+                    ->formatStateUsing(function ($state, $record): string {
+                        $method = (string) ($record->payment_method ?? 'cash');
+                        $plan = (string) ($record->online_payment_plan ?? '');
+
+                        if ($method === 'online' && $plan === 'partial_30') {
+                            return 'Online · Partial 30%';
+                        }
+
+                        if ($method === 'online') {
+                            return 'Online · Full';
+                        }
+
+                        return 'Cash';
+                    })
+                    ->colors([
+                        'success' => fn ($state, $record): bool => (string) ($record->payment_method ?? '') === 'online',
+                        'gray' => fn ($state, $record): bool => (string) ($record->payment_method ?? 'cash') !== 'online',
+                    ])
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query
+                        ->orderBy('payment_method', $direction)
+                        ->orderBy('online_payment_plan', $direction)),
+
                 BadgeColumn::make('status')
                     ->colors(Booking::statusColors())
                     ->formatStateUsing(fn (?string $state): string => Booking::statusOptions()[$state] ?? (string) $state)
@@ -355,6 +379,31 @@ class BookingsTable
             ->filters([
                 SelectFilter::make('status')
                     ->options(Booking::statusOptions()),
+                SelectFilter::make('payment_method')
+                    ->label('Payment intent')
+                    ->options([
+                        'cash' => 'Cash',
+                        'online_full' => 'Online · Full',
+                        'online_partial_30' => 'Online · Partial 30%',
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        $value = $data['value'] ?? null;
+
+                        return match ($value) {
+                            'cash' => $query->where(function (Builder $q): void {
+                                $q->whereNull('payment_method')
+                                    ->orWhere('payment_method', 'cash');
+                            }),
+                            'online_full' => $query->where('payment_method', 'online')
+                                ->where(function (Builder $q): void {
+                                    $q->whereNull('online_payment_plan')
+                                        ->orWhere('online_payment_plan', 'full');
+                                }),
+                            'online_partial_30' => $query->where('payment_method', 'online')
+                                ->where('online_payment_plan', 'partial_30'),
+                            default => $query,
+                        };
+                    }),
                 SelectFilter::make('room')
                     ->label('Room')
                     ->relationship(

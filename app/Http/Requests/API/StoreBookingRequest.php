@@ -3,6 +3,7 @@
 namespace App\Http\Requests\API;
 
 use App\Support\BookingPricing;
+use Illuminate\Validation\Rules\RequiredIf;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -66,6 +67,13 @@ class StoreBookingRequest extends FormRequest
             'check_out' => 'required|string',
             'days' => 'required|integer|min:1',
             'total_price' => 'required|numeric|min:0',
+            'payment_method' => ['nullable', 'string', Rule::in(['cash', 'online'])],
+            'online_payment_plan' => [
+                'nullable',
+                'string',
+                Rule::in(['full', 'partial_30']),
+                new RequiredIf(fn () => $this->input('payment_method') === 'online'),
+            ],
         ];
     }
 

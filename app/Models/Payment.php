@@ -14,6 +14,9 @@ class Payment extends Model
         'total_amount',
         'partial_amount',
         'is_fullypaid',
+        'provider',
+        'provider_ref',
+        'provider_status',
     ];
 
     protected $casts = [

@@ -8,32 +8,118 @@
     @endphp
 
     <style>
+        .settings-shell {
+            --settings-surface: rgba(255, 255, 255, 0.86);
+            --settings-border: rgba(148, 163, 184, 0.24);
+        }
+
+        .dark .settings-shell {
+            --settings-surface: rgba(15, 23, 42, 0.72);
+            --settings-border: rgba(148, 163, 184, 0.2);
+        }
+
         .settings-kpi-card {
-            transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+            transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background-color .18s ease;
+            border: 1px solid var(--settings-border);
+            background: var(--settings-surface);
+            backdrop-filter: blur(2px);
         }
 
         .settings-kpi-card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 14px 28px rgba(2, 6, 23, 0.12);
             border-color: rgba(116, 155, 102, 0.35);
         }
 
         .settings-soft-panel {
-            background-image: radial-gradient(circle at top right, rgba(116, 155, 102, 0.14), transparent 45%);
+            background-image:
+                radial-gradient(circle at top right, rgba(16, 185, 129, 0.14), transparent 45%),
+                radial-gradient(circle at bottom left, rgba(59, 130, 246, 0.08), transparent 35%);
+            border: 1px solid var(--settings-border);
+            border-radius: 1rem;
         }
 
         .settings-progress-fill {
             transition: width .55s ease-in-out;
         }
+
+        .settings-tab {
+            border: 1px solid var(--settings-border);
+            background: var(--settings-surface);
+            border-radius: 9999px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+        }
+
+        .dark .settings-tab {
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        .settings-field-shell {
+            border: 1px solid var(--settings-border);
+            background: var(--settings-surface);
+            border-radius: .9rem;
+            padding: .85rem .95rem;
+        }
+
+        .settings-shell .fi-section {
+            border-radius: 1rem;
+            border: 1px solid var(--settings-border);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.78) 0%, rgba(255, 255, 255, 0.66) 100%);
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+        }
+
+        .dark .settings-shell .fi-section {
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.72) 0%, rgba(15, 23, 42, 0.62) 100%);
+            box-shadow: 0 8px 20px rgba(2, 6, 23, 0.32);
+        }
+
+        .settings-shell .rounded-xl.border.border-gray-200 {
+            border-color: var(--settings-border) !important;
+            background: var(--settings-surface) !important;
+        }
+
+        .settings-shell input[type="text"],
+        .settings-shell input[type="email"],
+        .settings-shell input[type="url"],
+        .settings-shell input[type="password"],
+        .settings-shell input[type="number"],
+        .settings-shell select,
+        .settings-shell textarea {
+            border-radius: .85rem !important;
+            border-color: rgba(148, 163, 184, 0.4) !important;
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.55) inset, 0 1px 2px rgba(15, 23, 42, 0.05);
+        }
+
+        .dark .settings-shell input[type="text"],
+        .dark .settings-shell input[type="email"],
+        .dark .settings-shell input[type="url"],
+        .dark .settings-shell input[type="password"],
+        .dark .settings-shell input[type="number"],
+        .dark .settings-shell select,
+        .dark .settings-shell textarea {
+            border-color: rgba(148, 163, 184, 0.28) !important;
+            box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 1px 2px rgba(2, 6, 23, 0.28);
+        }
+
+        .settings-shell input:focus,
+        .settings-shell select:focus,
+        .settings-shell textarea:focus {
+            border-color: rgba(16, 185, 129, 0.55) !important;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18) !important;
+        }
+
+        .settings-shell .fi-btn {
+            border-radius: .72rem;
+        }
     </style>
 
-    <div class="space-y-6">
+    <div class="settings-shell space-y-6">
         <x-filament::section icon="heroicon-m-swatch" icon-color="success" class="settings-soft-panel">
             <x-slot name="heading">
                 <div class="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <div class="text-sm font-semibold text-gray-900 dark:text-gray-50">Communication Settings</div>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Same style system as Guest Demographics with Livewire tabs and health insights.</p>
+                        <div class="text-sm font-semibold text-gray-900 dark:text-gray-50">System Settings Center</div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Manage communications, maintenance mode, and payment controls in one place.</p>
                     </div>
                     <div class="flex items-center gap-2">
                         <span class="inline-flex items-center rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-wide {{ $emailOnline && $smsOnline ? 'bg-success-100 text-success-700 dark:bg-success-500/15 dark:text-success-300' : 'bg-warning-100 text-warning-700 dark:bg-warning-500/15 dark:text-warning-300' }}">
@@ -44,17 +130,18 @@
                 </div>
             </x-slot>
 
-            <div class="inline-flex w-full flex-wrap gap-2 rounded-xl border border-gray-200 bg-gray-50 px-2 py-2 text-xs dark:border-white/10 dark:bg-gray-800/60">
+            <div class="inline-flex w-full flex-wrap gap-2 rounded-2xl border border-gray-200/70 bg-white/70 px-2.5 py-2.5 text-xs shadow-sm dark:border-white/10 dark:bg-gray-900/45">
                 @foreach ([
                     'overview' => 'OVERVIEW',
                     'actions' => 'ACTIONS',
                     'email' => 'EMAIL CONFIG',
                     'sms' => 'SMS CONFIG',
                     'maintenance' => 'MAINTENANCE',
+                    'payment' => 'PAYMENT',
                 ] as $tabKey => $tabLabel)
                     <button type="button"
                         wire:click="setTab('{{ $tabKey }}')"
-                        class="inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide transition {{ $this->activeTab === $tabKey ? 'bg-emerald-500 text-white shadow-sm' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-100 dark:border-gray-700' }}">
+                        class="settings-tab inline-flex items-center rounded-full px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide transition {{ $this->activeTab === $tabKey ? 'bg-emerald-500 text-white shadow-sm border-emerald-500' : 'text-gray-700 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-gray-800/70' }}">
                         {{ $tabLabel }}
                     </button>
                 @endforeach
@@ -427,6 +514,136 @@
                         </div>
                     </div>
                 @endif
+            </x-filament::section>
+        @endif
+
+        @if ($this->activeTab === 'payment')
+            <x-filament::section icon="heroicon-m-credit-card" icon-color="success" heading="Payment Settings (Xendit)">
+                <x-slot name="description">
+                    Configure online payment availability and Xendit credentials for checkout step 4.
+                </x-slot>
+
+                <div class="mb-4 flex gap-2">
+                    @if (! $this->editingPayment)
+                        <x-filament::button size="sm" wire:click="enablePaymentEdit">Edit Payment Settings</x-filament::button>
+                    @else
+                        <x-filament::button size="sm" color="gray" wire:click="cancelPaymentEdit">Cancel</x-filament::button>
+                        <x-filament::button size="sm" color="success" wire:click="savePaymentSettings">Save Changes</x-filament::button>
+                    @endif
+                </div>
+
+                @if (! $this->editingPayment)
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-white/10 dark:bg-gray-900/40">
+                            <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Online Payment in Booking Step 4</p>
+                            <p class="mt-1 text-sm font-bold {{ $this->onlinePaymentEnabled ? 'text-success-700 dark:text-success-300' : 'text-gray-700 dark:text-gray-200' }}">
+                                {{ $this->onlinePaymentEnabled ? 'Enabled' : 'Disabled' }}
+                            </p>
+                        </div>
+                        <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-white/10 dark:bg-gray-900/40">
+                            <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Credentials</p>
+                            <p class="mt-1 text-sm font-bold text-gray-900 dark:text-white">
+                                {{ $this->xenditSecretKey !== '' || $this->xenditPublicKey !== '' ? 'Configured' : 'Not configured' }}
+                            </p>
+                        </div>
+                    </div>
+                @else
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div class="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-white/10 dark:bg-gray-900/40">
+                            <label class="flex items-center gap-3 text-sm font-medium text-gray-800 dark:text-gray-100">
+                                <input
+                                    type="checkbox"
+                                    wire:model.defer="onlinePaymentEnabled"
+                                    class="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                />
+                                Enable online payment option in booking step 4
+                            </label>
+                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                Default is disabled. Enable only when Xendit credentials are ready.
+                            </p>
+                        </div>
+
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">XENDIT_PUBLIC_KEY</label>
+                            <input
+                                type="text"
+                                wire:model.defer="xenditPublicKey"
+                                class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-900/70"
+                            />
+                        </div>
+
+                        <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">XENDIT_SECRET_KEY</label>
+                            <input
+                                type="password"
+                                wire:model.defer="xenditSecretKey"
+                                class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-900/70"
+                            />
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">XENDIT_WEBHOOK_TOKEN</label>
+                            <input
+                                type="password"
+                                wire:model.defer="xenditWebhookToken"
+                                class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-900/70"
+                            />
+                        </div>
+                    </div>
+                @endif
+
+                <div class="mt-5 rounded-2xl border border-emerald-200/60 bg-gradient-to-br from-emerald-50/80 via-white to-sky-50/80 px-4 py-4 shadow-sm dark:border-emerald-500/20 dark:from-emerald-500/10 dark:via-gray-900/70 dark:to-sky-500/10">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Xendit Webhook Diagnostics</p>
+                            <p class="mt-1 text-xs text-gray-600 dark:text-gray-300">Shows the latest webhook processing result for quick troubleshooting.</p>
+                        </div>
+                        <x-filament::button size="sm" color="gray" wire:click="refreshPaymentDebug">Refresh</x-filament::button>
+                    </div>
+
+                    @if ($this->lastXenditWebhookEvent)
+                        <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                            <div class="settings-field-shell">
+                                <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Received At</p>
+                                <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{{ $this->lastXenditWebhookEvent['received_at'] ?? '—' }}</p>
+                            </div>
+                            <div class="settings-field-shell">
+                                <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Raw Status</p>
+                                <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{{ $this->lastXenditWebhookEvent['raw_status'] ?? '—' }}</p>
+                            </div>
+                            <div class="settings-field-shell">
+                                <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Result</p>
+                                <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
+                                    {{ $this->lastXenditWebhookEvent['result'] ?? '—' }}
+                                    @if (! empty($this->lastXenditWebhookEvent['reason']))
+                                        <span class="text-xs text-gray-500 dark:text-gray-400">({{ $this->lastXenditWebhookEvent['reason'] }})</span>
+                                    @endif
+                                </p>
+                            </div>
+                            <div class="settings-field-shell">
+                                <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Booking Reference</p>
+                                <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{{ $this->lastXenditWebhookEvent['booking_reference'] ?? '—' }}</p>
+                            </div>
+                            <div class="settings-field-shell">
+                                <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Booking Status</p>
+                                <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{{ $this->lastXenditWebhookEvent['booking_status'] ?? '—' }}</p>
+                            </div>
+                            <div class="settings-field-shell">
+                                <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Paid Amount</p>
+                                <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{{ $this->lastXenditWebhookEvent['paid_amount'] ?? '—' }}</p>
+                            </div>
+                            <div class="settings-field-shell md:col-span-3">
+                                <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Invoice / External</p>
+                                <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
+                                    ID: {{ $this->lastXenditWebhookEvent['invoice_id'] ?? '—' }} |
+                                    External: {{ $this->lastXenditWebhookEvent['external_id'] ?? '—' }}
+                                </p>
+                            </div>
+                        </div>
+                    @else
+                        <p class="mt-3 rounded-xl border border-dashed border-emerald-300/70 bg-white/75 px-3 py-3 text-sm text-gray-600 dark:border-emerald-500/40 dark:bg-gray-900/40 dark:text-gray-300">No webhook events recorded yet.</p>
+                    @endif
+                </div>
             </x-filament::section>
         @endif
     </div>

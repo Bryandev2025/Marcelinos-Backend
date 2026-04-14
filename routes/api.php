@@ -7,9 +7,11 @@ use App\Http\Controllers\API\BubbleChatFaqController;
 use App\Http\Controllers\API\ContactController;
 use App\Http\Controllers\API\GalleryController;
 use App\Http\Controllers\API\MaintenanceModeController;
+use App\Http\Controllers\API\PaymentSettingsController;
 use App\Http\Controllers\API\ReviewController;
 use App\Http\Controllers\API\RoomController;
 use App\Http\Controllers\API\VenueController;
+use App\Http\Controllers\API\XenditWebhookController;
 use App\Http\Middleware\EnsureApiKeyIsValid;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -30,6 +32,8 @@ Route::get('/health', function () {
 });
 
 Route::get('/maintenance-mode', [MaintenanceModeController::class, 'show']);
+Route::get('/payment-settings', [PaymentSettingsController::class, 'show']);
+Route::post('/xendit/webhook', [XenditWebhookController::class, 'handle']);
 
 Route::middleware([EnsureApiKeyIsValid::class])->group(function () {
     Route::middleware('throttle:api')->group(function () {
@@ -43,6 +47,9 @@ Route::middleware([EnsureApiKeyIsValid::class])->group(function () {
             ->middleware('throttle:booking_otp');
         Route::patch('/bookings/{booking:reference_number}/cancel', [BookingController::class, 'cancel']);
         Route::get('bookings/receipt/{token}', [BookingController::class, 'showByReceiptToken']);
+        Route::get('bookings/receipt/{token}/payment-status', [BookingController::class, 'paymentStatusByReceiptToken']);
+        Route::post('bookings/receipt/{token}/retry-payment', [BookingController::class, 'retryOnlinePaymentByReceiptToken']);
+        Route::post('bookings/receipt/{token}/confirm-payment', [BookingController::class, 'confirmReceiptPayment']);
         Route::post('bookings/receipt/{token}/review', [ReviewController::class, 'storeByReceiptToken'])
             ->middleware('throttle:bookings');
         Route::get('bookings/reference/{reference}', [BookingController::class, 'showByReferenceNumber']);
