@@ -5,9 +5,11 @@ namespace App\Http\Controllers\API;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
 use App\Models\Payment;
-use Illuminate\Support\Carbon;
+use App\Notifications\Slack\XenditWebhookFailureSlackNotification;
+use App\Support\SlackBookingAlerts;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -30,6 +32,8 @@ class XenditWebhookController extends Controller
                 'booking_reference' => null,
                 'booking_receipt_token' => null,
             ]);
+
+            SlackBookingAlerts::notify(new XenditWebhookFailureSlackNotification('invalid_callback_token', $payload));
 
             return response()->json([
                 'success' => false,
@@ -60,6 +64,10 @@ class XenditWebhookController extends Controller
                 'booking_receipt_token' => null,
             ]);
 
+            if (SlackBookingAlerts::nonpaidXenditWebhookAlertsEnabled()) {
+                SlackBookingAlerts::notify(new XenditWebhookFailureSlackNotification('unsupported_status', $payload));
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Webhook acknowledged.',
@@ -82,6 +90,8 @@ class XenditWebhookController extends Controller
                 'booking_reference' => null,
                 'booking_receipt_token' => null,
             ]);
+
+            SlackBookingAlerts::notify(new XenditWebhookFailureSlackNotification('booking_not_found', $payload));
 
             return response()->json([
                 'success' => false,

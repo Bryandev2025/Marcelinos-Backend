@@ -32,6 +32,7 @@ use App\Observers\RoomObserver;
 use App\Observers\VenueBlockedDateObserver;
 use App\Observers\VenueObserver;
 use App\Support\ActivityLogger;
+use App\Support\GuzzleVerify;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse as LoginResponseContract;
 use Filament\Auth\Http\Responses\Contracts\LogoutResponse as LogoutResponseContract;
 use Filament\Resources\Events\RecordCreated;
@@ -47,6 +48,7 @@ use Illuminate\Http\Request;
 use Illuminate\Mail\Events\MessageSent;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
@@ -76,6 +78,8 @@ class AppServiceProvider extends ServiceProvider
     {
         Schema::defaultStringLength(191);
 
+        $this->configureOutgoingHttpSslVerification();
+
         $this->configureRateLimiting();
         $this->registerTableTotalsHooks();
         $this->registerFilamentNotificationSoundHook();
@@ -94,6 +98,25 @@ class AppServiceProvider extends ServiceProvider
         $this->registerCommunicationTrackingListeners();
 
         Event::listen(RecordCreated::class, RecordBookingWizardInitialPayment::class);
+    }
+
+    /**
+     * Use Composer's CA bundle when PHP/cURL has no trusted CAs (common on Windows),
+     * so Slack, Pusher, and other HTTPS clients verify TLS correctly.
+     *
+     * @see https://curl.se/docs/caextract.html
+     */
+    protected function configureOutgoingHttpSslVerification(): void
+    {
+        $verify = GuzzleVerify::option();
+
+        if ($verify === false) {
+            return;
+        }
+
+        Http::globalOptions([
+            'verify' => $verify,
+        ]);
     }
 
     protected function registerTableTotalsHooks(): void

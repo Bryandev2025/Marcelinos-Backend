@@ -8,7 +8,9 @@ use App\Events\FilamentNotificationSound;
 use App\Filament\Resources\Bookings\BookingResource;
 use App\Models\Booking;
 use App\Models\User;
+use App\Notifications\Slack\BookingLifecycleSlackNotification;
 use App\Support\ActivityLogger;
+use App\Support\SlackBookingAlerts;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
@@ -92,6 +94,8 @@ class BookingObserver
             $booking,
             'created'
         );
+
+        SlackBookingAlerts::notify(new BookingLifecycleSlackNotification($booking, 'created'));
     }
 
     public function updated(Booking $booking): void
@@ -174,6 +178,14 @@ class BookingObserver
 
                     $this->dispatchNotificationSound($user);
                 }
+            }
+
+            if (array_key_exists($booking->status, $statusConfig)) {
+                SlackBookingAlerts::notify(new BookingLifecycleSlackNotification($booking, $booking->status));
+            }
+
+            if (in_array($booking->status, [Booking::STATUS_PAID, Booking::STATUS_PARTIAL], true)) {
+                SlackBookingAlerts::notify(new BookingLifecycleSlackNotification($booking, $booking->status));
             }
 
             // Only log if an authenticated user with staff/admin role is present
