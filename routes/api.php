@@ -4,6 +4,7 @@ use App\Http\Controllers\API\BlockedDateController;
 use App\Http\Controllers\API\BlogPostController;
 use App\Http\Controllers\API\BookingController;
 use App\Http\Controllers\API\BubbleChatFaqController;
+use App\Http\Controllers\API\ClientErrorReportController;
 use App\Http\Controllers\API\ContactController;
 use App\Http\Controllers\API\GalleryController;
 use App\Http\Controllers\API\MaintenanceModeController;
@@ -20,6 +21,10 @@ use Illuminate\Support\Facades\Route;
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+
+/** Public ingest for browser error reports (Slack when SLACK_ERROR_ALERTS_ENABLED=true). */
+Route::post('/client-errors', [ClientErrorReportController::class, 'store'])
+    ->middleware('throttle:client_errors');
 
 Route::get('/health', function () {
     try {

@@ -263,6 +263,7 @@ class BookingLifecycleSlackNotification extends Notification implements ShouldQu
     {
         return match ($this->event) {
             'created' => 'New booking',
+            'deleted' => 'Booking deleted',
             Booking::STATUS_CANCELLED => 'Booking cancelled',
             Booking::STATUS_RESCHEDULED => 'Booking rescheduled',
             Booking::STATUS_COMPLETED => 'Booking completed',
@@ -276,6 +277,7 @@ class BookingLifecycleSlackNotification extends Notification implements ShouldQu
     {
         return match ($this->event) {
             'created' => '✨',
+            'deleted' => '🗑️',
             Booking::STATUS_CANCELLED => '🚫',
             Booking::STATUS_RESCHEDULED => '🔄',
             Booking::STATUS_COMPLETED => '🎉',

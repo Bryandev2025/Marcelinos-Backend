@@ -1,5 +1,6 @@
 <?php
 
+use App\Support\SlackErrorAlerts;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
@@ -20,6 +21,10 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->report(function (\Throwable $e): void {
+            SlackErrorAlerts::notifyIfReportable($e);
+        });
+
         $exceptions->renderable(function (AuthenticationException $exception, $request) {
             if ($request->expectsJson()) {
                 return null;
@@ -29,7 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         // Consistent JSON error responses for API; do not expose exception details in production
-        $exceptions->renderable(function (\Throwable $e, Request $request): ?Response {
+        $exceptions->renderable(function (Throwable $e, Request $request): ?Response {
             if (! $request->is('api/*') && ! $request->expectsJson()) {
                 return null;
             }
