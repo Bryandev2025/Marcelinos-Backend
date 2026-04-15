@@ -32,6 +32,12 @@ return [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
+            /** Optional: route error alerts to a different channel than booking alerts. */
+            'error_channel' => env('SLACK_ERROR_ALERTS_CHANNEL'),
+            /** Dedup window for repeated server exceptions (minutes). */
+            'error_alert_throttle_minutes' => (int) env('SLACK_ERROR_ALERT_THROTTLE_MINUTES', 5),
+            /** Dedup window for similar client error reports (minutes). */
+            'client_error_throttle_minutes' => (int) env('SLACK_CLIENT_ERROR_THROTTLE_MINUTES', 2),
         ],
     ],
 

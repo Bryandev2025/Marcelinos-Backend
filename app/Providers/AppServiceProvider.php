@@ -421,5 +421,11 @@ class AppServiceProvider extends ServiceProvider
                 ->by($request->ip())
                 ->response($jsonTooManyRequests);
         });
+
+        RateLimiter::for('client_errors', function (Request $request) use ($jsonTooManyRequests) {
+            return Limit::perMinute(30)
+                ->by($request->ip())
+                ->response($jsonTooManyRequests);
+        });
     }
 }
