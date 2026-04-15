@@ -25,7 +25,19 @@ jobs:
           script_stop: true
           script: |
             set -e
-            cd "${{ secrets.HOSTINGER_APP_PATH }}"
+            APP_PATH="${{ secrets.HOSTINGER_APP_PATH }}"
+
+            # Accept either project root or public dir in HOSTINGER_APP_PATH.
+            if [ -f "$APP_PATH/composer.json" ]; then
+              cd "$APP_PATH"
+            elif [ -f "$APP_PATH/../composer.json" ]; then
+              cd "$APP_PATH/.."
+            else
+              echo "composer.json not found in '$APP_PATH' or its parent."
+              echo "Set HOSTINGER_APP_PATH to your Laravel project root."
+              exit 1
+            fi
+
             git fetch --all
             git checkout production
             git pull origin production
