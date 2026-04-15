@@ -1,5 +1,7 @@
 <?php
 
+use App\Support\GuzzleVerify;
+
 return [
 
     /*
@@ -34,6 +36,9 @@ return [
                 'port' => env('PUSHER_PORT', 443),
                 'scheme' => env('PUSHER_SCHEME', 'https'),
                 'useTLS' => env('PUSHER_SCHEME', 'https') === 'https',
+            ],
+            'client_options' => [
+                'verify' => GuzzleVerify::option(),
             ],
         ],
 
