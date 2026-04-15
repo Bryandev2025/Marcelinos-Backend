@@ -35,7 +35,7 @@ class BookingCreated extends Mailable implements ShouldQueue
         }
 
         return $this
-            ->subject('Marcelino\'s Resort and Hotel - Booking Confirmation')
+            ->subject('Marcelino\'s Resort Hotel - Booking Confirmation')
             ->view('emails.booking-created');
     }
 }

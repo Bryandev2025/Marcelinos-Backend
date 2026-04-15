@@ -9,7 +9,7 @@
 </head>
 <body style="margin:0; padding:0; background-color:#ffffff; font-family:'Poppins', Arial, Helvetica, sans-serif; color:#1f2937;">
     <div style="display:none; max-height:0; overflow:hidden; opacity:0;">
-        Friendly reminder: your booking at Marcelino's Resort and Hotel is scheduled for tomorrow.
+        Friendly reminder: your booking at Marcelino's Resort Hotel is scheduled for tomorrow.
     </div>
 
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#ffffff; padding:24px 0; margin:0; font-family:'Poppins', Arial, Helvetica, sans-serif;">
@@ -23,8 +23,8 @@
                                 <tr>
                                     <td style="vertical-align:middle;">
                                         <a href="{{ config('app.url') }}" style="text-decoration:none;">
-                                            @php($logoPath = public_path('brand-logo.png'))
-                                            <img src="{{ file_exists($logoPath) ? $message->embed($logoPath) : (config('app.url') . '/brand-logo.png') }}" alt="Marcelino's Logo" width="60" style="display:block; height:auto; border:0; outline:none; text-decoration:none;">
+                                            @php($logoPath = public_path('b-logo.png'))
+                                            <img src="{{ file_exists($logoPath) ? $message->embed($logoPath) : (config('app.url') . '/b-logo.png') }}" alt="Marcelino's Logo" width="60" style="display:block; height:auto; border:0; outline:none; text-decoration:none;">
                                         </a>
                                     </td>
                                     <td style="vertical-align:middle; text-align:right; color:#111827; font-family:'Poppins', Arial, Helvetica, sans-serif;">
@@ -47,7 +47,7 @@
                             </p>
 
                             <p style="margin:0 0 16px; color:#4b5563; font-size:14.5px; line-height:24px; font-weight:400; font-family:'Poppins', Arial, Helvetica, sans-serif;">
-                                This is a friendly reminder that your booking at <strong>Marcelino's Resort and Hotel</strong> is scheduled for <strong>tomorrow</strong>.
+                                This is a friendly reminder that your booking at <strong>Marcelino's Resort Hotel</strong> is scheduled for <strong>tomorrow</strong>.
                             </p>
                         </td>
                     </tr>
@@ -134,7 +134,7 @@
                                 {{ config('app.name') }}
                             </div>
                             <div style="margin-top:4px; font-weight:400; font-family:'Poppins', Arial, Helvetica, sans-serif;">
-                                © {{ date('Y') }} Marcelino's Resort and Hotel. All rights reserved.
+                                © {{ date('Y') }} Marcelino's Resort Hotel. All rights reserved.
                             </div>
                         </td>
                     </tr>
