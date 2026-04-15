@@ -3,9 +3,9 @@
 namespace App\Http\Requests\API;
 
 use App\Support\BookingPricing;
-use Illuminate\Validation\Rules\RequiredIf;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\RequiredIf;
 
 class StoreBookingRequest extends FormRequest
 {
@@ -71,7 +71,7 @@ class StoreBookingRequest extends FormRequest
             'online_payment_plan' => [
                 'nullable',
                 'string',
-                Rule::in(['full', 'partial_30']),
+                'regex:/^(full|partial_([1-9]|[1-9][0-9]))$/',
                 new RequiredIf(fn () => $this->input('payment_method') === 'online'),
             ],
         ];

@@ -11,6 +11,7 @@ use App\Models\Venue;
 use App\Support\BookingPricing;
 use App\Support\RoomInventoryGroupKey;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Radio;
@@ -20,8 +21,8 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
-use Illuminate\Support\HtmlString;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\HtmlString;
 use Illuminate\Validation\ValidationException;
 
 class BookingForm
@@ -44,7 +45,7 @@ class BookingForm
 
             foreach (BlockedDate::query()->get(['date']) as $row) {
                 $d = $row->date;
-                $dates->push($d instanceof \Carbon\CarbonInterface ? $d->format('Y-m-d') : Carbon::parse($d)->format('Y-m-d'));
+                $dates->push($d instanceof CarbonInterface ? $d->format('Y-m-d') : Carbon::parse($d)->format('Y-m-d'));
             }
 
             if ($roomIds !== []) {
@@ -214,7 +215,7 @@ class BookingForm
                         })
                         ->helperText('Color-coded by room type and bed specification. Totals update as selections change.')
                         ->rules([
-                            fn (Get $get, ?Booking $record) => function (string $attribute, $value, $fail) use ($get, $record): void {
+                            fn (Get $get, ?Booking $record) => function (string $attribute, $value, $fail) use ($get): void {
                                 $roomIds = array_filter((array) ($get('rooms') ?? []));
                                 $venueIds = array_filter((array) ($get('venues') ?? []));
                                 if ($roomIds === [] && $venueIds === []) {
@@ -377,8 +378,11 @@ class BookingForm
                         ->label('Online payment plan')
                         ->formatStateUsing(function ($state): string {
                             $value = (string) $state;
+                            if (preg_match('/^partial_([1-9]|[1-9][0-9])$/', $value, $matches) === 1) {
+                                return 'PARTIAL '.$matches[1].'%';
+                            }
+
                             return match ($value) {
-                                'partial_30' => 'PARTIAL 30%',
                                 'full' => 'FULL',
                                 default => '—',
                             };

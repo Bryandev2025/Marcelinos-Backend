@@ -7,6 +7,7 @@ use App\Filament\Actions\TypedDeleteBulkAction;
 use App\Filament\Actions\TypedForceDeleteAction;
 use App\Filament\Actions\TypedForceDeleteBulkAction;
 use App\Filament\Exports\BookingExporter;
+use App\Mail\BookingCreated;
 use App\Models\Booking;
 use App\Models\Room;
 use App\Support\BookingPricing;
@@ -34,6 +35,7 @@ use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Mail;
 
 class BookingsTable
 {
@@ -348,8 +350,8 @@ class BookingsTable
                         $method = (string) ($record->payment_method ?? 'cash');
                         $plan = (string) ($record->online_payment_plan ?? '');
 
-                        if ($method === 'online' && $plan === 'partial_30') {
-                            return 'Online · Partial 30%';
+                        if ($method === 'online' && preg_match('/^partial_([1-9]|[1-9][0-9])$/', $plan, $matches) === 1) {
+                            return 'Online · Partial '.$matches[1].'%';
                         }
 
                         if ($method === 'online') {
@@ -385,7 +387,7 @@ class BookingsTable
                     ->options([
                         'cash' => 'Cash',
                         'online_full' => 'Online · Full',
-                        'online_partial_30' => 'Online · Partial 30%',
+                        'online_partial' => 'Online · Partial',
                     ])
                     ->query(function (Builder $query, array $data): Builder {
                         $value = $data['value'] ?? null;
@@ -400,8 +402,8 @@ class BookingsTable
                                     $q->whereNull('online_payment_plan')
                                         ->orWhere('online_payment_plan', 'full');
                                 }),
-                            'online_partial_30' => $query->where('payment_method', 'online')
-                                ->where('online_payment_plan', 'partial_30'),
+                            'online_partial' => $query->where('payment_method', 'online')
+                                ->where('online_payment_plan', 'like', 'partial_%'),
                             default => $query,
                         };
                     }),
@@ -616,17 +618,17 @@ class BookingsTable
                         ->visible(fn (Booking $record) => $record->guest?->email !== null)
                         ->action(function (Booking $record) {
                             if ($record->guest?->email) {
-                                $mail = \Illuminate\Support\Facades\Mail::to($record->guest->email);
+                                $mail = Mail::to($record->guest->email);
                                 $bookingCcAddress = config('mail.booking_cc_address');
 
                                 if (filled($bookingCcAddress)) {
                                     $mail->cc($bookingCcAddress);
                                 }
 
-                                $mail->send(new \App\Mail\BookingCreated($record));
+                                $mail->send(new BookingCreated($record));
                             }
                         }),
-                ])
+                ]),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

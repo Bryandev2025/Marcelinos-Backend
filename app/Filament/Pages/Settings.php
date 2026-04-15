@@ -4,17 +4,18 @@ namespace App\Filament\Pages;
 
 use App\Support\EnvEditor;
 use App\Support\MaintenancePageVariant;
+use Carbon\Carbon;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class Settings extends Page
 {
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-cog-6-tooth';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-cog-6-tooth';
 
     protected static bool $shouldRegisterNavigation = false;
 
@@ -29,6 +30,7 @@ class Settings extends Page
     public bool $editingSms = false;
 
     public bool $editingMaintenance = false;
+
     public bool $editingPayment = false;
 
     public string $mailHost = '';
@@ -90,10 +92,19 @@ class Settings extends Page
     public string $maintenanceEta = '';
 
     public string $maintenanceVariant = MaintenancePageVariant::DEFAULT;
+
     public bool $onlinePaymentEnabled = false;
+
+    public string $partialPaymentOptions = '10,20,30';
+
+    public bool $allowCustomPartialPayment = false;
+
     public string $xenditSecretKey = '';
+
     public string $xenditPublicKey = '';
+
     public string $xenditWebhookToken = '';
+
     public ?array $lastXenditWebhookEvent = null;
 
     public function mount(): void
@@ -296,13 +307,19 @@ class Settings extends Page
 
         $this->validate([
             'onlinePaymentEnabled' => ['required', 'boolean'],
+            'partialPaymentOptions' => ['nullable', 'string', 'max:255'],
+            'allowCustomPartialPayment' => ['required', 'boolean'],
             'xenditSecretKey' => ['nullable', 'string', 'max:255'],
             'xenditPublicKey' => ['nullable', 'string', 'max:255'],
             'xenditWebhookToken' => ['nullable', 'string', 'max:255'],
         ]);
 
+        $normalizedPartialOptions = $this->normalizePartialPaymentOptions($this->partialPaymentOptions);
+
         EnvEditor::updateMany([
             'PAYMENT_ONLINE_ENABLED' => $this->onlinePaymentEnabled ? 'true' : 'false',
+            'PAYMENT_PARTIAL_OPTIONS' => implode(',', $normalizedPartialOptions),
+            'PAYMENT_PARTIAL_ALLOW_CUSTOM' => $this->allowCustomPartialPayment ? 'true' : 'false',
             'XENDIT_SECRET_KEY' => $this->xenditSecretKey,
             'XENDIT_PUBLIC_KEY' => $this->xenditPublicKey,
             'XENDIT_WEBHOOK_TOKEN' => $this->xenditWebhookToken,
@@ -310,7 +327,11 @@ class Settings extends Page
 
         Cache::forever('payment_settings_config', [
             'online_payment_enabled' => $this->onlinePaymentEnabled,
+            'partial_payment_options' => $normalizedPartialOptions,
+            'allow_custom_partial_payment' => $this->allowCustomPartialPayment,
         ]);
+
+        $this->partialPaymentOptions = implode(',', $normalizedPartialOptions);
 
         $this->editingPayment = false;
 
@@ -432,6 +453,7 @@ class Settings extends Page
                 ->body('SMS connectivity test is cooling down to avoid rate limits.')
                 ->info()
                 ->send();
+
             return;
         }
 
@@ -576,6 +598,8 @@ class Settings extends Page
         $this->maintenanceDescription = (string) env('MAINTENANCE_MODE_DESCRIPTION', 'Our website is currently under maintenance. Please check back again shortly.');
         $this->maintenanceEta = (string) env('MAINTENANCE_MODE_ETA', '');
         $this->onlinePaymentEnabled = filter_var(env('PAYMENT_ONLINE_ENABLED', false), FILTER_VALIDATE_BOOLEAN);
+        $this->partialPaymentOptions = (string) env('PAYMENT_PARTIAL_OPTIONS', '10,20,30');
+        $this->allowCustomPartialPayment = filter_var(env('PAYMENT_PARTIAL_ALLOW_CUSTOM', false), FILTER_VALIDATE_BOOLEAN);
         $this->xenditSecretKey = (string) env('XENDIT_SECRET_KEY', '');
         $this->xenditPublicKey = (string) env('XENDIT_PUBLIC_KEY', '');
         $this->xenditWebhookToken = (string) env('XENDIT_WEBHOOK_TOKEN', '');
@@ -625,6 +649,7 @@ class Settings extends Page
             $rateLimitedUntil = Cache::get("semaphore_rate_limited_until_{$apiHash}");
             if (is_numeric($rateLimitedUntil) && (int) $rateLimitedUntil > now()->timestamp) {
                 $this->applyCachedSmsSnapshot($apiHash, $today);
+
                 return 'Rate limited (retry soon)';
             }
 
@@ -653,6 +678,7 @@ class Settings extends Page
                     Cache::put("semaphore_rate_limited_until_{$apiHash}", $until->timestamp, $until);
 
                     $this->applyCachedSmsSnapshot($apiHash, $today);
+
                     return 'Rate limited (HTTP 429)';
                 }
 
@@ -693,6 +719,7 @@ class Settings extends Page
                 Cache::put("semaphore_rate_limited_until_{$apiHash}", $until->timestamp, $until);
 
                 $this->applyCachedSmsSnapshot($apiHash, $today);
+
                 return 'Rate limited (HTTP 429)';
             }
 
@@ -735,8 +762,9 @@ class Settings extends Page
         }
 
         try {
-            $parsed = \Carbon\Carbon::parse($value);
+            $parsed = Carbon::parse($value);
             $diff = now()->diffInSeconds($parsed, false);
+
             return max(15, min(3600, $diff > 0 ? $diff : 60));
         } catch (\Throwable) {
             return 60;
@@ -765,5 +793,20 @@ class Settings extends Page
     {
         return max(0, (float) $this->smsLowCreditThreshold);
     }
-}
 
+    /**
+     * @return array<int>
+     */
+    private function normalizePartialPaymentOptions(?string $raw): array
+    {
+        $values = collect(explode(',', (string) $raw))
+            ->map(fn (string $v): int => (int) trim($v))
+            ->filter(fn (int $v): bool => $v > 0 && $v < 100)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        return $values !== [] ? $values : [30];
+    }
+}

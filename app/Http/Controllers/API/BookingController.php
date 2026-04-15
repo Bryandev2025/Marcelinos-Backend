@@ -168,7 +168,7 @@ class BookingController extends Controller
         }
 
         $validated = $request->validate([
-            'payment_mode' => ['nullable', 'string', 'in:full,partial_30'],
+            'payment_mode' => ['nullable', 'string', 'regex:/^(full|partial_([1-9]|[1-9][0-9]))$/'],
         ]);
 
         if (in_array($booking->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true)) {
@@ -178,7 +178,12 @@ class BookingController extends Controller
         }
 
         $paymentMode = (string) ($validated['payment_mode'] ?? 'full');
-        $nextStatus = $paymentMode === 'partial_30'
+        if ($paymentMode !== 'full' && ! $this->isAllowedPartialPlan($paymentMode)) {
+            return response()->json([
+                'message' => 'Selected partial payment option is not allowed.',
+            ], 422);
+        }
+        $nextStatus = $this->extractPartialPercentage($paymentMode) !== null
             ? Booking::STATUS_PARTIAL
             : Booking::STATUS_PAID;
 
@@ -373,9 +378,19 @@ class BookingController extends Controller
             $paymentUrl = null;
 
             if ($paymentMethod === 'online') {
+                if ($onlinePaymentPlan !== 'full' && ! $this->isAllowedPartialPlan($onlinePaymentPlan)) {
+                    $booking->delete();
+
+                    return response()->json([
+                        'message' => 'Selected partial payment option is not allowed by admin settings.',
+                        'error' => 'invalid_partial_payment_plan',
+                    ], 422);
+                }
+
                 $paymentConfigEnabled = filter_var(env('PAYMENT_ONLINE_ENABLED', false), FILTER_VALIDATE_BOOLEAN);
                 if (! $paymentConfigEnabled) {
                     $booking->delete();
+
                     return response()->json([
                         'message' => 'Online payment is currently disabled by admin settings.',
                         'error' => 'online_payment_disabled',
@@ -387,6 +402,7 @@ class BookingController extends Controller
 
                 if (! is_string($paymentUrl) || trim($paymentUrl) === '') {
                     $booking->delete();
+
                     return response()->json([
                         'message' => 'Unable to create Xendit payment invoice.',
                         'error' => 'xendit_invoice_failed',
@@ -947,14 +963,15 @@ class BookingController extends Controller
         }
 
         $totalAmount = (float) $booking->total_price;
-        $chargeAmount = $paymentPlan === 'partial_30'
-            ? max(1, (float) round($totalAmount * 0.30, 2))
+        $partialPercent = $this->extractPartialPercentage($paymentPlan);
+        $chargeAmount = $partialPercent !== null
+            ? max(1, (float) round($totalAmount * ($partialPercent / 100), 2))
             : max(1, $totalAmount);
 
         $frontendBase = rtrim((string) config('app.frontend_url'), '/');
         $receiptToken = (string) $booking->receipt_token;
-        $successQuery = $paymentPlan === 'partial_30'
-            ? '?payment=success&payment_mode=partial_30'
+        $successQuery = $partialPercent !== null
+            ? '?payment=success&payment_mode='.rawurlencode($paymentPlan)
             : '?payment=success&payment_mode=full';
         $failureQuery = '?payment=failed';
 
@@ -986,6 +1003,71 @@ class BookingController extends Controller
         }
 
         $body = $response->json();
+
         return is_array($body) ? $body : [];
+    }
+
+    private function extractPartialPercentage(string $plan): ?int
+    {
+        if (preg_match('/^partial_([1-9]|[1-9][0-9])$/', $plan, $matches) !== 1) {
+            return null;
+        }
+
+        $percent = (int) ($matches[1] ?? 0);
+        if ($percent <= 0 || $percent >= 100) {
+            return null;
+        }
+
+        return $percent;
+    }
+
+    /**
+     * @return array{partial_payment_options: array<int>, allow_custom_partial_payment: bool}
+     */
+    private function paymentSettingsConfig(): array
+    {
+        $cached = Cache::get('payment_settings_config');
+        if (is_array($cached)) {
+            $options = collect($cached['partial_payment_options'] ?? [])
+                ->map(fn ($v): int => (int) $v)
+                ->filter(fn (int $v): bool => $v > 0 && $v < 100)
+                ->unique()
+                ->sort()
+                ->values()
+                ->all();
+
+            return [
+                'partial_payment_options' => $options !== [] ? $options : [30],
+                'allow_custom_partial_payment' => (bool) ($cached['allow_custom_partial_payment'] ?? false),
+            ];
+        }
+
+        $options = collect(explode(',', (string) env('PAYMENT_PARTIAL_OPTIONS', '10,20,30')))
+            ->map(fn (string $v): int => (int) trim($v))
+            ->filter(fn (int $v): bool => $v > 0 && $v < 100)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        return [
+            'partial_payment_options' => $options !== [] ? $options : [30],
+            'allow_custom_partial_payment' => filter_var(env('PAYMENT_PARTIAL_ALLOW_CUSTOM', false), FILTER_VALIDATE_BOOLEAN),
+        ];
+    }
+
+    private function isAllowedPartialPlan(string $plan): bool
+    {
+        $percent = $this->extractPartialPercentage($plan);
+        if ($percent === null) {
+            return false;
+        }
+
+        $settings = $this->paymentSettingsConfig();
+        if ($settings['allow_custom_partial_payment']) {
+            return true;
+        }
+
+        return in_array($percent, $settings['partial_payment_options'], true);
     }
 }
