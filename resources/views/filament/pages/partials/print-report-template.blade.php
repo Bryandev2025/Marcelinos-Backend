@@ -57,7 +57,7 @@ $foreignData (Collection: country, total)
     {{-- ===== REPORT HEADER WITH LOGO ===== --}}
     <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 3px solid #15803d;">
         <div style="flex-shrink: 0;">
-            <img src="{{ $logoSrc ?? asset('brand-logo.webp') }}" alt="Marcelinos Resort and Hotel" style="height: 64px; width: auto; display: block;" />
+            <img src="{{ $logoSrc ?? asset('brand-logo.webp') }}" alt="Marcelinos Resort Hotel" style="height: 64px; width: auto; display: block;" />
         </div>
         <div style="flex: 1; min-width: 0;">
             <div style="font-size: 10px; font-weight: 700; letter-spacing: 1.2px; color: #15803d; text-transform: uppercase; margin-bottom: 2px;">Tourism Demographics Report</div>
@@ -292,7 +292,7 @@ $foreignData (Collection: country, total)
         style="margin-top: 32px; padding-top: 12px; border-top: 2px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: #64748b;">
         <div style="display: flex; align-items: center; gap: 10px;">
             <img src="{{ $logoSrc ?? asset('brand-logo.webp') }}" alt="" style="height: 28px; width: auto;" aria-hidden="true" />
-            <span><strong style="color: #0f172a;">Marcelinos Resort and Hotel</strong> · Confidential</span>
+            <span><strong style="color: #0f172a;">Marcelinos Resort Hotel</strong> · Confidential</span>
         </div>
         <div style="text-align: right;">
             Printed {{ now()->format('F j, Y  g:i A') }} · System-generated report

@@ -22,7 +22,7 @@ class BookingActionOtp extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Marcelino\'s Resort and Hotel - '.$this->purposeLabel.' verification',
+            subject: 'Marcelino\'s Resort Hotel - '.$this->purposeLabel.' verification',
         );
     }
 
