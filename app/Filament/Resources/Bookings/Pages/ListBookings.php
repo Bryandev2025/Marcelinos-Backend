@@ -8,7 +8,9 @@ use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
+use Filament\Schemas\Components\Tabs\Tab;
 use JeffersonGoncalves\Filament\QrCodeField\Forms\Components\QrCodeInput;
+use Illuminate\Database\Eloquent\Builder;
 
 class ListBookings extends ListRecords
 {
@@ -85,6 +87,38 @@ class ListBookings extends ListRecords
                 ])
                 ->action(fn() => null),
         ];
+    }
+
+    public function getTabs(): array
+    {
+        $tabs = [
+            'all' => Tab::make('All')
+                ->badge(Booking::query()->count()),
+        ];
+
+        $statusOrder = [
+            Booking::STATUS_UNPAID,
+            Booking::STATUS_PARTIAL,
+            Booking::STATUS_PAID,
+            Booking::STATUS_OCCUPIED,
+            Booking::STATUS_COMPLETED,
+            Booking::STATUS_CANCELLED,
+            Booking::STATUS_RESCHEDULED,
+        ];
+
+        $statusOptions = Booking::statusOptions();
+
+        foreach ($statusOrder as $status) {
+            if (! array_key_exists($status, $statusOptions)) {
+                continue;
+            }
+
+            $tabs[$status] = Tab::make($statusOptions[$status])
+                ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('status', $status))
+                ->badge(Booking::query()->where('status', $status)->count());
+        }
+
+        return $tabs;
     }
 
     /**

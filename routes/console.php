@@ -79,6 +79,7 @@ Schedule::call(function (): void {
         ->where('created_at', '<', now()->subDays(60))
         ->delete();
 })
+    ->name('activity-log-retention-cleanup')
     ->daily()
     ->timezone($manila)
     ->withoutOverlapping();

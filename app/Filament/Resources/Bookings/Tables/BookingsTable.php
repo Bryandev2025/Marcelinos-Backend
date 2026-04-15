@@ -22,7 +22,6 @@ use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\ToggleButtons;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Utilities\Get;
@@ -43,9 +42,11 @@ class BookingsTable
         return $table
             ->recordAction('view')
             ->poll('10s')
+            ->striped()
             ->filtersFormColumns([
                 'default' => 1,
                 'sm' => 2,
+                'lg' => 3,
             ])
             ->filtersFormWidth(Width::TwoExtraLarge)
             ->filtersFormMaxHeight('min(75dvh, 32rem)')
@@ -446,16 +447,12 @@ class BookingsTable
                                     ->default(false)
                                     ->live(),
                             ]),
-                        ToggleButtons::make('month')
-                            ->label(fn (Get $get): string => 'Months ('.($get('year') ?? now()->year).')')
+                        Select::make('month')
+                            ->label(fn (Get $get): string => 'Month ('.($get('year') ?? now()->year).')')
                             ->options(self::monthButtonLabels())
                             ->default(now()->format('m'))
-                            ->inline(false)
-                            ->columns([
-                                'default' => 3,
-                                'sm' => 4,
-                                'md' => 6,
-                            ])
+                            ->native(false)
+                            ->searchable()
                             ->visible(fn (Get $get) => ! (bool) $get('use_custom')),
                         Grid::make([
                             'default' => 1,
@@ -503,6 +500,10 @@ class BookingsTable
                             $year = $data['year'] ?? null;
                             $month = $data['month'] ?? null;
                             if ($year !== null && $year !== '' && $month !== null && $month !== '') {
+                                if ((string) $month === 'all') {
+                                    return ["Year: {$year} (all months)"];
+                                }
+
                                 $label = Carbon::createFromDate((int) $year, (int) $month, 1)->format('F Y');
 
                                 return ["Month: {$label}"];
@@ -642,6 +643,7 @@ class BookingsTable
     private static function monthButtonLabels(): array
     {
         return [
+            'all' => 'All',
             '01' => 'January',
             '02' => 'February',
             '03' => 'March',
@@ -666,6 +668,12 @@ class BookingsTable
             $month = $data['month'] ?? null;
 
             if ($year !== null && $year !== '' && $month !== null && $month !== '') {
+                if ((string) $month === 'all') {
+                    $carbon = Carbon::createFromDate((int) $year, 1, 1)->startOfYear();
+
+                    return [$carbon->copy(), $carbon->copy()->endOfYear()];
+                }
+
                 $carbon = Carbon::createFromDate((int) $year, (int) $month, 1)->startOfMonth();
 
                 return [$carbon->copy(), $carbon->copy()->endOfMonth()];
