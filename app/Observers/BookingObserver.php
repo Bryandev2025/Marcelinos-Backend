@@ -10,6 +10,7 @@ use App\Models\Booking;
 use App\Models\User;
 use App\Notifications\Slack\BookingLifecycleSlackNotification;
 use App\Support\ActivityLogger;
+use App\Support\BookingDoubleBookAlert;
 use App\Support\SlackBookingAlerts;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
@@ -96,6 +97,8 @@ class BookingObserver
         );
 
         SlackBookingAlerts::notify(new BookingLifecycleSlackNotification($booking, 'created'));
+
+        BookingDoubleBookAlert::scheduleCheckAfterSave($booking);
     }
 
     public function updated(Booking $booking): void
@@ -219,6 +222,8 @@ class BookingObserver
             $booking,
             'updated'
         );
+
+        BookingDoubleBookAlert::scheduleCheckAfterSave($booking);
     }
 
     private function collectBookingChanges(Booking $booking): array
