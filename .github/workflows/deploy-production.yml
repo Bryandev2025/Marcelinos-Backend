@@ -3,7 +3,7 @@ name: Deploy to Hostinger (Production)
 on:
   push:
     branches:
-      - production
+      - staging
 
 concurrency:
   group: deploy-production
