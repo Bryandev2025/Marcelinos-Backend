@@ -290,6 +290,8 @@ class BookingObserver
             $booking,
             'deleted'
         );
+
+        SlackBookingAlerts::notify(new BookingLifecycleSlackNotification($booking, 'deleted'));
     }
 
     private function safeBroadcast(callable $dispatch, string $eventName, Booking $booking, string $action): void
