@@ -217,10 +217,16 @@ class RoomCalendar extends Page
         $monthStart = Carbon::create(year: $this->year, month: $this->month, day: 1)->startOfDay();
         $monthEnd = $monthStart->copy()->endOfMonth()->endOfDay();
 
+        $isVenueMode = $this->inventory === self::INVENTORY_VENUES;
+
         $bookings = Booking::query()
             ->whereNotIn('status', [Booking::STATUS_CANCELLED])
             ->where('check_in', '<=', $monthEnd)
-            ->where('check_out', '>', $monthStart)
+            ->when(
+                $isVenueMode,
+                fn ($q) => $q->where('check_out', '>=', $monthStart),
+                fn ($q) => $q->where('check_out', '>', $monthStart),
+            )
             ->with(['rooms:id,type', 'roomLines', 'venues:id,name'])
             ->get();
 
@@ -234,14 +240,20 @@ class RoomCalendar extends Page
                 continue;
             }
 
-            $firstNight = $booking->check_in->copy()->startOfDay();
-            $lastNight = $booking->check_out->copy()->startOfDay()->subDay();
-            if ($lastNight->lt($firstNight)) {
+            $startDay = $booking->check_in->copy()->startOfDay();
+            $endDay = $booking->check_out->copy()->startOfDay();
+
+            // Rooms use lodging nights (checkout day excluded); venues use inclusive event dates.
+            if (! $isVenueMode) {
+                $endDay->subDay();
+            }
+
+            if ($endDay->lt($startDay)) {
                 continue;
             }
 
-            $from = $firstNight->max($monthStart);
-            $endDay = $lastNight->min($monthStart->copy()->endOfMonth()->startOfDay());
+            $from = $startDay->max($monthStart);
+            $endDay = $endDay->min($monthStart->copy()->endOfMonth()->startOfDay());
 
             $day = $from->copy();
             while ($day->lte($endDay)) {
@@ -338,7 +350,11 @@ class RoomCalendar extends Page
         $date = Carbon::parse($this->modalDate);
 
         return Booking::query()
-            ->overlappingLodgingNight($date)
+            ->when(
+                $this->inventory === self::INVENTORY_VENUES,
+                fn ($q) => $q->overlappingDate($date),
+                fn ($q) => $q->overlappingLodgingNight($date),
+            )
             ->where(function ($q) {
                 $type = $this->modalType;
                 if ($this->inventory === self::INVENTORY_VENUES) {
