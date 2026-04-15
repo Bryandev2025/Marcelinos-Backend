@@ -6,7 +6,7 @@ on:
       - staging
 
 concurrency:
-  group: deploy-production
+  group: deploy-staging
   cancel-in-progress: true
 
 jobs:
@@ -39,8 +39,8 @@ jobs:
             fi
 
             git fetch --all
-            git checkout production
-            git pull origin production
+            git checkout staging
+            git pull origin staging
             composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev
             php artisan migrate --force
             php artisan optimize:clear
