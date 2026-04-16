@@ -92,6 +92,27 @@
     stroke: currentColor;
 }
 
+/* Shared panel polish: cleaner surfaces and spacing */
+.fi-section,
+.fi-ta,
+.fi-wi-stats-overview-stat {
+    border-radius: 0.9rem;
+}
+
+.fi-section {
+    border-color: rgba(148, 163, 184, 0.28);
+}
+
+.dark .fi-section {
+    border-color: rgba(71, 85, 105, 0.55);
+}
+
+.fi-input,
+.fi-select-input,
+.fi-textarea {
+    border-radius: 0.75rem;
+}
+
 /* Make ToggleButtons behave like real “selected pills”. */
 .fi-fo-toggle-buttons input:not(:checked)+label.fi-btn {
     background-color: transparent !important;

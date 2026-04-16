@@ -97,6 +97,11 @@ class Settings extends Page
 
     public string $partialPaymentOptions = '10,20,30';
 
+    /**
+     * @var array<int>
+     */
+    public array $partialPaymentSelection = [10, 20, 30];
+
     public bool $allowCustomPartialPayment = false;
 
     public string $xenditSecretKey = '';
@@ -307,14 +312,15 @@ class Settings extends Page
 
         $this->validate([
             'onlinePaymentEnabled' => ['required', 'boolean'],
-            'partialPaymentOptions' => ['nullable', 'string', 'max:255'],
+            'partialPaymentSelection' => ['required', 'array', 'min:1'],
+            'partialPaymentSelection.*' => ['integer', Rule::in($this->availablePartialPaymentOptions())],
             'allowCustomPartialPayment' => ['required', 'boolean'],
             'xenditSecretKey' => ['nullable', 'string', 'max:255'],
             'xenditPublicKey' => ['nullable', 'string', 'max:255'],
             'xenditWebhookToken' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $normalizedPartialOptions = $this->normalizePartialPaymentOptions($this->partialPaymentOptions);
+        $normalizedPartialOptions = $this->normalizePartialPaymentSelection($this->partialPaymentSelection);
 
         EnvEditor::updateMany([
             'PAYMENT_ONLINE_ENABLED' => $this->onlinePaymentEnabled ? 'true' : 'false',
@@ -332,6 +338,7 @@ class Settings extends Page
         ]);
 
         $this->partialPaymentOptions = implode(',', $normalizedPartialOptions);
+        $this->partialPaymentSelection = $normalizedPartialOptions;
 
         $this->editingPayment = false;
 
@@ -599,6 +606,7 @@ class Settings extends Page
         $this->maintenanceEta = (string) env('MAINTENANCE_MODE_ETA', '');
         $this->onlinePaymentEnabled = filter_var(env('PAYMENT_ONLINE_ENABLED', false), FILTER_VALIDATE_BOOLEAN);
         $this->partialPaymentOptions = (string) env('PAYMENT_PARTIAL_OPTIONS', '10,20,30');
+        $this->partialPaymentSelection = $this->normalizePartialPaymentOptions($this->partialPaymentOptions);
         $this->allowCustomPartialPayment = filter_var(env('PAYMENT_PARTIAL_ALLOW_CUSTOM', false), FILTER_VALIDATE_BOOLEAN);
         $this->xenditSecretKey = (string) env('XENDIT_SECRET_KEY', '');
         $this->xenditPublicKey = (string) env('XENDIT_PUBLIC_KEY', '');
@@ -808,5 +816,32 @@ class Settings extends Page
             ->all();
 
         return $values !== [] ? $values : [30];
+    }
+
+    /**
+     * @param  array<mixed>  $raw
+     * @return array<int>
+     */
+    private function normalizePartialPaymentSelection(array $raw): array
+    {
+        $allowed = $this->availablePartialPaymentOptions();
+
+        $values = collect($raw)
+            ->map(fn ($v): int => (int) $v)
+            ->filter(fn (int $v): bool => in_array($v, $allowed, true))
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+
+        return $values !== [] ? $values : [30];
+    }
+
+    /**
+     * @return array<int>
+     */
+    private function availablePartialPaymentOptions(): array
+    {
+        return [10, 20, 30, 40, 50, 60, 70, 80, 90];
     }
 }

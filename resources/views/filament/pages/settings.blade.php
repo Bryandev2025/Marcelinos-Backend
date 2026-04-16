@@ -67,131 +67,71 @@
 
     <style>
         .premium-settings {
-            --surface: #ffffff;
-            --surface-muted: #f8fafc;
-            --surface-hover: #f8fafc;
-            --border-color: #e2e8f0;
-            --text-main: #0f172a;
-            --text-muted: #64748b;
-            --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-            --shadow-elevated: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-        }
-        .dark .premium-settings {
-            --surface: rgba(15, 23, 42, 0.6);
-            --surface-muted: rgba(30, 41, 59, 0.65);
-            --surface-hover: rgba(30, 41, 59, 0.8);
-            --border-color: rgba(51, 65, 85, 0.6);
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
-            --shadow-elevated: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+            color: inherit;
         }
 
+        .page-hero-card,
         .premium-card {
-            background: var(--surface);
-            border: 1px solid var(--border-color);
-            border-radius: 1.5rem;
-            box-shadow: var(--shadow-sm);
-            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-            position: relative;
-            overflow: hidden;
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-        }
-        .premium-card::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%);
-            opacity: 0;
-            transition: opacity 0.4s ease;
-            pointer-events: none;
-            z-index: 1;
-        }
-        .premium-card:hover {
-            transform: translateY(-4px);
-            box-shadow: var(--shadow-elevated);
-            border-color: rgba(99, 102, 241, 0.3);
-        }
-        .premium-card:hover::before {
-            opacity: 1;
+            background: rgb(255 255 255 / 1);
+            border: 1px solid rgb(226 232 240 / 1);
+            border-radius: 0.75rem;
+            box-shadow: 0 1px 2px rgb(15 23 42 / 0.06);
         }
 
-        @media (hover: none) and (pointer: coarse) {
-            .premium-card:hover {
-                transform: none;
-                box-shadow: var(--shadow-sm);
-                border-color: var(--border-color);
-            }
+        .dark .page-hero-card,
+        .dark .premium-card {
+            background: rgb(15 23 42 / 1);
+            border-color: rgb(51 65 85 / 0.7);
         }
-        
-        .pulse-indicator {
-            position: relative;
-            display: inline-flex;
-            height: 10px;
-            width: 10px;
-            border-radius: 50%;
-        }
-        .pulse-indicator::after {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            border-radius: 50%;
-            border: 1.5px solid currentColor;
-            animation: pulse-ring 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-        @keyframes pulse-ring {
-            0% { transform: scale(1); opacity: 1; border-width: 2px; }
-            100% { transform: scale(3.5); opacity: 0; border-width: 0; }
+
+        .section-shell {
+            border-top: 3px solid rgb(131 160 112 / 0.45);
         }
 
         .premium-input {
             width: 100%;
-            border-radius: 1rem;
-            border: 1px solid var(--border-color);
-            background: var(--surface-muted);
-            padding: 0.75rem 1.25rem;
-            font-size: 0.95rem;
-            color: var(--text-main);
-            transition: all 0.25s ease;
-            backdrop-filter: blur(8px);
+            border: 1px solid rgb(203 213 225 / 1);
+            border-radius: 0.625rem;
+            background: rgb(255 255 255 / 1);
+            color: inherit;
+            padding: 0.625rem 0.875rem;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
         }
+
+        .dark .premium-input {
+            border-color: rgb(71 85 105 / 0.75);
+            background: rgb(15 23 42 / 1);
+        }
+
         .premium-input:focus {
             outline: none;
-            border-color: #6366f1;
-            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
-            background: var(--surface);
-            transform: translateY(-1px);
+            border-color: rgb(131 160 112 / 1);
+            box-shadow: 0 0 0 3px rgb(131 160 112 / 0.2);
         }
+
         .premium-input:disabled {
-            opacity: 0.6;
+            opacity: 0.75;
             cursor: not-allowed;
-            background: var(--surface-hover);
         }
 
-        .glass-header-card {
-            background: linear-gradient(135deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.4) 100%);
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
-            border: 1px solid rgba(255,255,255,0.3);
-            border-radius: 1.5rem;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.05);
-        }
-        .dark .glass-header-card {
-            background: linear-gradient(135deg, rgba(30,41,59,0.7) 0%, rgba(15,23,42,0.4) 100%);
-            border: 1px solid rgba(255,255,255,0.08);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        .pulse-indicator {
+            display: inline-flex;
+            width: 0.5rem;
+            height: 0.5rem;
+            border-radius: 9999px;
         }
 
-        .glass-tabs {
+        .settings-tabs {
             scrollbar-width: none;
         }
-        .glass-tabs::-webkit-scrollbar {
+
+        .settings-tabs::-webkit-scrollbar {
             display: none;
         }
-        
+
         .progress-bar-animated {
-            transition: width 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transition: width 0.3s ease;
         }
     </style>
 
@@ -199,26 +139,22 @@
         <div class="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 space-y-6 pb-10 sm:pb-12">
         
         <!-- Hero Header Area -->
-        <div class="glass-header-card p-5 sm:p-7 lg:p-10 relative overflow-hidden">
-            <!-- Background Decorations -->
-            <div class="absolute -top-32 -right-32 w-96 h-96 bg-indigo-500/20 dark:bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
-            <div class="absolute -bottom-32 -left-32 w-96 h-96 bg-emerald-500/20 dark:bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
-            
-            <div class="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <div class="page-hero-card section-shell p-5 sm:p-7 lg:p-8">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                 <div>
-                    <h1 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-gray-900 dark:text-white flex items-center gap-4">
-                        <div class="p-3 bg-indigo-100 dark:bg-indigo-500/20 rounded-2xl text-indigo-600 dark:text-indigo-400">
-                            <x-filament::icon icon="heroicon-m-adjustments-horizontal" class="h-8 w-8" />
+                    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-3">
+                        <div class="p-2.5 bg-[#83A070]/15 dark:bg-[#83A070]/20 rounded-xl text-[#618753] dark:text-[#9bb78b]">
+                            <x-filament::icon icon="heroicon-m-adjustments-horizontal" class="h-7 w-7" />
                         </div>
                         Platform Settings
                     </h1>
                     <p class="mt-3 text-sm sm:text-base text-gray-600 dark:text-gray-400 max-w-2xl leading-relaxed">
-                        Control your core infrastructure. Manage gateway configurations, monitor API health limits, and dictate payment flows from a centralized operations hub.
+                        Manage infrastructure, delivery channels, maintenance messaging, and payments in one professional control center.
                     </p>
                 </div>
                 
                 <div class="flex flex-col gap-3 w-full sm:w-auto sm:min-w-[240px] min-w-0">
-                    <div class="premium-card p-4 rounded-xl flex items-center justify-between !shadow-none ring-1 ring-gray-900/5 dark:ring-white/10">
+                    <div class="premium-card p-4 rounded-xl flex items-center justify-between">
                         <div>
                             <p class="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-1">Status Overview</p>
                             @if ($emailOnline && $smsOnline)
@@ -233,7 +169,7 @@
                                 </div>
                             @endif
                         </div>
-                        <x-filament::button size="sm" color="gray" wire:click="refreshHealth" icon="heroicon-m-arrow-path" class="!rounded-lg tooltip-trigger" title="Force Refresh Status">
+                        <x-filament::button size="sm" color="gray" wire:click="refreshHealth" icon="heroicon-m-arrow-path" class="!rounded-lg" title="Force Refresh Status">
                             Refresh
                         </x-filament::button>
                     </div>
@@ -242,13 +178,12 @@
         </div>
 
         <!-- Horizontal Tabs Row -->
-        <div class="w-full overflow-x-auto glass-tabs pb-2 -mx-4 sm:mx-0">
-            <nav class="flex gap-2 bg-gray-50/80 dark:bg-gray-800/60 p-1.5 rounded-2xl border border-gray-200/80 dark:border-gray-700/80 backdrop-blur-md w-max min-w-full sm:w-full sm:flex-wrap sm:justify-start px-4 sm:px-1.5">
+        <div class="w-full overflow-x-auto settings-tabs pb-2 -mx-4 sm:mx-0">
+            <nav class="flex gap-2 bg-white dark:bg-slate-900 p-1.5 rounded-xl border border-gray-200 dark:border-slate-700 w-max min-w-full sm:w-full sm:flex-wrap sm:justify-start px-4 sm:px-1.5 shadow-sm">
                 @foreach ($tabMeta as $tabKey => $tabInfo)
                     <button type="button"
                         wire:click="setTab('{{ $tabKey }}')"
-                        class="flex-shrink-0 whitespace-nowrap flex items-center gap-2.5 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl font-semibold text-sm transition-all duration-300 {{ $this->activeTab === $tabKey ? $tabInfo['bg'] . ' ' . $tabInfo['color'] . ' shadow-sm ring-1 ring-gray-900/5 dark:ring-white/10 scale-100' : 'text-gray-500 hover:text-gray-900 hover:bg-white dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700/50' }}"
-                        style="{{ $this->activeTab === $tabKey ? 'box-shadow: 0 4px 14px ' . $tabInfo['active_glow'] . ';' : '' }}">
+                        class="flex-shrink-0 whitespace-nowrap flex items-center gap-2.5 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-semibold text-sm transition-all duration-200 {{ $this->activeTab === $tabKey ? 'bg-[#83A070]/15 text-[#618753] dark:bg-[#83A070]/20 dark:text-[#b4cca7] border border-[#83A070]/40' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700/50 border border-transparent' }}">
                         <x-filament::icon :icon="$tabInfo['icon']" class="h-5 w-5" />
                         {{ $tabInfo['label'] }}
                     </button>
@@ -262,15 +197,12 @@
             @if (count($this->alerts) > 0)
                 <div class="space-y-4 mb-8">
                     @foreach ($this->alerts as $alert)
-                        <div class="group relative overflow-hidden rounded-2xl p-5 flex items-start gap-5 border shadow-sm transition-all hover:shadow-md
+                        <div class="rounded-xl p-4 flex items-start gap-4 border shadow-sm
                             {{ $alert['level'] === 'danger' ? 'border-rose-200 bg-rose-50 dark:border-rose-500/20 dark:bg-rose-500/10' : 'border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10' }}">
-                            <div class="absolute right-0 top-0 opacity-5 group-hover:opacity-10 transition-opacity">
-                                <x-filament::icon :icon="$alert['level'] === 'danger' ? 'heroicon-s-exclamation-circle' : 'heroicon-s-exclamation-triangle'" class="h-32 w-32 -mt-4 -mr-4" />
-                            </div>
                             <div class="flex-shrink-0 mt-0.5 p-2 rounded-full {{ $alert['level'] === 'danger' ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400' : 'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400' }}">
                                 <x-filament::icon :icon="$alert['level'] === 'danger' ? 'heroicon-m-exclamation-circle' : 'heroicon-m-exclamation-triangle'" class="h-6 w-6" />
                             </div>
-                            <div class="relative z-10 flex-1">
+                            <div class="flex-1">
                                 <h3 class="text-base font-bold tracking-tight {{ $alert['level'] === 'danger' ? 'text-rose-900 dark:text-rose-300' : 'text-amber-900 dark:text-amber-300' }}">{{ $alert['title'] }}</h3>
                                 <div class="mt-1 text-sm font-medium {{ $alert['level'] === 'danger' ? 'text-rose-700 dark:text-rose-400' : 'text-amber-700 dark:text-amber-400' }}">{{ $alert['detail'] }}</div>
                             </div>
@@ -279,7 +211,7 @@
                 </div>
             @endif
 
-            <div class="animate-fade-in-up">
+            <div>
                 <!-- Section Header -->
                 <div class="mb-6 flex flex-col md:flex-row md:items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-4 gap-4">
                     <div>
@@ -314,7 +246,7 @@
                                     <span class="text-sm font-medium text-gray-500 dark:text-gray-400">out of {{ number_format($emailLimit) }} limit</span>
                                 </div>
                                 <div class="h-3 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                    <div class="progress-bar-animated h-full rounded-full {{ $emailPercent > 85 ? 'bg-gradient-to-r from-rose-400 to-rose-600' : 'bg-gradient-to-r from-emerald-400 to-emerald-600' }}" 
+                                    <div class="progress-bar-animated h-full rounded-full {{ $emailPercent > 85 ? 'bg-rose-500' : 'bg-emerald-500' }}"
                                          style="width: {{ $emailPercent }}%"></div>
                                 </div>
                                 <p class="mt-2 text-[11px] font-bold uppercase tracking-widest {{ $emailPercent > 85 ? 'text-rose-600 dark:text-rose-400' : 'text-gray-500 dark:text-gray-400' }}">
@@ -336,7 +268,7 @@
                             <dt class="text-sm font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-1">SMS Gateway Status</dt>
                             
                             <div class="mt-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-100 dark:border-gray-800 flex flex-col justify-center gap-1 h-[104px]">
-                                <span class="text-3xl font-extrabold text-gray-900 dark:text-white bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-indigo-600 dark:from-purple-400 dark:to-indigo-400">
+                                <span class="text-3xl font-bold text-gray-900 dark:text-white">
                                     {{ $this->smsCredits !== null ? number_format($this->smsCredits, 2) : 'N/A' }}
                                 </span>
                                 <span class="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Available Credits</span>
@@ -392,7 +324,7 @@
                                         Ping Semaphore
                                     </x-filament::button>
                                 </div>
-                                <p wire:loading wire:target="sendTestEmail,testSmsConnectivity" class="text-xs font-bold text-center text-emerald-600 dark:text-emerald-400 mt-2 animate-pulse w-full">
+                                <p wire:loading wire:target="sendTestEmail,testSmsConnectivity" class="text-xs font-semibold text-center text-emerald-600 dark:text-emerald-400 mt-2 w-full">
                                     Executing Request...
                                 </p>
                             </div>
@@ -678,12 +610,11 @@
 
                         @if (! $this->editingPayment)
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div class="p-5 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/80 dark:to-gray-900 border border-gray-200 dark:border-gray-700/50 shadow-sm">
+                                <div class="p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 shadow-sm">
                                     <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">Checkout Status</p>
                                     <div class="flex items-center gap-3">
                                         <span class="relative flex h-4 w-4">
                                           @if($this->onlinePaymentEnabled)
-                                              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                                               <span class="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-white dark:border-gray-900"></span>
                                           @else
                                               <span class="relative inline-flex rounded-full h-4 w-4 bg-gray-400 border-2 border-white dark:border-gray-900"></span>
@@ -693,7 +624,7 @@
                                     </div>
                                 </div>
 
-                                <div class="p-5 rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800/80 dark:to-gray-900 border border-gray-200 dark:border-gray-700/50 shadow-sm">
+                                <div class="p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 shadow-sm">
                                     <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-3">Deposit Structure</p>
                                     <div class="flex items-center gap-2 flex-wrap">
                                         @foreach(explode(',', $this->partialPaymentOptions) as $opt)
@@ -726,22 +657,25 @@
 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 dark:bg-gray-800/40 p-6 rounded-2xl border border-gray-100 dark:border-gray-800">
                                     <div>
-                                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Partial Options (CSV)</label>
-                                        <div class="relative">
-                                            <input type="text" wire:model.defer="partialPaymentOptions" class="premium-input pl-10 tracking-widest font-mono" placeholder="10, 20, 30" />
-                                            <x-filament::icon icon="heroicon-m-bars-3-bottom-left" class="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                                        </div>
+                                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Partial Payment Percentages</label>
+                                        <select wire:model.defer="partialPaymentSelection" multiple class="premium-input min-h-[10rem]">
+                                            @foreach ([10, 20, 30, 40, 50, 60, 70, 80, 90] as $option)
+                                                <option value="{{ $option }}">{{ $option }}%</option>
+                                            @endforeach
+                                        </select>
+                                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                            Hold Ctrl/Cmd to select multiple options. Full payment (100%) is intentionally excluded.
+                                        </p>
                                     </div>
                                     
                                     <div class="flex items-center mt-3 md:mt-0">
-                                        <label class="flex items-center gap-3 cursor-pointer">
-                                            <div class="relative flex items-center">
-                                                <input type="checkbox" wire:model.defer="allowCustomPartialPayment" class="peer h-5 w-5 cursor-pointer transition-all appearance-none rounded shadow hover:shadow-md border border-gray-300 checked:bg-indigo-600 checked:border-indigo-600" />
-                                                <span class="absolute text-white opacity-0 peer-checked:opacity-100 top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" stroke="currentColor" stroke-width="1"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
-                                                </span>
-                                            </div>
-                                            <span class="text-sm font-bold text-gray-700 dark:text-gray-200">Allow Custom Deposit Inputs</span>
+                                        <label class="inline-flex items-center gap-3 cursor-pointer select-none">
+                                            <input
+                                                type="checkbox"
+                                                wire:model.live="allowCustomPartialPayment"
+                                                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800"
+                                            />
+                                            <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">Allow Custom Deposit Inputs</span>
                                         </label>
                                     </div>
                                 </div>
@@ -768,9 +702,8 @@
                         @endif
 
                         <!-- Diagnostics Log section -->
-                        <div class="mt-10 rounded-2xl border border-sky-200/60 bg-gradient-to-br from-sky-50 dark:from-sky-900/10 to-transparent p-6 shadow-sm overflow-hidden relative">
-                            <div class="absolute right-0 top-0 w-32 h-32 bg-sky-500/5 rotate-45 transform origin-top-right"></div>
-                            <div class="flex sm:items-center flex-col sm:flex-row justify-between gap-4 mb-6 relative z-10">
+                        <div class="mt-10 rounded-2xl border border-sky-200/60 bg-sky-50/60 dark:bg-sky-900/10 p-6 shadow-sm overflow-hidden relative">
+                            <div class="flex sm:items-center flex-col sm:flex-row justify-between gap-4 mb-6">
                                 <div>
                                     <h4 class="text-base font-extrabold text-sky-900 dark:text-sky-300 flex items-center gap-2">
                                         <x-filament::icon icon="heroicon-m-code-bracket-square" class="h-5 w-5" />
@@ -782,7 +715,7 @@
                             </div>
 
                             @if ($this->lastXenditWebhookEvent)
-                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 relative z-10">
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                                     <div class="bg-white/60 dark:bg-gray-900/50 p-3 rounded-xl border border-white/50 dark:border-gray-800">
                                         <p class="text-[10px] font-bold uppercase text-gray-400">Time Delta</p>
                                         <p class="text-sm font-bold text-gray-900 dark:text-white mt-1">{{ $this->lastXenditWebhookEvent['received_at'] ?? '—' }}</p>
@@ -820,7 +753,7 @@
                                     </div>
                                 </div>
                             @else
-                                <div class="text-center p-8 border border-dashed border-sky-300 dark:border-sky-700/50 rounded-2xl relative z-10">
+                                <div class="text-center p-8 border border-dashed border-sky-300 dark:border-sky-700/50 rounded-2xl">
                                     <x-filament::icon icon="heroicon-o-inbox" class="h-10 w-10 text-sky-300 dark:text-sky-700 mx-auto mb-3" />
                                     <p class="text-sm font-bold tracking-wide text-sky-800/60 dark:text-sky-300/60">Awaiting Submissions...</p>
                                     <p class="text-xs text-sky-600/50 dark:text-sky-400/50 mt-1">Telemetry will display when the gateway triggers an event.</p>
