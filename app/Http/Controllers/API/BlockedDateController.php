@@ -8,6 +8,8 @@ use App\Models\Booking;
 use App\Models\Room;
 use App\Models\Venue;
 use App\Support\ApiResponse;
+use App\Support\RoomInventoryGroupAvailability;
+use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
 
@@ -19,7 +21,7 @@ class BlockedDateController extends Controller
      * - Manually blocked dates from BlockedDate table
      * - Dates where all rooms or all venues are fully booked
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         $today = Carbon::today()->toDateString();
         $blockedDates = collect();
@@ -45,6 +47,78 @@ class BlockedDateController extends Controller
             ->unique(fn($d) => $d['date'])
             ->sortBy('date')
             ->values();
+
+        // 3. Booking-specific conflicts for reschedule calendar
+        $reference = $request->query('booking_reference');
+        if ($reference) {
+            $booking = Booking::with(['roomLines', 'venues'])
+                ->where('reference_number', $reference)
+                ->first();
+
+            if ($booking) {
+                $todayCarbon = Carbon::today();
+                $horizonEnd = $todayCarbon->copy()->addDays(365);
+                $bookingConflictedDates = [];
+
+                $venueIds = $booking->venues->pluck('id')->all();
+                $otherVenueBookings = collect();
+                if (! empty($venueIds)) {
+                    $otherVenueBookings = Booking::query()
+                        ->with('venues:id')
+                        ->where('id', '!=', $booking->id)
+                        ->where('status', '!=', Booking::STATUS_CANCELLED)
+                        ->where('check_in', '<', $horizonEnd)
+                        ->where('check_out', '>', $todayCarbon)
+                        ->whereHas('venues', fn($q) => $q->whereIn('venues.id', $venueIds))
+                        ->get(['id', 'check_in', 'check_out']);
+                }
+
+                for ($i = 0; $i < 365; $i++) {
+                    $dayStart = $todayCarbon->copy()->addDays($i)->startOfDay();
+                    $dayEnd = $dayStart->copy()->addDay();
+                    $hasConflict = false;
+
+                    foreach ($booking->roomLines as $line) {
+                        $remaining = RoomInventoryGroupAvailability::remainingForLine(
+                            $line->room_type,
+                            $line->inventory_group_key,
+                            $dayStart,
+                            $dayEnd,
+                            $booking->id,
+                        );
+
+                        if ($remaining < (int) $line->quantity) {
+                            $hasConflict = true;
+                            break;
+                        }
+                    }
+
+                    if (! $hasConflict && $otherVenueBookings->isNotEmpty()) {
+                        foreach ($otherVenueBookings as $other) {
+                            $otherStart = Carbon::parse($other->check_in);
+                            $otherEnd = Carbon::parse($other->check_out);
+                            if ($otherStart->lt($dayEnd) && $otherEnd->gt($dayStart)) {
+                                $hasConflict = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if ($hasConflict) {
+                        $bookingConflictedDates[] = [
+                            'date' => $dayStart->toDateString(),
+                            'reason' => 'Fully booked',
+                        ];
+                    }
+                }
+
+                $blockedDates = $blockedDates
+                    ->merge($bookingConflictedDates)
+                    ->unique(fn($d) => $d['date'])
+                    ->sortBy('date')
+                    ->values();
+            }
+        }
 
         return ApiResponse::success($blockedDates->all());
     }
