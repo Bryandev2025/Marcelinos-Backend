@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Support\PsgcApi;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Http\Request;
 
 class Guest extends Model
 {
@@ -96,7 +98,10 @@ class Guest extends Model
 
     public static function store($request)
     {
-        $validated = $request->validate([
+        $source = $request instanceof Request ? $request->all() : (array) $request;
+        $normalized = self::normalizeGuestPayload($source);
+
+        $validated = validator($normalized, [
             'first_name' => 'required|string|max:100',
             'middle_name' => 'nullable|string|max:100',
             'last_name' => 'required|string|max:100',
@@ -109,8 +114,108 @@ class Guest extends Model
             'province' => 'nullable|string|max:100',
             'municipality' => 'nullable|string|max:100',
             'barangay' => 'nullable|string|max:100',
-        ]);
+        ])->validate();
+
+        if (! $validated['is_international']) {
+            $validated['country'] = 'Philippines';
+        }
 
         return self::create($validated);
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @return array<string, mixed>
+     */
+    private static function normalizeGuestPayload(array $input): array
+    {
+        $nested = [];
+        foreach (['guest', 'guest_details', 'guestDetail', 'guest_info'] as $key) {
+            if (isset($input[$key]) && is_array($input[$key])) {
+                $nested = $input[$key];
+                break;
+            }
+        }
+
+        $data = array_merge($input, $nested);
+        $isInternational = self::toBoolean($data['is_international'] ?? $data['international'] ?? false);
+
+        $regionCode = self::readString($data, ['ph_region_code', 'region_code']);
+        $provinceCode = self::readString($data, ['ph_province_code', 'province_code']);
+        $municipalityCode = self::readString($data, ['ph_municipality_code', 'municipality_code', 'city_code']);
+        $barangayCode = self::readString($data, ['ph_barangay_code', 'barangay_code', 'baranggay_code']);
+
+        $region = self::readString($data, ['region']);
+        if ($region === null && $regionCode !== null) {
+            $region = PsgcApi::regionOptions()[$regionCode] ?? null;
+        }
+
+        $province = self::readString($data, ['province']);
+        if ($province === null && $provinceCode !== null && $regionCode !== null) {
+            $province = PsgcApi::provinceOptions($regionCode)[$provinceCode] ?? null;
+        }
+
+        $municipality = self::readString($data, ['municipality', 'city', 'municipality_city']);
+        if ($municipality === null && $municipalityCode !== null) {
+            $municipality = PsgcApi::municipalityOptions($regionCode, $provinceCode)[$municipalityCode] ?? null;
+        }
+
+        $barangay = self::readString($data, ['barangay', 'baranggay']);
+        if ($barangay === null && $barangayCode !== null && $municipalityCode !== null) {
+            $barangay = PsgcApi::barangayOptions($municipalityCode)[$barangayCode] ?? null;
+        }
+
+        return [
+            'first_name' => self::readString($data, ['first_name']),
+            'middle_name' => self::readString($data, ['middle_name']),
+            'last_name' => self::readString($data, ['last_name']),
+            'email' => self::readString($data, ['email']),
+            'contact_num' => self::readString($data, ['contact_num', 'contact_number', 'phone']),
+            'gender' => self::readString($data, ['gender']),
+            'is_international' => $isInternational,
+            'country' => self::readString($data, ['country']),
+            'region' => $isInternational ? null : $region,
+            'province' => $isInternational ? null : $province,
+            'municipality' => $isInternational ? null : $municipality,
+            'barangay' => $isInternational ? null : $barangay,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array<int, string>  $keys
+     */
+    private static function readString(array $data, array $keys): ?string
+    {
+        foreach ($keys as $key) {
+            if (! array_key_exists($key, $data)) {
+                continue;
+            }
+
+            if ($data[$key] === null) {
+                return null;
+            }
+
+            $value = trim((string) $data[$key]);
+
+            return $value !== '' ? $value : null;
+        }
+
+        return null;
+    }
+
+    private static function toBoolean(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_int($value)) {
+            return $value === 1;
+        }
+
+        $normalized = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+
+        return $normalized ?? false;
     }
 }
