@@ -10,7 +10,7 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
-use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Filters\TrashedFilter;
@@ -26,10 +26,10 @@ class RoomsTable
             ->recordUrl(fn ($record) => RoomResource::getUrl('view', ['record' => $record]))
             ->columns([
                 // ✅ Featured Image
-                SpatieMediaLibraryImageColumn::make('featured_image')
+                ImageColumn::make('featured_image')
                     ->label('Featured')
                     ->circular()
-                    ->collection('featured'),
+                    ->getStateUsing(fn (Room $record) => $record->featured_image_url),
 
                 TextColumn::make('name')
                     ->searchable()

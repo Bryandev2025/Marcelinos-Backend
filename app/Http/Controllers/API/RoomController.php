@@ -59,7 +59,7 @@ class RoomController extends Controller
                 }
             }
 
-            $query = Room::with(['amenities', 'media', 'bedSpecifications'])
+            $query = Room::with(['amenities', 'media', 'bedSpecifications.media'])
                 ->orderByRaw("FIELD(type, 'standard', 'family', 'deluxe')");
             $checkIn = null;
             $checkOut = null;
@@ -199,7 +199,7 @@ class RoomController extends Controller
     public function show(Request $request, $id): JsonResponse
     {
         try {
-            $room = Room::with(['amenities', 'media', 'bedSpecifications'])->findOrFail($id);
+            $room = Room::with(['amenities', 'media', 'bedSpecifications.media'])->findOrFail($id);
             $data = (new RoomResource($room))->resolve();
 
             $checkInQuery = $request->query('check_in');

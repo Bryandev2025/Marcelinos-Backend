@@ -174,6 +174,11 @@ class Room extends Model implements HasMedia
 
     public function getFeaturedImageUrlAttribute(): ?string
     {
+        $primaryBedSpec = $this->primaryBedSpecification();
+        if ($primaryBedSpec?->featured_image_url) {
+            return $primaryBedSpec->featured_image_url;
+        }
+
         $media = $this->getFirstMedia('featured');
 
         return $media ? $this->resolveMediaUrl($media, 'card') : null;
@@ -181,6 +186,11 @@ class Room extends Model implements HasMedia
 
     public function getGalleryUrlsAttribute(): array
     {
+        $primaryBedSpec = $this->primaryBedSpecification();
+        if ($primaryBedSpec && count($primaryBedSpec->gallery_urls) > 0) {
+            return $primaryBedSpec->gallery_urls;
+        }
+
         return $this->getMedia('gallery')
             ->map(fn (Media $media) => $this->resolveMediaUrl($media, 'card'))
             ->values()
@@ -256,5 +266,12 @@ class Room extends Model implements HasMedia
     public function bedSpecifications()
     {
         return $this->belongsToMany(BedSpecification::class, 'bed_specification_room');
+    }
+
+    private function primaryBedSpecification(): ?BedSpecification
+    {
+        $this->loadMissing(['bedSpecifications.media']);
+
+        return $this->bedSpecifications->first();
     }
 }

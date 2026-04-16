@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\BedSpecifications\Schemas;
 
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -23,6 +24,25 @@ class BedSpecificationForm
                             ->maxLength(255)
                             ->unique(ignoreRecord: true)
                             ->columnSpanFull(),
+                    ]),
+                Section::make('Images')
+                    ->description('Images are attached to the bed specification (used by rooms that reference it).')
+                    ->icon('heroicon-o-photo')
+                    ->schema([
+                        SpatieMediaLibraryFileUpload::make('featured_image')
+                            ->collection('featured')
+                            ->label('Featured Image')
+                            ->disk('public')
+                            ->image()
+                            ->imagePreviewHeight('200')
+                            ->required(fn ($record) => $record === null),
+                        SpatieMediaLibraryFileUpload::make('gallery_images')
+                            ->collection('gallery')
+                            ->multiple()
+                            ->label('Gallery Images')
+                            ->disk('public')
+                            ->image()
+                            ->imagePreviewHeight('150'),
                     ]),
             ]);
     }
