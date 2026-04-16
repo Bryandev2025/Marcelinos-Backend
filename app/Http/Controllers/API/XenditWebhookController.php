@@ -142,12 +142,15 @@ class XenditWebhookController extends Controller
             $booking->update($updateFields);
         }
 
-        if ($booking->status !== $nextStatus) {
-            $booking->update(['status' => $nextStatus]);
-        }
+        // Persist payment + webhook event before status change so Slack/observers see Payment rows
+        // when the queue runs synchronously.
         $this->upsertProviderPaymentRecord($booking, $invoiceId, $status, $paidAmount, $bookingTotal);
         $this->recordWebhookEvent($eventKey, $payload);
         Cache::forget($this->pendingOnlinePaymentCacheKey((int) $booking->id));
+
+        if ($booking->status !== $nextStatus) {
+            $booking->update(['status' => $nextStatus]);
+        }
         $freshBooking = $booking->fresh();
         $this->storeDebugSnapshot($payload, [
             'result' => 'processed',
