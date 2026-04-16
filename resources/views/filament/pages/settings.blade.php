@@ -1,4 +1,4 @@
-<x-filament-panels::page wire:poll.75s="refreshHealth">
+<x-filament-panels::page wire:poll.180s="refreshHealth">
     @php
         $emailUsed = max(0, (int) $this->emailsSentToday);
         $emailLimit = max(1, (int) $this->mailDailyLimit);
@@ -133,6 +133,22 @@
         .progress-bar-animated {
             transition: width 0.3s ease;
         }
+
+        .mobile-safe-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .mobile-safe-actions > * {
+            flex: 1 1 auto;
+        }
+
+        @media (max-width: 640px) {
+            .mobile-safe-actions > * {
+                width: 100%;
+            }
+        }
     </style>
 
     <div class="premium-settings w-full">
@@ -153,7 +169,7 @@
                     </p>
                 </div>
                 
-                <div class="flex flex-col gap-3 w-full sm:w-auto sm:min-w-[240px] min-w-0">
+                <div class="flex flex-col gap-3 w-full sm:w-auto sm:min-w-[260px] min-w-0">
                     <div class="premium-card p-4 rounded-xl flex items-center justify-between">
                         <div>
                             <p class="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-1">Status Overview</p>
@@ -178,12 +194,12 @@
         </div>
 
         <!-- Horizontal Tabs Row -->
-        <div class="w-full overflow-x-auto settings-tabs pb-2 -mx-4 sm:mx-0">
-            <nav class="flex gap-2 bg-white dark:bg-slate-900 p-1.5 rounded-xl border border-gray-200 dark:border-slate-700 w-max min-w-full sm:w-full sm:flex-wrap sm:justify-start px-4 sm:px-1.5 shadow-sm">
+        <div class="w-full mx-auto overflow-x-auto settings-tabs pb-2 -mx-4 sm:mx-0">
+            <nav class="flex flex-col justify-center items-center sm:flex-row gap-2 bg-white dark:bg-slate-900 p-1.5 rounded-xl border border-gray-200 dark:border-slate-700 w-max min-w-full sm:w-full sm:flex-wrap sm:justify-start px-4 sm:px-1.5 shadow-sm">
                 @foreach ($tabMeta as $tabKey => $tabInfo)
                     <button type="button"
                         wire:click="setTab('{{ $tabKey }}')"
-                        class="flex-shrink-0 whitespace-nowrap flex items-center gap-2.5 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg font-semibold text-sm transition-all duration-200 {{ $this->activeTab === $tabKey ? 'bg-[#83A070]/15 text-[#618753] dark:bg-[#83A070]/20 dark:text-[#b4cca7] border border-[#83A070]/40' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700/50 border border-transparent' }}">
+                        class="shrink-0 whitespace-nowrap flex items-center gap-2.5 px-3.5 sm:px-4 py-3 rounded-lg font-semibold text-sm transition-all duration-200 min-h-[44px] {{ $this->activeTab === $tabKey ? 'bg-[#83A070]/15 text-[#618753] dark:bg-[#83A070]/20 dark:text-[#b4cca7] border border-[#83A070]/40' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700/50 border border-transparent' }}">
                         <x-filament::icon :icon="$tabInfo['icon']" class="h-5 w-5" />
                         {{ $tabInfo['label'] }}
                     </button>
@@ -310,13 +326,15 @@
                             </p>
                             
                             <div class="space-y-4">
-                                <div class="relative">
-                                    <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Test Recipient Address</label>
-                                    <input type="email" wire:model.defer="testEmailRecipient" class="premium-input pl-10" placeholder="admin@domain.com" />
-                                    <x-filament::icon icon="heroicon-m-at-symbol" class="absolute left-3.5 top-[2.1rem] h-5 w-5 text-gray-400" />
+                                <div>
+                                    <label class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
+                                        <x-filament::icon icon="heroicon-m-at-symbol" class="h-4 w-4 text-gray-400" />
+                                        Test Recipient Address
+                                    </label>
+                                    <input type="email" wire:model.defer="testEmailRecipient" class="premium-input" placeholder="admin@domain.com" />
                                 </div>
                                 
-                                <div class="grid grid-cols-2 gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
                                     <x-filament::button wire:click="sendTestEmail" color="primary" class="w-full !rounded-xl !py-2.5 shadow-md">
                                         Dispatch Email
                                     </x-filament::button>
@@ -349,11 +367,11 @@
                                 </div>
                                 
                                 <div>
-                                    <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Low SMS Credits Mark</label>
-                                    <div class="relative">
-                                        <span class="absolute left-4 top-[11px] text-gray-500 font-bold">₱</span>
-                                        <input type="number" min="0" step="0.01" wire:model.blur="smsLowCreditThreshold" class="premium-input pl-8" />
-                                    </div>
+                                    <label class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
+                                        <x-filament::icon icon="heroicon-m-currency-dollar" class="h-4 w-4 text-gray-400" />
+                                        Low SMS Credits Mark (PHP)
+                                    </label>
+                                    <input type="number" min="0" step="0.01" wire:model.blur="smsLowCreditThreshold" class="premium-input" />
                                 </div>
                             </div>
                         </div>
@@ -374,9 +392,9 @@
                                         Unlock for Editing
                                     </x-filament::button>
                                 @else
-                                    <div class="flex gap-3">
-                                        <x-filament::button size="md" color="gray" wire:click="cancelMailEdit" class="!rounded-xl">Cancel</x-filament::button>
-                                        <x-filament::button size="md" color="success" wire:click="saveMailSettings" icon="heroicon-m-check" class="!rounded-xl shadow-md">Save Configuration</x-filament::button>
+                                    <div class="mobile-safe-actions">
+                                        <x-filament::button size="md" color="gray" wire:click="cancelMailEdit" class="!rounded-xl w-full sm:w-auto">Cancel</x-filament::button>
+                                        <x-filament::button size="md" color="success" wire:click="saveMailSettings" icon="heroicon-m-check" class="!rounded-xl shadow-md w-full sm:w-auto">Save Configuration</x-filament::button>
                                     </div>
                                 @endif
                             </div>
@@ -394,13 +412,15 @@
                                 ['key' => 'mailFromName', 'label' => 'Sender Name', 'type' => 'text', 'icon' => 'heroicon-m-identification'],
                             ] as $field)
                                 <div>
-                                    <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">{{ $field['label'] }}</label>
+                                    <label class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
+                                        <x-filament::icon :icon="$field['icon']" class="h-4 w-4 text-gray-400" />
+                                        {{ $field['label'] }}
+                                    </label>
                                     <div class="relative">
                                         <input type="{{ $field['key'] === 'mailPassword' && $this->showMailPassword ? 'text' : $field['type'] }}" 
                                                wire:model.defer="{{ $field['key'] }}"
-                                               class="premium-input pl-11 {{ $field['key'] === 'mailPassword' ? 'pr-12' : '' }}"
+                                               class="premium-input {{ $field['key'] === 'mailPassword' ? 'pr-12' : '' }}"
                                                @disabled(! $this->editingMail) />
-                                        <x-filament::icon :icon="$field['icon']" class="absolute left-3.5 top-3 h-5 w-5 text-gray-400" />
                                         
                                         @if ($field['key'] === 'mailPassword' && $this->editingMail)
                                             <button type="button" class="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors" wire:click="toggleMailPasswordVisibility">
@@ -428,9 +448,9 @@
                                         Unlock for Editing
                                     </x-filament::button>
                                 @else
-                                    <div class="flex gap-3">
-                                        <x-filament::button size="md" color="gray" wire:click="cancelSmsEdit" class="!rounded-xl">Cancel</x-filament::button>
-                                        <x-filament::button size="md" color="success" wire:click="saveSmsSettings" icon="heroicon-m-check" class="!rounded-xl shadow-md">Save Settings</x-filament::button>
+                                    <div class="mobile-safe-actions">
+                                        <x-filament::button size="md" color="gray" wire:click="cancelSmsEdit" class="!rounded-xl w-full sm:w-auto">Cancel</x-filament::button>
+                                        <x-filament::button size="md" color="success" wire:click="saveSmsSettings" icon="heroicon-m-check" class="!rounded-xl shadow-md w-full sm:w-auto">Save Settings</x-filament::button>
                                     </div>
                                 @endif
                             </div>
@@ -439,10 +459,12 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-7">
                             <div class="md:col-span-2">
                                 <label class="block text-[10px] font-bold uppercase tracking-widest text-purple-600 dark:text-purple-400 mb-2">Secure Value</label>
-                                <label class="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">Semaphore API Key</label>
+                                <label class="flex items-center gap-2 text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">
+                                    <x-filament::icon icon="heroicon-m-key" class="h-4 w-4 text-gray-400" />
+                                    Semaphore API Key
+                                </label>
                                 <div class="relative">
-                                    <input type="{{ $this->showSmsApiKey ? 'text' : 'password' }}" wire:model.defer="semaphoreApiKey" class="premium-input text-lg font-mono tracking-widest pl-11 pr-12 py-3" @disabled(! $this->editingSms) />
-                                    <x-filament::icon icon="heroicon-m-key" class="absolute left-4 top-[14px] h-5 w-5 text-gray-400" />
+                                    <input type="{{ $this->showSmsApiKey ? 'text' : 'password' }}" wire:model.defer="semaphoreApiKey" class="premium-input text-lg font-mono tracking-widest pr-12 py-3" @disabled(! $this->editingSms) />
                                     @if ($this->editingSms)
                                         <button type="button" class="absolute right-4 top-[14px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" wire:click="toggleSmsApiKeyVisibility">
                                             <x-filament::icon :icon="$this->showSmsApiKey ? 'heroicon-m-eye-slash' : 'heroicon-m-eye'" class="h-6 w-6" />
@@ -452,19 +474,19 @@
                             </div>
                             
                             <div>
-                                <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">OTP Endpoint URL</label>
-                                <div class="relative">
-                                    <input type="url" wire:model.defer="semaphoreOtpUrl" class="premium-input pl-11" @disabled(! $this->editingSms) />
-                                    <x-filament::icon icon="heroicon-m-link" class="absolute left-3.5 top-3 h-5 w-5 text-gray-400" />
-                                </div>
+                                <label class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
+                                    <x-filament::icon icon="heroicon-m-link" class="h-4 w-4 text-gray-400" />
+                                    OTP Endpoint URL
+                                </label>
+                                <input type="url" wire:model.defer="semaphoreOtpUrl" class="premium-input" @disabled(! $this->editingSms) />
                             </div>
                             
                             <div>
-                                <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Verified Sender Name</label>
-                                <div class="relative">
-                                    <input type="text" wire:model.defer="semaphoreSenderName" class="premium-input pl-11" maxlength="11" @disabled(! $this->editingSms) />
-                                    <x-filament::icon icon="heroicon-m-megaphone" class="absolute left-3.5 top-3 h-5 w-5 text-gray-400" />
-                                </div>
+                                <label class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
+                                    <x-filament::icon icon="heroicon-m-megaphone" class="h-4 w-4 text-gray-400" />
+                                    Verified Sender Name
+                                </label>
+                                <input type="text" wire:model.defer="semaphoreSenderName" class="premium-input" maxlength="11" @disabled(! $this->editingSms) />
                             </div>
                         </div>
                     </div>
@@ -484,9 +506,9 @@
                                         Modify Notice
                                     </x-filament::button>
                                 @else
-                                    <div class="flex gap-3">
-                                        <x-filament::button size="md" color="gray" wire:click="cancelMaintenanceEdit" class="!rounded-xl">Cancel</x-filament::button>
-                                        <x-filament::button size="md" color="success" wire:click="saveMaintenanceSettings" icon="heroicon-m-check" class="!rounded-xl shadow-md">Deploy Changes</x-filament::button>
+                                    <div class="mobile-safe-actions">
+                                        <x-filament::button size="md" color="gray" wire:click="cancelMaintenanceEdit" class="!rounded-xl w-full sm:w-auto">Cancel</x-filament::button>
+                                        <x-filament::button size="md" color="success" wire:click="saveMaintenanceSettings" icon="heroicon-m-check" class="!rounded-xl shadow-md w-full sm:w-auto">Deploy Changes</x-filament::button>
                                     </div>
                                 @endif
                             </div>
@@ -600,9 +622,9 @@
                                         Configure Gateway
                                     </x-filament::button>
                                 @else
-                                    <div class="flex gap-3">
-                                        <x-filament::button size="md" color="gray" wire:click="cancelPaymentEdit" class="!rounded-xl">Cancel</x-filament::button>
-                                        <x-filament::button size="md" color="success" wire:click="savePaymentSettings" icon="heroicon-m-check" class="!rounded-xl shadow-md">Apply Strategy</x-filament::button>
+                                    <div class="mobile-safe-actions">
+                                        <x-filament::button size="md" color="gray" wire:click="cancelPaymentEdit" class="!rounded-xl w-full sm:w-auto">Cancel</x-filament::button>
+                                        <x-filament::button size="md" color="success" wire:click="savePaymentSettings" icon="heroicon-m-check" class="!rounded-xl shadow-md w-full sm:w-auto">Apply Strategy</x-filament::button>
                                     </div>
                                 @endif
                             </div>
@@ -627,11 +649,9 @@
                                 <div class="p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 shadow-sm">
                                     <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-3">Deposit Structure</p>
                                     <div class="flex items-center gap-2 flex-wrap">
-                                        @foreach(explode(',', $this->partialPaymentOptions) as $opt)
-                                            <span class="px-3 py-1 bg-white dark:bg-gray-700 rounded-lg text-sm font-bold text-indigo-600 dark:text-indigo-400 shadow-sm border border-gray-100 dark:border-gray-600">
-                                                {{ trim($opt) }}%
-                                            </span>
-                                        @endforeach
+                                        <span class="px-3 py-1 bg-white dark:bg-gray-700 rounded-lg text-sm font-bold text-indigo-600 dark:text-indigo-400 shadow-sm border border-gray-100 dark:border-gray-600">
+                                            {{ (int) $this->partialPaymentSelection }}%
+                                        </span>
                                         @if($this->allowCustomPartialPayment)
                                             <span class="px-3 py-1 bg-indigo-50 dark:bg-indigo-500/20 rounded-lg text-sm font-bold text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/30 border-dashed">
                                                 + Custom Value
@@ -657,15 +677,43 @@
 
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 dark:bg-gray-800/40 p-6 rounded-2xl border border-gray-100 dark:border-gray-800">
                                     <div>
-                                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Partial Payment Percentages</label>
-                                        <select wire:model.defer="partialPaymentSelection" multiple class="premium-input min-h-[10rem]">
-                                            @foreach ([10, 20, 30, 40, 50, 60, 70, 80, 90] as $option)
-                                                <option value="{{ $option }}">{{ $option }}%</option>
-                                            @endforeach
-                                        </select>
-                                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                            Hold Ctrl/Cmd to select multiple options. Full payment (100%) is intentionally excluded.
-                                        </p>
+                                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Partial Payment Percentage</label>
+                                        @if (! $this->allowCustomPartialPayment)
+                                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                                @foreach ([10, 20, 30, 40, 50, 60, 70, 80, 90] as $option)
+                                                    <label class="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-slate-800 px-3 py-2 cursor-pointer">
+                                                        <input
+                                                            type="radio"
+                                                            value="{{ $option }}"
+                                                            wire:model.defer="partialPaymentSelection"
+                                                            class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-500 dark:bg-slate-700"
+                                                        />
+                                                        <span class="text-sm font-semibold text-gray-700 dark:text-slate-100">{{ $option }}%</span>
+                                                    </label>
+                                                @endforeach
+                                            </div>
+                                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                                Select one deposit option. Full payment (100%) is intentionally excluded.
+                                            </p>
+                                        @else
+                                            <div class="max-w-xs">
+                                                <label class="block text-xs font-semibold text-indigo-600 dark:text-indigo-300 mb-2">Custom Deposit Percentage</label>
+                                                <div class="relative">
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        max="99"
+                                                        wire:model.defer="partialPaymentSelection"
+                                                        class="premium-input pr-10"
+                                                        placeholder="e.g. 25"
+                                                    />
+                                                    <span class="absolute right-3 top-2.5 text-sm font-bold text-gray-500 dark:text-gray-300">%</span>
+                                                </div>
+                                            </div>
+                                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                                Enter a custom deposit percentage from 1 to 99.
+                                            </p>
+                                        @endif
                                     </div>
                                     
                                     <div class="flex items-center mt-3 md:mt-0">
