@@ -42,34 +42,38 @@ Route::post('/xendit/webhook', [XenditWebhookController::class, 'handle']);
 
 Route::middleware([EnsureApiKeyIsValid::class])->group(function () {
     Route::middleware('throttle:api')->group(function () {
-        // Bookings (stricter limit on create and review)
-        Route::get('bookings', [BookingController::class, 'index']);
+        // Admin/staff booking management (requires user auth + policy checks)
+        Route::middleware('auth:sanctum')->group(function () {
+            Route::get('bookings', [BookingController::class, 'index']);
+            Route::get('bookings/{id}', [BookingController::class, 'show']);
+            Route::put('bookings/{id}', [BookingController::class, 'update']);
+            Route::delete('bookings/{id}', [BookingController::class, 'destroy']);
+        });
+
+        // Public booking flow (stricter limit on create and review)
         Route::post('bookings', [BookingController::class, 'store'])->middleware('throttle:bookings');
-        Route::get('bookings/{id}', [BookingController::class, 'show']);
-        Route::put('bookings/{id}', [BookingController::class, 'update']);
-        Route::delete('bookings/{id}', [BookingController::class, 'destroy']);
         Route::post('/bookings/{booking:reference_number}/otp/send', [BookingController::class, 'sendBookingOtp'])
             ->middleware('throttle:booking_otp');
         Route::patch('/bookings/{booking:reference_number}/cancel', [BookingController::class, 'cancel']);
-        Route::get('bookings/receipt/{token}', [BookingController::class, 'showByReceiptToken']);
-        Route::get('bookings/receipt/{token}/payment-status', [BookingController::class, 'paymentStatusByReceiptToken']);
-        Route::post('bookings/receipt/{token}/retry-payment', [BookingController::class, 'retryOnlinePaymentByReceiptToken']);
-        Route::post('bookings/receipt/{token}/confirm-payment', [BookingController::class, 'confirmReceiptPayment']);
+        Route::get('bookings/receipt/{token}', [BookingController::class, 'showByReceiptToken'])->middleware('throttle:receipt_lookup');
+        Route::get('bookings/receipt/{token}/payment-status', [BookingController::class, 'paymentStatusByReceiptToken'])->middleware('throttle:receipt_lookup');
+        Route::post('bookings/receipt/{token}/retry-payment', [BookingController::class, 'retryOnlinePaymentByReceiptToken'])->middleware('throttle:receipt_lookup');
+        Route::post('bookings/receipt/{token}/confirm-payment', [BookingController::class, 'confirmReceiptPayment'])->middleware('throttle:receipt_lookup');
         Route::post('bookings/receipt/{token}/review', [ReviewController::class, 'storeByReceiptToken'])
             ->middleware('throttle:bookings');
-        Route::get('bookings/reference/{reference}', [BookingController::class, 'showByReferenceNumber']);
+        Route::get('bookings/reference/{reference}', [BookingController::class, 'showByReferenceNumber'])->middleware('throttle:receipt_lookup');
         Route::post('bookings/reference/{reference}/review', [ReviewController::class, 'storeByBookingReference'])->middleware('throttle:bookings');
         Route::patch('/bookings/{reference}/reschedule', [BookingController::class, 'reschedule']);
         // Venues
-        Route::get('/venues', [VenueController::class, 'index']);
+        Route::get('/venues', [VenueController::class, 'index'])->middleware('throttle:catalog_reads');
         Route::get('/venues/{id}', [VenueController::class, 'show']);
 
         // Rooms
-        Route::get('rooms', [RoomController::class, 'index']);
+        Route::get('rooms', [RoomController::class, 'index'])->middleware('throttle:catalog_reads');
         Route::get('/rooms/{id}', [RoomController::class, 'show']);
 
         // Blocked Dates
-        Route::get('/blocked-dates', [BlockedDateController::class, 'index']);
+        Route::get('/blocked-dates', [BlockedDateController::class, 'index'])->middleware('throttle:heavy_availability');
 
         // Contact form (stricter limit)
         Route::post('/contact', [ContactController::class, 'store'])->middleware('throttle:contact');

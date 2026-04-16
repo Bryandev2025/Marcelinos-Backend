@@ -20,6 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -85,6 +86,7 @@ class BookingController extends Controller
     public function index(Request $request)
     {
         try {
+            Gate::authorize('viewAny', Booking::class);
             $perPage = min((int) $request->query('per_page', 15), 50);
 
             $bookings = Booking::with(['guest', 'rooms', 'venues', 'roomLines'])
@@ -479,16 +481,26 @@ class BookingController extends Controller
      */
     private function validateGuestRoomLines(array $roomLines, Carbon $checkIn, Carbon $checkOut, ?int $excludeBookingId): ?JsonResponse
     {
+        $typePool = collect($roomLines)
+            ->pluck('room_type')
+            ->filter(fn ($type) => is_string($type) && $type !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        $roomsByType = Room::query()
+            ->whereIn('type', $typePool)
+            ->where('status', '!=', Room::STATUS_MAINTENANCE)
+            ->with(['bedSpecifications'])
+            ->get()
+            ->groupBy('type');
+
         foreach ($roomLines as $line) {
             $type = $line['room_type'];
             $key = $line['inventory_group_key'];
             $submittedUnit = (float) $line['unit_price'];
 
-            $candidates = Room::query()
-                ->where('type', $type)
-                ->where('status', '!=', Room::STATUS_MAINTENANCE)
-                ->with(['bedSpecifications'])
-                ->get()
+            $candidates = ($roomsByType->get($type) ?? collect())
                 ->filter(fn (Room $r) => RoomInventoryGroupKey::forRoom($r) === $key);
 
             if ($candidates->isEmpty()) {
@@ -583,6 +595,8 @@ class BookingController extends Controller
                 ], 404);
             }
 
+            Gate::authorize('view', $booking);
+
             $this->expireIfNeeded($booking);
 
             return response()->json($booking, 200);
@@ -604,6 +618,8 @@ class BookingController extends Controller
                     'message' => 'Booking not found',
                 ], 404);
             }
+
+            Gate::authorize('update', $booking);
 
             if ($this->expireIfNeeded($booking)) {
                 return response()->json([
@@ -656,6 +672,8 @@ class BookingController extends Controller
                     'message' => 'Booking not found',
                 ], 404);
             }
+
+            Gate::authorize('delete', $booking);
 
             $booking->delete();
 

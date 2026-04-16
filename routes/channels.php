@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Booking;
 use Illuminate\Support\Facades\Broadcast;
 
 /*
@@ -22,12 +23,20 @@ use Illuminate\Support\Facades\Broadcast;
 Broadcast::channel(
     'booking.{reference}',
     function ($user, string $reference) {
-        // Staff/admin can listen to any booking; guests only their own.
         if (in_array($user->role ?? null, ['admin', 'staff'], true)) {
             return true;
         }
-        // If you have a relation like user->bookings, check reference here
-        return true;
+
+        $booking = Booking::query()
+            ->with('guest:id,email')
+            ->where('reference_number', $reference)
+            ->first();
+
+        if (! $booking || ! $booking->guest) {
+            return false;
+        }
+
+        return strcasecmp((string) $booking->guest->email, (string) ($user->email ?? '')) === 0;
     }
 );
 
@@ -40,8 +49,20 @@ Broadcast::channel(
 );
 
 Broadcast::channel('booking.{reference}.cancelled', function ($user, string $reference) { 
-    return in_array($user->role ?? null, ['admin', 'staff'], true) 
-        || true; // allow guest if needed 
+    if (in_array($user->role ?? null, ['admin', 'staff'], true)) {
+        return true;
+    }
+
+    $booking = Booking::query()
+        ->with('guest:id,email')
+        ->where('reference_number', $reference)
+        ->first();
+
+    if (! $booking || ! $booking->guest) {
+        return false;
+    }
+
+    return strcasecmp((string) $booking->guest->email, (string) ($user->email ?? '')) === 0;
 });
 Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
     return (int) $user->id === (int) $id;

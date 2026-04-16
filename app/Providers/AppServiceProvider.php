@@ -427,5 +427,23 @@ class AppServiceProvider extends ServiceProvider
                 ->by($request->ip())
                 ->response($jsonTooManyRequests);
         });
+
+        RateLimiter::for('receipt_lookup', function (Request $request) use ($jsonTooManyRequests) {
+            return Limit::perMinute(15)
+                ->by($request->ip())
+                ->response($jsonTooManyRequests);
+        });
+
+        RateLimiter::for('heavy_availability', function (Request $request) use ($jsonTooManyRequests) {
+            return Limit::perMinute(20)
+                ->by($request->ip())
+                ->response($jsonTooManyRequests);
+        });
+
+        RateLimiter::for('catalog_reads', function (Request $request) use ($jsonTooManyRequests) {
+            return Limit::perMinute(45)
+                ->by($request->ip())
+                ->response($jsonTooManyRequests);
+        });
     }
 }

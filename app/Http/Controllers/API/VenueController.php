@@ -30,6 +30,7 @@ class VenueController extends Controller
     {
         try {
             $isAll = filter_var($request->query('is_all', false), FILTER_VALIDATE_BOOLEAN);
+            $limit = min(max((int) $request->query('limit', $isAll ? 24 : 100), 1), 200);
 
             if (! $isAll) {
                 $request->validate([
@@ -66,26 +67,52 @@ class VenueController extends Controller
                 $checkOut = Carbon::parse($request->query('check_out'))->endOfDay();
             }
 
-            $venues = $query->get();
+            $venues = $query->limit($limit)->get();
 
             $availableVenueIds = [];
             $blockedDateVenueIds = [];
+            $blockedReasonsByVenueId = [];
+            $bookedVenueIds = [];
             if (! $isAll && $venues->isNotEmpty()) {
                 $venueIds = $venues->pluck('id')->all();
                 $availableVenueIds = Venue::whereIn('id', $venueIds)
                     ->availableBetween($checkIn, $checkOut)
                     ->pluck('id')
                     ->all();
-                $blockedDateVenueIds = VenueBlockedDate::query()
+                $blockedOverlaps = VenueBlockedDate::query()
                     ->whereIn('venue_id', $venueIds)
                     ->overlappingBookingRange($checkIn, $checkOut)
+                    ->get(['venue_id', 'reason']);
+
+                $blockedDateVenueIds = $blockedOverlaps
                     ->pluck('venue_id')
                     ->unique()
+                    ->all();
+
+                $blockedReasonsByVenueId = $blockedOverlaps
+                    ->groupBy('venue_id')
+                    ->map(fn ($group) => $group
+                        ->pluck('reason')
+                        ->filter(fn ($reason) => filled($reason))
+                        ->unique()
+                        ->values()
+                        ->all()
+                    )
+                    ->all();
+
+                $bookedVenueIds = Booking::query()
+                    ->join('booking_venue', 'bookings.id', '=', 'booking_venue.booking_id')
+                    ->whereIn('booking_venue.venue_id', $venueIds)
+                    ->where('bookings.status', '!=', Booking::STATUS_CANCELLED)
+                    ->where('bookings.check_in', '<', $checkOut)
+                    ->where('bookings.check_out', '>', $checkIn)
+                    ->distinct()
+                    ->pluck('booking_venue.venue_id')
                     ->all();
             }
 
             $data = VenueResource::collection($venues)->resolve();
-            $data = array_map(function ($item) use ($isAll, $availableVenueIds, $blockedDateVenueIds, $venues, $checkIn, $checkOut) {
+            $data = array_map(function ($item) use ($isAll, $availableVenueIds, $blockedDateVenueIds, $blockedReasonsByVenueId, $bookedVenueIds, $venues) {
                 $item['available'] = $isAll ? null : in_array($item['id'], $availableVenueIds, true);
                 $item['is_block_date'] = $isAll ? null : in_array($item['id'], $blockedDateVenueIds, true);
                 $item['unavailability_code'] = null;
@@ -93,7 +120,7 @@ class VenueController extends Controller
                 $item['unavailability_detail'] = null;
                 if (! $isAll && $item['available'] === false) {
                     $venue = $venues->firstWhere('id', $item['id']);
-                    $u = $this->resolveVenueUnavailability($venue, $checkIn, $checkOut);
+                    $u = $this->resolveVenueUnavailability($venue, $blockedReasonsByVenueId, $bookedVenueIds);
                     if ($u !== null) {
                         $item['unavailability_code'] = $u['code'];
                         $item['unavailability_title'] = $u['title'];
@@ -126,7 +153,7 @@ class VenueController extends Controller
     /**
      * Human-readable reason when a venue is not bookable for the requested range.
      */
-    private function resolveVenueUnavailability(?Venue $venue, Carbon $checkIn, Carbon $checkOut): ?array
+    private function resolveVenueUnavailability(?Venue $venue, array $blockedReasonsByVenueId, array $bookedVenueIds): ?array
     {
         if ($venue === null) {
             return null;
@@ -148,18 +175,8 @@ class VenueController extends Controller
             ];
         }
 
-        $blockedOverlap = VenueBlockedDate::query()
-            ->where('venue_id', $venue->id)
-            ->overlappingBookingRange($checkIn, $checkOut)
-            ->get(['blocked_on', 'reason']);
-
-        if ($blockedOverlap->isNotEmpty()) {
-            $reasonTexts = $blockedOverlap
-                ->pluck('reason')
-                ->filter(fn ($r) => filled($r))
-                ->unique()
-                ->values()
-                ->all();
+        if (array_key_exists($venue->id, $blockedReasonsByVenueId)) {
+            $reasonTexts = $blockedReasonsByVenueId[$venue->id] ?? [];
 
             $detail = count($reasonTexts) > 0
                 ? implode(' · ', $reasonTexts)
@@ -172,13 +189,7 @@ class VenueController extends Controller
             ];
         }
 
-        $hasBooking = $venue->bookings()
-            ->where('bookings.status', '!=', Booking::STATUS_CANCELLED)
-            ->where('bookings.check_in', '<', $checkOut)
-            ->where('bookings.check_out', '>', $checkIn)
-            ->exists();
-
-        if ($hasBooking) {
+        if (in_array($venue->id, $bookedVenueIds, true)) {
             return [
                 'code' => 'booked',
                 'title' => 'Already reserved',
