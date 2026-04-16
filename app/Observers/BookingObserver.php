@@ -6,6 +6,7 @@ use App\Events\AdminDashboardNotification;
 use App\Events\BookingStatusUpdated;
 use App\Events\FilamentNotificationSound;
 use App\Filament\Resources\Bookings\BookingResource;
+use App\Mail\TestimonialFeedbackEmail;
 use App\Models\Booking;
 use App\Models\User;
 use App\Notifications\Slack\BookingLifecycleSlackNotification;
@@ -15,6 +16,7 @@ use App\Support\SlackBookingAlerts;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 class BookingObserver
@@ -214,6 +216,13 @@ class BookingObserver
                     userId: $user->id,
                 );
             }
+
+            if ($booking->status === Booking::STATUS_COMPLETED) {
+                $this->sendEligibleTestimonialFeedback(
+                    $booking,
+                    (string) $booking->getOriginal('status') === Booking::STATUS_OCCUPIED
+                );
+            }
         }
 
         $this->safeBroadcast(
@@ -332,6 +341,43 @@ class BookingObserver
         } catch (\Throwable $exception) {
             Log::debug('FilamentNotificationSound failed', [
                 'user_id' => $user->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    private function sendEligibleTestimonialFeedback(Booking $booking, bool $sendImmediately = false): void
+    {
+        if ($booking->testimonial_feedback_sent_at) {
+            return;
+        }
+
+        $booking->loadMissing('guest');
+
+        $email = $booking->guest?->email;
+        if (! $email || ! $booking->check_out) {
+            return;
+        }
+
+        if (! $sendImmediately) {
+            $timezone = config('app.timezone', 'Asia/Manila');
+            $cutoff = now($timezone)->subDay();
+            $checkOut = $booking->check_out->copy()->timezone($timezone);
+
+            if ($checkOut->gt($cutoff)) {
+                return;
+            }
+        }
+
+        try {
+            Mail::to($email)->send(new TestimonialFeedbackEmail($booking));
+            $booking->updateQuietly(['testimonial_feedback_sent_at' => now()]);
+        } catch (\Throwable $exception) {
+            Log::error('Failed sending testimonial feedback', [
+                'booking_id' => $booking->id,
+                'reference_number' => $booking->reference_number,
+                'guest_email' => $email,
+                'send_immediately' => $sendImmediately,
                 'error' => $exception->getMessage(),
             ]);
         }

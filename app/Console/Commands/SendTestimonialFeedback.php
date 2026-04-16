@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Models\ActivityLog;
 use App\Mail\TestimonialFeedbackEmail;
 use App\Models\Booking;
 use Illuminate\Console\Command;
@@ -55,46 +54,11 @@ class SendTestimonialFeedback extends Command
         $failed = 0;
 
         $query->chunkById(100, function ($bookings) use (&$sent, &$failed) {
-            $ids = $bookings->pluck('id')->all();
-
-            // Only send testimonial feedback when the booking transitioned from
-            // `occupied` -> `completed`. We use the latest audit record to enforce
-            // that rule for admin/staff-triggered status changes.
-            //
-            // When there is no audit record (e.g. console-driven completion), we
-            // allow sending because the completion flow only upgrades from
-            // `occupied` -> `completed`.
-            $statusChangedLogs = ActivityLog::query()
-                ->where('category', 'booking')
-                ->where('event', 'booking.status_changed')
-                ->where('subject_type', Booking::class)
-                ->whereIn('subject_id', $ids)
-                ->orderBy('created_at', 'desc')
-                ->get();
-
-            $latestStatusChangedLogByBookingId = [];
-            foreach ($statusChangedLogs as $log) {
-                $bookingId = (int) $log->subject_id;
-                if (! isset($latestStatusChangedLogByBookingId[$bookingId])) {
-                    $latestStatusChangedLogByBookingId[$bookingId] = $log;
-                }
-            }
-
             foreach ($bookings as $booking) {
                 $guest = $booking->guest;
                 $email = $guest?->email;
                 if (! $email) {
                     continue;
-                }
-
-                $latestLog = $latestStatusChangedLogByBookingId[(int) $booking->id] ?? null;
-                if ($latestLog) {
-                    $oldStatus = data_get($latestLog->meta, 'old_status');
-                    $newStatus = data_get($latestLog->meta, 'new_status');
-
-                    if ($oldStatus !== Booking::STATUS_OCCUPIED || $newStatus !== Booking::STATUS_COMPLETED) {
-                        continue;
-                    }
                 }
 
                 try {
