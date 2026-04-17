@@ -22,10 +22,8 @@
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                                 <tr>
                                     <td style="vertical-align:middle;">
-                                        <a href="{{ config('app.url') }}" style="text-decoration:none;">
-                                            @php($logoPath = public_path('b-logo.png'))
-                                            <img src="{{ file_exists($logoPath) ? $message->embed($logoPath) : (config('app.url') . '/b-logo.png') }}" alt="Marcelino's Logo" width="60" style="display:block; height:auto; border:0; outline:none; text-decoration:none;">
-                                        </a>
+                                        @php($logoPath = public_path('brand-logo.png'))
+                                        <img src="{{ file_exists($logoPath) ? $message->embed($logoPath) : (config('app.url') . '/brand-logo.png') }}" alt="Marcelino's" width="60" style="display:block; height:auto; border:0; outline:none; text-decoration:none;">
                                     </td>
                                     <td style="vertical-align:middle; text-align:right; color:#111827; font-family:'Poppins', Arial, Helvetica, sans-serif;">
                                         <div style="font-size:16px; line-height:22px; font-weight:700; font-family:'Poppins', Arial, Helvetica, sans-serif;">
@@ -43,7 +41,7 @@
                     <tr>
                         <td style="padding:28px 32px 8px; font-family:'Poppins', Arial, Helvetica, sans-serif;">
                             <p style="margin:0 0 12px; font-size:22px; line-height:30px; font-family:'Playfair Display', Georgia, 'Times New Roman', serif; font-weight:600; color:#111827;">
-                                Hello {{ $booking->full_name ?? $booking->guest_name }},
+                                Hello {{ $booking->guest?->full_name ?? 'Guest' }},
                             </p>
 
                             <p style="margin:0 0 16px; color:#4b5563; font-size:14.5px; line-height:24px; font-weight:400; font-family:'Poppins', Arial, Helvetica, sans-serif;">
