@@ -28,6 +28,16 @@ final class PhAddressFields
                 ->preload()
                 ->live()
                 ->dehydrated(false)
+                ->afterStateHydrated(function (Get $get, Set $set, ?string $state): void {
+                    if ($state || (bool) $get('is_international')) {
+                        return;
+                    }
+
+                    $regionCode = PsgcApi::regionCodeFromLabel((string) ($get('region') ?? ''));
+                    if ($regionCode !== null) {
+                        $set('ph_region_code', $regionCode);
+                    }
+                })
                 ->required(fn (Get $get): bool => ! (bool) $get('is_international'))
                 ->visible(fn (Get $get): bool => ! (bool) $get('is_international'))
                 ->afterStateUpdated(function (Set $set, ?string $state): void {
@@ -56,6 +66,21 @@ final class PhAddressFields
                 ->preload()
                 ->live()
                 ->dehydrated(false)
+                ->afterStateHydrated(function (Get $get, Set $set, ?string $state): void {
+                    if ($state || (bool) $get('is_international')) {
+                        return;
+                    }
+
+                    $regionCode = (string) ($get('ph_region_code') ?? '');
+                    if ($regionCode === '' || PsgcApi::isNcr($regionCode)) {
+                        return;
+                    }
+
+                    $provinceCode = PsgcApi::provinceCodeFromLabel($regionCode, (string) ($get('province') ?? ''));
+                    if ($provinceCode !== null) {
+                        $set('ph_province_code', $provinceCode);
+                    }
+                })
                 ->visible(function (Get $get): bool {
                     if ((bool) $get('is_international')) {
                         return false;
@@ -88,6 +113,27 @@ final class PhAddressFields
                 ->preload()
                 ->live()
                 ->dehydrated(false)
+                ->afterStateHydrated(function (Get $get, Set $set, ?string $state): void {
+                    if ($state || (bool) $get('is_international')) {
+                        return;
+                    }
+
+                    $regionCode = (string) ($get('ph_region_code') ?? '');
+                    if ($regionCode === '') {
+                        return;
+                    }
+
+                    $provinceCode = (string) ($get('ph_province_code') ?? '');
+                    $municipalityCode = PsgcApi::municipalityCodeFromLabel(
+                        $regionCode,
+                        $provinceCode !== '' ? $provinceCode : null,
+                        (string) ($get('municipality') ?? ''),
+                    );
+
+                    if ($municipalityCode !== null) {
+                        $set('ph_municipality_code', $municipalityCode);
+                    }
+                })
                 ->required(fn (Get $get): bool => ! (bool) $get('is_international'))
                 ->visible(fn (Get $get): bool => ! (bool) $get('is_international'))
                 ->disabled(function (Get $get): bool {
@@ -118,6 +164,21 @@ final class PhAddressFields
                 ->searchable()
                 ->preload()
                 ->dehydrated(false)
+                ->afterStateHydrated(function (Get $get, Set $set, ?string $state): void {
+                    if ($state || (bool) $get('is_international')) {
+                        return;
+                    }
+
+                    $municipalityCode = (string) ($get('ph_municipality_code') ?? '');
+                    if ($municipalityCode === '') {
+                        return;
+                    }
+
+                    $barangayCode = PsgcApi::barangayCodeFromLabel($municipalityCode, (string) ($get('barangay') ?? ''));
+                    if ($barangayCode !== null) {
+                        $set('ph_barangay_code', $barangayCode);
+                    }
+                })
                 ->required(fn (Get $get): bool => ! (bool) $get('is_international'))
                 ->visible(fn (Get $get): bool => ! (bool) $get('is_international'))
                 ->disabled(fn (Get $get): bool => (string) ($get('ph_municipality_code') ?? '') === '')

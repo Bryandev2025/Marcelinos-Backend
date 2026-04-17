@@ -5,7 +5,6 @@ namespace App\Filament\Resources\Rooms\Schemas;
 use App\Models\Room;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
@@ -74,20 +73,6 @@ class RoomForm
                     ->options(Room::statusOptions())
                     ->default(Room::STATUS_AVAILABLE)
                     ->required(),
-                SpatieMediaLibraryFileUpload::make('featured_image')
-                    ->collection('featured')
-                    ->label('Featured Image')
-                    ->disk('public')
-                    ->image()
-                    ->imagePreviewHeight('200')
-                    ->required(fn ($record) => $record === null),
-                SpatieMediaLibraryFileUpload::make('gallery_images')
-                    ->collection('gallery')
-                    ->multiple()
-                    ->label('Gallery Images')
-                    ->disk('public')
-                    ->image()
-                    ->imagePreviewHeight('150'),
                 CheckboxList::make('amenities')
                     ->label('Amenities')
                     ->relationship(

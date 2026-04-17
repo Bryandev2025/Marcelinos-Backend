@@ -61,6 +61,40 @@
                                 </tr>
                                 <tr>
                                     <td style="padding:14px 18px; font-family:'Poppins', Arial, Helvetica, sans-serif;">
+                                        @php
+                                            $paymentMethod = (string) ($booking->payment_method ?? 'cash');
+                                            $onlinePlan = (string) ($booking->online_payment_plan ?? '');
+                                            $bookingStatus = (string) ($booking->status ?? '');
+                                            $paymentTypeLabel = 'Cash';
+                                            $paymentStatusLabel = 'Pending Cash Payment';
+
+                                            if ($paymentMethod === 'online') {
+                                                if (preg_match('/^partial_([1-9]|[1-9][0-9])$/', $onlinePlan, $partialMatches) === 1) {
+                                                    $paymentTypeLabel = 'Online (Partial '.($partialMatches[1] ?? '').'%)';
+                                                } else {
+                                                    $paymentTypeLabel = 'Online (Full)';
+                                                }
+
+                                                if ($bookingStatus === \App\Models\Booking::STATUS_PARTIAL) {
+                                                    $paymentStatusLabel = 'Partially Paid (Online)';
+                                                } elseif ($bookingStatus === \App\Models\Booking::STATUS_PAID) {
+                                                    $paymentStatusLabel = 'Fully Paid (Online)';
+                                                } elseif ($bookingStatus === \App\Models\Booking::STATUS_UNPAID) {
+                                                    $paymentStatusLabel = 'Unpaid (Online - Invoice Pending)';
+                                                } else {
+                                                    $paymentStatusLabel = ucfirst($bookingStatus).' (Online)';
+                                                }
+                                            } elseif ($bookingStatus === \App\Models\Booking::STATUS_PAID) {
+                                                $paymentStatusLabel = 'Fully Paid';
+                                            } elseif ($bookingStatus === \App\Models\Booking::STATUS_PARTIAL) {
+                                                $paymentStatusLabel = 'Partially Paid';
+                                            } elseif ($bookingStatus === \App\Models\Booking::STATUS_UNPAID) {
+                                                $paymentStatusLabel = 'Unpaid';
+                                            } else {
+                                                $paymentStatusLabel = ucfirst($bookingStatus);
+                                            }
+                                        @endphp
+
                                         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-size:14px; line-height:22px; color:#374151; font-family:'Poppins', Arial, Helvetica, sans-serif;">
                                             <tr>
                                                 <td style="padding:6px 0; width:38%; color:#6b7280; font-weight:400; font-family:'Poppins', Arial, Helvetica, sans-serif;">
@@ -92,6 +126,22 @@
                                                 </td>
                                                 <td style="padding:6px 0; font-weight:600; text-transform:capitalize; color:#374151; font-family:'Poppins', Arial, Helvetica, sans-serif;">
                                                     {{ $booking->status }}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding:6px 0; color:#6b7280; font-weight:400; font-family:'Poppins', Arial, Helvetica, sans-serif;">
+                                                    Payment Type
+                                                </td>
+                                                <td style="padding:6px 0; font-weight:600; color:#374151; font-family:'Poppins', Arial, Helvetica, sans-serif;">
+                                                    {{ $paymentTypeLabel }}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style="padding:6px 0; color:#6b7280; font-weight:400; font-family:'Poppins', Arial, Helvetica, sans-serif;">
+                                                    Payment Status
+                                                </td>
+                                                <td style="padding:6px 0; font-weight:600; color:#374151; font-family:'Poppins', Arial, Helvetica, sans-serif;">
+                                                    {{ $paymentStatusLabel }}
                                                 </td>
                                             </tr>
                                             <tr>

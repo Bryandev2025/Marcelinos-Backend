@@ -31,6 +31,7 @@ class RoomController extends Controller
     {
         try {
             $isAll = filter_var($request->query('is_all', false), FILTER_VALIDATE_BOOLEAN);
+            $limit = min(max((int) $request->query('limit', $isAll ? 24 : 100), 1), 200);
 
             if (! $isAll) {
                 $request->validate([
@@ -59,7 +60,8 @@ class RoomController extends Controller
                 }
             }
 
-            $query = Room::with(['amenities', 'media', 'bedSpecifications'])
+            $query = Room::query()
+                ->with(['amenities', 'media', 'bedSpecifications.media'])
                 ->orderByRaw("FIELD(type, 'standard', 'family', 'deluxe')");
             $checkIn = null;
             $checkOut = null;
@@ -68,26 +70,52 @@ class RoomController extends Controller
                 $checkOut = Carbon::parse($request->query('check_out'))->endOfDay();
             }
 
-            $rooms = $query->get();
+            $rooms = $query->limit($limit)->get();
 
             $availableRoomIds = [];
             $blockedDateRoomIds = [];
+            $blockedReasonsByRoomId = [];
+            $bookedRoomIds = [];
             if (! $isAll && $rooms->isNotEmpty()) {
                 $roomIds = $rooms->pluck('id')->all();
                 $availableRoomIds = Room::whereIn('id', $roomIds)
                     ->availableBetween($checkIn, $checkOut)
                     ->pluck('id')
                     ->all();
-                $blockedDateRoomIds = RoomBlockedDate::query()
+                $blockedOverlaps = RoomBlockedDate::query()
                     ->whereIn('room_id', $roomIds)
                     ->overlappingBookingRange($checkIn, $checkOut)
+                    ->get(['room_id', 'reason']);
+
+                $blockedDateRoomIds = $blockedOverlaps
                     ->pluck('room_id')
                     ->unique()
+                    ->all();
+
+                $blockedReasonsByRoomId = $blockedOverlaps
+                    ->groupBy('room_id')
+                    ->map(fn ($group) => $group
+                        ->pluck('reason')
+                        ->filter(fn ($reason) => filled($reason))
+                        ->unique()
+                        ->values()
+                        ->all()
+                    )
+                    ->all();
+
+                $bookedRoomIds = Booking::query()
+                    ->join('booking_room', 'bookings.id', '=', 'booking_room.booking_id')
+                    ->whereIn('booking_room.room_id', $roomIds)
+                    ->where('bookings.status', '!=', Booking::STATUS_CANCELLED)
+                    ->where('bookings.check_in', '<', $checkOut)
+                    ->where('bookings.check_out', '>', $checkIn)
+                    ->distinct()
+                    ->pluck('booking_room.room_id')
                     ->all();
             }
 
             $data = RoomResource::collection($rooms)->resolve();
-            $data = array_map(function ($item) use ($isAll, $availableRoomIds, $blockedDateRoomIds, $rooms, $checkIn, $checkOut) {
+            $data = array_map(function ($item) use ($isAll, $availableRoomIds, $blockedDateRoomIds, $blockedReasonsByRoomId, $bookedRoomIds, $rooms) {
                 $item['available'] = $isAll ? null : in_array($item['id'], $availableRoomIds, true);
                 $item['is_block_date'] = $isAll ? null : in_array($item['id'], $blockedDateRoomIds, true);
                 $item['unavailability_code'] = null;
@@ -95,7 +123,7 @@ class RoomController extends Controller
                 $item['unavailability_detail'] = null;
                 if (! $isAll && $item['available'] === false) {
                     $room = $rooms->firstWhere('id', $item['id']);
-                    $u = $this->resolveRoomUnavailability($room, $checkIn, $checkOut);
+                    $u = $this->resolveRoomUnavailability($room, $blockedReasonsByRoomId, $bookedRoomIds);
                     if ($u !== null) {
                         $item['unavailability_code'] = $u['code'];
                         $item['unavailability_title'] = $u['title'];
@@ -134,7 +162,7 @@ class RoomController extends Controller
      * Human-readable reason when a room is not bookable for the requested range.
      * Priority: maintenance → staff-blocked dates (with reasons) → overlapping guest booking.
      */
-    private function resolveRoomUnavailability(?Room $room, Carbon $checkIn, Carbon $checkOut): ?array
+    private function resolveRoomUnavailability(?Room $room, array $blockedReasonsByRoomId, array $bookedRoomIds): ?array
     {
         if ($room === null) {
             return null;
@@ -148,18 +176,8 @@ class RoomController extends Controller
             ];
         }
 
-        $blockedOverlap = RoomBlockedDate::query()
-            ->where('room_id', $room->id)
-            ->overlappingBookingRange($checkIn, $checkOut)
-            ->get(['blocked_on', 'reason']);
-
-        if ($blockedOverlap->isNotEmpty()) {
-            $reasonTexts = $blockedOverlap
-                ->pluck('reason')
-                ->filter(fn ($r) => filled($r))
-                ->unique()
-                ->values()
-                ->all();
+        if (array_key_exists($room->id, $blockedReasonsByRoomId)) {
+            $reasonTexts = $blockedReasonsByRoomId[$room->id] ?? [];
 
             $detail = count($reasonTexts) > 0
                 ? implode(' · ', $reasonTexts)
@@ -172,13 +190,7 @@ class RoomController extends Controller
             ];
         }
 
-        $hasBooking = $room->bookings()
-            ->where('bookings.status', '!=', Booking::STATUS_CANCELLED)
-            ->where('bookings.check_in', '<', $checkOut)
-            ->where('bookings.check_out', '>', $checkIn)
-            ->exists();
-
-        if ($hasBooking) {
+        if (in_array($room->id, $bookedRoomIds, true)) {
             return [
                 'code' => 'booked',
                 'title' => 'Already reserved',
@@ -199,7 +211,7 @@ class RoomController extends Controller
     public function show(Request $request, $id): JsonResponse
     {
         try {
-            $room = Room::with(['amenities', 'media', 'bedSpecifications'])->findOrFail($id);
+            $room = Room::with(['amenities', 'media', 'bedSpecifications.media'])->findOrFail($id);
             $data = (new RoomResource($room))->resolve();
 
             $checkInQuery = $request->query('check_in');

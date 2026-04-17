@@ -35,6 +35,11 @@ class Booking extends Model
         'xendit_invoice_url',
         'no_of_days',
         'venue_event_type',
+        'reminder_sent',
+        'reminder_sent_at',
+        'reminder_sms_sent',
+        'reminder_sms_sent_at',
+        'reminder_sms_error',
         'testimonial_feedback_sent_at',
     ];
 
@@ -43,6 +48,10 @@ class Booking extends Model
         'check_out' => 'datetime',
         'total_price' => 'decimal:2',
         'no_of_days' => 'integer',
+        'reminder_sent' => 'boolean',
+        'reminder_sent_at' => 'datetime',
+        'reminder_sms_sent' => 'boolean',
+        'reminder_sms_sent_at' => 'datetime',
         'testimonial_feedback_sent_at' => 'datetime',
     ];
 

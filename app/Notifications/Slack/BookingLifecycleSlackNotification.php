@@ -14,6 +14,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\Slack\SlackMessage;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 
 class BookingLifecycleSlackNotification extends Notification implements ShouldQueue
 {
@@ -68,6 +69,7 @@ class BookingLifecycleSlackNotification extends Notification implements ShouldQu
 
         $plan = filled($booking->online_payment_plan) ? $booking->online_payment_plan : '—';
         $xendit = filled($booking->xendit_invoice_id) ? $booking->xendit_invoice_id : '—';
+        $xenditAmountPaid = $this->formatXenditAmountPaidForSlack($booking);
 
         $message = (new SlackMessage)
             ->username(config('app.name').' bookings')
@@ -86,6 +88,7 @@ class BookingLifecycleSlackNotification extends Notification implements ShouldQu
                         $booking->payment_method ?: '—',
                         $plan,
                         $xendit,
+                        $xenditAmountPaid,
                         $roomsRequested,
                         $venuesDetail,
                         $venueEventDetail,
@@ -122,6 +125,7 @@ class BookingLifecycleSlackNotification extends Notification implements ShouldQu
         string $paymentMethod,
         string $plan,
         string $xendit,
+        string $xenditAmountPaid,
         string $roomsRequested,
         string $venuesDetail,
         string $venueEventDetail,
@@ -141,6 +145,7 @@ class BookingLifecycleSlackNotification extends Notification implements ShouldQu
             [$L('💳 Payment method'), $V($paymentMethod)],
             [$L('🌐 Online payment plan'), $V($plan)],
             [$L('📄 Xendit invoice'), $V($xendit)],
+            [$L('💰 Xendit amount paid'), $V($xenditAmountPaid)],
             [$L('🛏️ Rooms requested'), $V($roomsRequested)],
             [$L('🏢 Venues'), $V($venuesDetail)],
         ];
@@ -225,6 +230,212 @@ class BookingLifecycleSlackNotification extends Notification implements ShouldQu
         return $booking->rooms
             ->map(fn (Room $room) => $room->adminSelectLabel())
             ->implode("\n");
+    }
+
+    /**
+     * Resolves the guest amount tied to Xendit: webhook rows use provider "xendit" and
+     * {@see Payment::provider_ref} = invoice id; Filament / wizard rows often omit
+     * provider but still represent the Xendit charge. Next, the xendit_webhook_events table
+     * stores Xendit's paid_amount. If nothing matches, we fall back to the invoice
+     * amount implied by {@see Booking::online_payment_plan} (same rules as {@see \App\Http\Controllers\API\BookingController::createXenditInvoiceForBooking}).
+     *
+     * @return array{paid: float, denom: float, is_partial: bool, source_note: string}|null
+     */
+    private function resolveXenditPaidContext(Booking $booking): ?array
+    {
+        $invoiceId = trim((string) ($booking->xendit_invoice_id ?? ''));
+
+        if ($invoiceId !== '') {
+            /** @var Payment|null $byInvoiceRef */
+            $byInvoiceRef = $booking->payments()
+                ->where('provider_ref', $invoiceId)
+                ->latest()
+                ->first();
+            if ($byInvoiceRef !== null) {
+                return $this->xenditContextFromPayment($booking, $byInvoiceRef);
+            }
+        }
+
+        /** @var Payment|null $explicit */
+        $explicit = $booking->payments()
+            ->where('provider', 'xendit')
+            ->latest()
+            ->first();
+        if ($explicit !== null) {
+            return $this->xenditContextFromPayment($booking, $explicit);
+        }
+
+        $isOnline = ($booking->payment_method ?? '') === 'online';
+        if ($isOnline && $invoiceId !== '') {
+            $payments = $booking->payments()->orderBy('id')->get();
+            if ($payments->count() === 1) {
+                /** @var Payment $only */
+                $only = $payments->first();
+
+                return $this->xenditContextFromPayment($booking, $only);
+            }
+        }
+
+        if ($invoiceId !== '') {
+            $fromWebhookEvents = $this->xenditPaidContextFromWebhookEventsTable($booking, $invoiceId);
+            if ($fromWebhookEvents !== null) {
+                return $fromWebhookEvents;
+            }
+        }
+
+        if ($invoiceId !== '') {
+            $planned = $this->plannedXenditInvoiceAmountPhp($booking);
+            if ($planned !== null) {
+                $bookingTotal = (float) $booking->total_price;
+                if ($bookingTotal <= 0.0) {
+                    return null;
+                }
+
+                $isPartial = $planned + 0.009 < $bookingTotal;
+
+                return [
+                    'paid' => $planned,
+                    'denom' => $bookingTotal,
+                    'is_partial' => $isPartial,
+                    'source_note' => ' · from payment plan (no Xendit-linked payment row yet)',
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Fallback when Payment rows are missing: uses paid_amount from persisted Xendit callbacks.
+     *
+     * @return array{paid: float, denom: float, is_partial: bool, source_note: string}|null
+     */
+    private function xenditPaidContextFromWebhookEventsTable(Booking $booking, string $invoiceId): ?array
+    {
+        $ref = trim((string) $booking->reference_number);
+
+        $row = DB::table('xendit_webhook_events')
+            ->where('invoice_id', $invoiceId)
+            ->whereNotNull('paid_amount')
+            ->where('paid_amount', '>', 0)
+            ->when($ref !== '', function ($query) use ($ref): void {
+                $query->where('external_id', $ref);
+            })
+            ->orderByDesc('received_at')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($row === null && $ref !== '') {
+            $row = DB::table('xendit_webhook_events')
+                ->where('invoice_id', $invoiceId)
+                ->whereNotNull('paid_amount')
+                ->where('paid_amount', '>', 0)
+                ->orderByDesc('received_at')
+                ->orderByDesc('id')
+                ->first();
+        }
+
+        if ($row === null) {
+            return null;
+        }
+
+        $paid = (float) $row->paid_amount;
+        if ($paid <= 0.0) {
+            return null;
+        }
+
+        $bookingTotal = (float) $booking->total_price;
+        $denom = $bookingTotal > 0.0 ? $bookingTotal : $paid;
+        $isPartial = $bookingTotal > 0.0 && $paid + 0.009 < $bookingTotal;
+
+        return [
+            'paid' => $paid,
+            'denom' => $denom,
+            'is_partial' => $isPartial,
+            'source_note' => ' · from Xendit webhook',
+        ];
+    }
+
+    /**
+     * @return array{paid: float, denom: float, is_partial: bool, source_note: string}
+     */
+    private function xenditContextFromPayment(Booking $booking, Payment $payment): array
+    {
+        $paid = (float) $payment->partial_amount;
+        $denom = (float) $payment->total_amount;
+        if ($denom <= 0.0) {
+            $denom = (float) $booking->total_price;
+        }
+
+        $isPartial = $booking->status === Booking::STATUS_PARTIAL
+            || ! $payment->is_fullypaid;
+
+        return [
+            'paid' => $paid,
+            'denom' => $denom,
+            'is_partial' => $isPartial,
+            'source_note' => '',
+        ];
+    }
+
+    /**
+     * Mirrors {@see \App\Http\Controllers\API\BookingController::createXenditInvoiceForBooking} charge logic.
+     */
+    private function plannedXenditInvoiceAmountPhp(Booking $booking): ?float
+    {
+        $plan = (string) ($booking->online_payment_plan ?? '');
+        $totalAmount = (float) $booking->total_price;
+        if ($totalAmount <= 0.0) {
+            return null;
+        }
+
+        $partialPercent = $this->extractPartialPercentageFromPlan($plan);
+        if ($partialPercent !== null) {
+            return max(1.0, (float) round($totalAmount * ($partialPercent / 100), 2));
+        }
+
+        if ($plan === 'full' || $plan === '') {
+            return max(1.0, $totalAmount);
+        }
+
+        return null;
+    }
+
+    private function extractPartialPercentageFromPlan(string $plan): ?int
+    {
+        if (preg_match('/^partial_([1-9]|[1-9][0-9])$/', $plan, $matches) !== 1) {
+            return null;
+        }
+
+        $percent = (int) ($matches[1] ?? 0);
+        if ($percent <= 0 || $percent >= 100) {
+            return null;
+        }
+
+        return $percent;
+    }
+
+    private function formatXenditAmountPaidForSlack(Booking $booking): string
+    {
+        $ctx = $this->resolveXenditPaidContext($booking);
+        if ($ctx === null) {
+            return '—';
+        }
+
+        $formattedPaid = number_format($ctx['paid'], 2).' PHP';
+
+        if (! $ctx['is_partial']) {
+            return $formattedPaid.$ctx['source_note'];
+        }
+
+        $denom = $ctx['denom'];
+        if ($denom <= 0.0) {
+            return $formattedPaid.$ctx['source_note'];
+        }
+
+        $pct = round(($ctx['paid'] / $denom) * 100, 1);
+
+        return "{$formattedPaid} · {$pct}% of booking total".$ctx['source_note'];
     }
 
     /**

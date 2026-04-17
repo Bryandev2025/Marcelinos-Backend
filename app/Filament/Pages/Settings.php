@@ -95,7 +95,9 @@ class Settings extends Page
 
     public bool $onlinePaymentEnabled = false;
 
-    public string $partialPaymentOptions = '10,20,30';
+    public string $partialPaymentOptions = '30';
+
+    public int $partialPaymentSelection = 30;
 
     public bool $allowCustomPartialPayment = false;
 
@@ -201,6 +203,7 @@ class Settings extends Page
 
         Notification::make()
             ->title('Email settings saved')
+            ->body('SMTP and sender settings were updated successfully.')
             ->success()
             ->send();
 
@@ -230,6 +233,7 @@ class Settings extends Page
 
         Notification::make()
             ->title('SMS settings saved')
+            ->body('Semaphore gateway settings were updated successfully.')
             ->success()
             ->send();
 
@@ -284,6 +288,7 @@ class Settings extends Page
 
         Notification::make()
             ->title('Maintenance settings saved')
+            ->body('Maintenance mode preferences are now active.')
             ->success()
             ->send();
     }
@@ -307,18 +312,21 @@ class Settings extends Page
 
         $this->validate([
             'onlinePaymentEnabled' => ['required', 'boolean'],
-            'partialPaymentOptions' => ['nullable', 'string', 'max:255'],
+            'partialPaymentSelection' => $this->partialPaymentRules(),
             'allowCustomPartialPayment' => ['required', 'boolean'],
             'xenditSecretKey' => ['nullable', 'string', 'max:255'],
             'xenditPublicKey' => ['nullable', 'string', 'max:255'],
             'xenditWebhookToken' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $normalizedPartialOptions = $this->normalizePartialPaymentOptions($this->partialPaymentOptions);
+        $normalizedPartialOption = $this->normalizePartialPaymentSelection(
+            $this->partialPaymentSelection,
+            $this->allowCustomPartialPayment
+        );
 
         EnvEditor::updateMany([
             'PAYMENT_ONLINE_ENABLED' => $this->onlinePaymentEnabled ? 'true' : 'false',
-            'PAYMENT_PARTIAL_OPTIONS' => implode(',', $normalizedPartialOptions),
+            'PAYMENT_PARTIAL_OPTIONS' => (string) $normalizedPartialOption,
             'PAYMENT_PARTIAL_ALLOW_CUSTOM' => $this->allowCustomPartialPayment ? 'true' : 'false',
             'XENDIT_SECRET_KEY' => $this->xenditSecretKey,
             'XENDIT_PUBLIC_KEY' => $this->xenditPublicKey,
@@ -327,16 +335,18 @@ class Settings extends Page
 
         Cache::forever('payment_settings_config', [
             'online_payment_enabled' => $this->onlinePaymentEnabled,
-            'partial_payment_options' => $normalizedPartialOptions,
+            'partial_payment_options' => [$normalizedPartialOption],
             'allow_custom_partial_payment' => $this->allowCustomPartialPayment,
         ]);
 
-        $this->partialPaymentOptions = implode(',', $normalizedPartialOptions);
+        $this->partialPaymentOptions = (string) $normalizedPartialOption;
+        $this->partialPaymentSelection = $normalizedPartialOption;
 
         $this->editingPayment = false;
 
         Notification::make()
             ->title('Payment settings saved')
+            ->body('Payment and gateway configuration were updated.')
             ->success()
             ->send();
     }
@@ -404,6 +414,25 @@ class Settings extends Page
         $this->emailsSentToday = $this->resolveEmailsSentToday();
         $this->emailsLeftToday = max(0, $this->mailDailyLimit - $this->emailsSentToday);
         $this->lastCheckedAt = now()->format('Y-m-d H:i:s');
+    }
+
+    public function updatedEmailAlertThreshold($value): void
+    {
+        $this->emailAlertThreshold = (string) max(1, min(100, (int) $value));
+    }
+
+    public function updatedSmsLowCreditThreshold($value): void
+    {
+        $this->smsLowCreditThreshold = number_format(max(0, (float) $value), 2, '.', '');
+    }
+
+    public function updatedAllowCustomPartialPayment($value): void
+    {
+        $this->allowCustomPartialPayment = filter_var($value, FILTER_VALIDATE_BOOLEAN);
+        $this->partialPaymentSelection = $this->normalizePartialPaymentSelection(
+            $this->partialPaymentSelection,
+            $this->allowCustomPartialPayment
+        );
     }
 
     public function sendTestEmail(): void
@@ -598,8 +627,13 @@ class Settings extends Page
         $this->maintenanceDescription = (string) env('MAINTENANCE_MODE_DESCRIPTION', 'Our website is currently under maintenance. Please check back again shortly.');
         $this->maintenanceEta = (string) env('MAINTENANCE_MODE_ETA', '');
         $this->onlinePaymentEnabled = filter_var(env('PAYMENT_ONLINE_ENABLED', false), FILTER_VALIDATE_BOOLEAN);
-        $this->partialPaymentOptions = (string) env('PAYMENT_PARTIAL_OPTIONS', '10,20,30');
         $this->allowCustomPartialPayment = filter_var(env('PAYMENT_PARTIAL_ALLOW_CUSTOM', false), FILTER_VALIDATE_BOOLEAN);
+        $this->partialPaymentOptions = (string) env('PAYMENT_PARTIAL_OPTIONS', '30');
+        $this->partialPaymentSelection = $this->normalizePartialPaymentSelection(
+            $this->partialPaymentOptions,
+            $this->allowCustomPartialPayment
+        );
+        $this->partialPaymentOptions = (string) $this->partialPaymentSelection;
         $this->xenditSecretKey = (string) env('XENDIT_SECRET_KEY', '');
         $this->xenditPublicKey = (string) env('XENDIT_PUBLIC_KEY', '');
         $this->xenditWebhookToken = (string) env('XENDIT_WEBHOOK_TOKEN', '');
@@ -807,6 +841,38 @@ class Settings extends Page
             ->values()
             ->all();
 
-        return $values !== [] ? $values : [30];
+        return isset($values[0]) ? [(int) $values[0]] : [30];
+    }
+
+    private function normalizePartialPaymentSelection(int|string $raw, bool $allowCustom = false): int
+    {
+        $value = (int) $raw;
+
+        if ($allowCustom) {
+            return max(1, min(99, $value));
+        }
+
+        $allowed = $this->availablePartialPaymentOptions();
+
+        return in_array($value, $allowed, true) ? $value : 30;
+    }
+
+    private function partialPaymentRules(): array
+    {
+        $rules = ['required', 'integer', 'min:1', 'max:99'];
+
+        if (! $this->allowCustomPartialPayment) {
+            $rules[] = Rule::in($this->availablePartialPaymentOptions());
+        }
+
+        return $rules;
+    }
+
+    /**
+     * @return array<int>
+     */
+    private function availablePartialPaymentOptions(): array
+    {
+        return [10, 20, 30, 40, 50, 60, 70, 80, 90];
     }
 }

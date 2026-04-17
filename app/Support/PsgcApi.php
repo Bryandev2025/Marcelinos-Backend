@@ -147,6 +147,38 @@ final class PsgcApi
         return self::entityName("/barangays/{$code}");
     }
 
+    public static function regionCodeFromLabel(?string $label): ?string
+    {
+        return self::codeFromLabel(self::regionOptions(), $label);
+    }
+
+    public static function provinceCodeFromLabel(?string $regionCode, ?string $label): ?string
+    {
+        if (! $regionCode) {
+            return null;
+        }
+
+        return self::codeFromLabel(self::provinceOptions($regionCode), $label);
+    }
+
+    public static function municipalityCodeFromLabel(?string $regionCode, ?string $provinceCode, ?string $label): ?string
+    {
+        if (! $regionCode) {
+            return null;
+        }
+
+        return self::codeFromLabel(self::municipalityOptions($regionCode, $provinceCode), $label);
+    }
+
+    public static function barangayCodeFromLabel(?string $municipalityCode, ?string $label): ?string
+    {
+        if (! $municipalityCode) {
+            return null;
+        }
+
+        return self::codeFromLabel(self::barangayOptions($municipalityCode), $label);
+    }
+
     private static function entityName(string $path): ?string
     {
         $key = 'psgc.entity.'.md5($path);
@@ -160,6 +192,39 @@ final class PsgcApi
 
             return isset($decoded['name']) ? (string) $decoded['name'] : null;
         });
+    }
+
+    /**
+     * @param  array<string, string>  $options
+     */
+    private static function codeFromLabel(array $options, ?string $label): ?string
+    {
+        $needle = self::normalizeLabel($label);
+        if ($needle === null) {
+            return null;
+        }
+
+        foreach ($options as $code => $name) {
+            if (self::normalizeLabel($name) === $needle) {
+                return $code;
+            }
+        }
+
+        return null;
+    }
+
+    private static function normalizeLabel(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $normalized = trim((string) $value);
+        if ($normalized === '') {
+            return null;
+        }
+
+        return mb_strtolower(preg_replace('/\s+/', ' ', $normalized) ?? $normalized, 'UTF-8');
     }
 
     /**

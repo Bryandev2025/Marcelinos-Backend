@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\API\StoreBookingRequest;
 use App\Models\Booking;
 use App\Models\Guest;
+use App\Models\Payment;
 use App\Models\Room;
 use App\Models\Venue;
 use App\Services\BookingActionOtpService;
@@ -19,6 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -84,6 +86,7 @@ class BookingController extends Controller
     public function index(Request $request)
     {
         try {
+            Gate::authorize('viewAny', Booking::class);
             $perPage = min((int) $request->query('per_page', 15), 50);
 
             $bookings = Booking::with(['guest', 'rooms', 'venues', 'roomLines'])
@@ -183,6 +186,19 @@ class BookingController extends Controller
                 'message' => 'Selected partial payment option is not allowed.',
             ], 422);
         }
+        if (empty($booking->payment_method)) {
+            $booking->update(['payment_method' => 'online']);
+        }
+        if (empty($booking->online_payment_plan) && $paymentMode !== '') {
+            $booking->update(['online_payment_plan' => $paymentMode]);
+        }
+
+        // Persist a payment row immediately so receipts can display "Amount paid" even
+        // if webhook delivery is delayed. Webhook will upsert the same provider_ref.
+        $invoiceId = trim((string) ($booking->xendit_invoice_id ?? ''));
+        $chargeAmount = $this->plannedPaymentAmountForMode($booking, $paymentMode);
+        $this->upsertConfirmedPaymentRecord($booking, $invoiceId, $chargeAmount);
+
         $nextStatus = $this->extractPartialPercentage($paymentMode) !== null
             ? Booking::STATUS_PARTIAL
             : Booking::STATUS_PAID;
@@ -209,6 +225,9 @@ class BookingController extends Controller
         $filename = $booking->qr_code ? basename($booking->qr_code) : null;
 
         $bookingPayload = $booking->fresh(['guest', 'rooms', 'venues', 'roomLines']);
+        $amountPaid = (float) $bookingPayload->total_paid;
+        $balance = max(0, (float) $bookingPayload->balance);
+        $amountDueNow = $this->resolveAmountDueNow($bookingPayload);
 
         return response()->json([
             'booking' => $bookingPayload,
@@ -218,6 +237,9 @@ class BookingController extends Controller
                 'invoice_id' => (string) ($bookingPayload->xendit_invoice_id ?? ''),
                 'invoice_url' => (string) ($bookingPayload->xendit_invoice_url ?? ''),
                 'can_retry' => $this->canRetryOnlinePayment($bookingPayload),
+                'amount_paid' => $amountPaid,
+                'balance' => $balance,
+                'amount_due_now' => $amountDueNow,
             ],
             'unpaid_expires_at' => $bookingPayload->unpaidExpiresAt()?->toIso8601String(),
             'unpaid_expiry_days' => Booking::UNPAID_EXPIRY_DAYS,
@@ -459,16 +481,26 @@ class BookingController extends Controller
      */
     private function validateGuestRoomLines(array $roomLines, Carbon $checkIn, Carbon $checkOut, ?int $excludeBookingId): ?JsonResponse
     {
+        $typePool = collect($roomLines)
+            ->pluck('room_type')
+            ->filter(fn ($type) => is_string($type) && $type !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        $roomsByType = Room::query()
+            ->whereIn('type', $typePool)
+            ->where('status', '!=', Room::STATUS_MAINTENANCE)
+            ->with(['bedSpecifications'])
+            ->get()
+            ->groupBy('type');
+
         foreach ($roomLines as $line) {
             $type = $line['room_type'];
             $key = $line['inventory_group_key'];
             $submittedUnit = (float) $line['unit_price'];
 
-            $candidates = Room::query()
-                ->where('type', $type)
-                ->where('status', '!=', Room::STATUS_MAINTENANCE)
-                ->with(['bedSpecifications'])
-                ->get()
+            $candidates = ($roomsByType->get($type) ?? collect())
                 ->filter(fn (Room $r) => RoomInventoryGroupKey::forRoom($r) === $key);
 
             if ($candidates->isEmpty()) {
@@ -563,6 +595,8 @@ class BookingController extends Controller
                 ], 404);
             }
 
+            Gate::authorize('view', $booking);
+
             $this->expireIfNeeded($booking);
 
             return response()->json($booking, 200);
@@ -584,6 +618,8 @@ class BookingController extends Controller
                     'message' => 'Booking not found',
                 ], 404);
             }
+
+            Gate::authorize('update', $booking);
 
             if ($this->expireIfNeeded($booking)) {
                 return response()->json([
@@ -636,6 +672,8 @@ class BookingController extends Controller
                     'message' => 'Booking not found',
                 ], 404);
             }
+
+            Gate::authorize('delete', $booking);
 
             $booking->delete();
 
@@ -867,7 +905,12 @@ class BookingController extends Controller
             ], 422);
         }
 
-        $invoice = $this->createXenditInvoiceForBooking($booking, $guest, $plan);
+        $overrideAmount = null;
+        if ((string) $booking->status === Booking::STATUS_PARTIAL) {
+            $overrideAmount = max(1, (float) $booking->balance);
+        }
+
+        $invoice = $this->createXenditInvoiceForBooking($booking, $guest, $plan, $overrideAmount);
         $paymentUrl = $invoice['invoice_url'] ?? null;
 
         if (! is_string($paymentUrl) || trim($paymentUrl) === '') {
@@ -955,7 +998,12 @@ class BookingController extends Controller
     /**
      * @return array{invoice_url?: string}
      */
-    private function createXenditInvoiceForBooking(Booking $booking, Guest $guest, string $paymentPlan): array
+    private function createXenditInvoiceForBooking(
+        Booking $booking,
+        Guest $guest,
+        string $paymentPlan,
+        ?float $overrideAmount = null
+    ): array
     {
         $secretKey = trim((string) config('services.xendit.secret_key'));
         if ($secretKey === '') {
@@ -967,6 +1015,9 @@ class BookingController extends Controller
         $chargeAmount = $partialPercent !== null
             ? max(1, (float) round($totalAmount * ($partialPercent / 100), 2))
             : max(1, $totalAmount);
+        if ($overrideAmount !== null) {
+            $chargeAmount = max(1, (float) round($overrideAmount, 2));
+        }
 
         $frontendBase = rtrim((string) config('app.frontend_url'), '/');
         $receiptToken = (string) $booking->receipt_token;
@@ -991,6 +1042,7 @@ class BookingController extends Controller
                 'receipt_token' => $booking->receipt_token,
                 'payment_mode' => $paymentPlan,
                 'full_amount' => $totalAmount,
+                'override_amount' => $overrideAmount,
             ],
         ];
 
@@ -1019,6 +1071,82 @@ class BookingController extends Controller
         }
 
         return $percent;
+    }
+
+    private function resolveAmountDueNow(Booking $booking): float
+    {
+        $totalAmount = (float) $booking->total_price;
+        $balance = max(0, (float) $booking->balance);
+        $plan = (string) ($booking->online_payment_plan ?? '');
+        $status = (string) ($booking->status ?? '');
+        $partialPercent = $this->extractPartialPercentage($plan);
+
+        if ($status === Booking::STATUS_PARTIAL) {
+            return $balance;
+        }
+
+        if ($partialPercent !== null) {
+            return max(0, (float) round($totalAmount * ($partialPercent / 100), 2));
+        }
+
+        return max(0, $totalAmount);
+    }
+
+    private function plannedPaymentAmountForMode(Booking $booking, string $paymentMode): float
+    {
+        $totalAmount = (float) $booking->total_price;
+        $balance = max(0, (float) $booking->balance);
+        $partialPercent = $this->extractPartialPercentage($paymentMode);
+
+        if ((string) $booking->status === Booking::STATUS_PARTIAL) {
+            return $balance;
+        }
+
+        if ($partialPercent !== null) {
+            return max(0, (float) round($totalAmount * ($partialPercent / 100), 2));
+        }
+
+        return max(0, $totalAmount);
+    }
+
+    private function upsertConfirmedPaymentRecord(Booking $booking, string $invoiceId, float $amount): void
+    {
+        if ($amount <= 0) {
+            return;
+        }
+
+        $totalAmount = (int) round((float) $booking->total_price);
+        $partialAmount = (int) round($amount);
+        $isFullyPaid = $totalAmount > 0 && $partialAmount >= $totalAmount;
+
+        // Best-effort: prefer linking to invoice id; if missing, still store the payment.
+        if ($invoiceId !== '') {
+            $existing = Payment::query()
+                ->where('booking_id', $booking->id)
+                ->where('provider', 'xendit')
+                ->where('provider_ref', $invoiceId)
+                ->first();
+
+            if ($existing) {
+                $existing->update([
+                    'total_amount' => $totalAmount,
+                    'partial_amount' => $partialAmount,
+                    'is_fullypaid' => $isFullyPaid,
+                    'provider_status' => 'confirmed',
+                ]);
+
+                return;
+            }
+        }
+
+        $booking->payments()->create([
+            'total_amount' => $totalAmount,
+            'partial_amount' => $partialAmount,
+            'is_fullypaid' => $isFullyPaid,
+            'provider' => $invoiceId !== '' ? 'xendit' : null,
+            'provider_ref' => $invoiceId !== '' ? $invoiceId : null,
+            'provider_status' => 'confirmed',
+        ]);
     }
 
     /**

@@ -56,6 +56,7 @@ return [
     'semaphore' => [
         'api_key' => env('SEMAPHORE_API_KEY'),
         'otp_url' => env('SEMAPHORE_OTP_URL', 'https://api.semaphore.co/api/v4/otp'),
+        'messages_url' => env('SEMAPHORE_MESSAGES_URL', 'https://api.semaphore.co/api/v4/messages'),
         'sender_name' => env('SEMAPHORE_SENDER_NAME'),
     ],
 
@@ -63,6 +64,21 @@ return [
         'secret_key' => env('XENDIT_SECRET_KEY'),
         'webhook_token' => env('XENDIT_WEBHOOK_TOKEN'),
         'invoice_url' => env('XENDIT_INVOICE_URL', 'https://api.xendit.co/v2/invoices'),
+    ],
+
+    'google_sheets' => [
+        'enabled' => filter_var(env('GOOGLE_SHEETS_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        'spreadsheet_id' => env('GOOGLE_SHEETS_SPREADSHEET_ID'),
+        'credentials_path' => env('GOOGLE_SHEETS_CREDENTIALS_PATH'),
+        'status_to_sheet' => [
+            'unpaid' => env('GOOGLE_SHEETS_TAB_UNPAID', 'Unpaid'),
+            'partial' => env('GOOGLE_SHEETS_TAB_PARTIAL', 'Partial'),
+            'paid' => env('GOOGLE_SHEETS_TAB_PAID', 'Paid'),
+            'completed' => env('GOOGLE_SHEETS_TAB_COMPLETE', 'Complete'),
+            'occupied' => env('GOOGLE_SHEETS_TAB_CHECKED_IN', 'Checked in'),
+            'cancelled' => env('GOOGLE_SHEETS_TAB_CANCEL', 'Cancel'),
+            'rescheduled' => env('GOOGLE_SHEETS_TAB_RESCHEDULED', 'Rescheduled'),
+        ],
     ],
 
 ];

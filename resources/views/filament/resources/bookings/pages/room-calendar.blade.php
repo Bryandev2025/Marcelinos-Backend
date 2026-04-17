@@ -327,7 +327,7 @@
     @if ($modalDate && $modalType)
         <div
             class="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-gray-950/60 px-0 py-0 backdrop-blur-[2px] sm:items-center sm:px-4 sm:py-10"
-            wire:click="closeModal"
+            wire:click.self="closeModal"
             x-data
             x-on:keydown.escape.window="$wire.closeModal()"
             role="presentation"
@@ -448,12 +448,13 @@
                                         class="flex flex-col gap-3 border-b border-gray-100 px-3 py-3 dark:border-white/5 sm:flex-row sm:items-start sm:justify-between sm:px-4"
                                     >
                                         <div class="min-w-0">
-                                            <a
-                                                href="{{ \App\Filament\Resources\Bookings\BookingResource::getUrl('view', ['record' => $row['id']]) }}"
-                                                class="break-all font-mono text-sm font-semibold text-primary-600 hover:text-primary-700 hover:underline dark:text-primary-400 dark:hover:text-primary-300"
+                                            <button
+                                                type="button"
+                                                @click.stop="window.location.assign('{{ \App\Filament\Resources\Bookings\BookingResource::getUrl('view', ['record' => $row['id']]) }}')"
+                                                class="break-all text-left font-mono text-sm font-semibold text-primary-600 hover:text-primary-700 hover:underline dark:text-primary-400 dark:hover:text-primary-300"
                                             >
                                                 {{ $row['reference_number'] }}
-                                            </a>
+                                            </button>
                                             <p class="mt-0.5 break-words text-sm text-gray-700 dark:text-gray-200">
                                                 {{ $row['guest_name'] }}
                                             </p>
@@ -514,20 +515,20 @@
                                                     x-transition.origin.top.right
                                                     class="absolute right-0 top-full z-30 mt-1 w-40 overflow-hidden rounded-md border border-gray-300 bg-white py-1 shadow-md dark:border-white/15 dark:bg-gray-900"
                                                 >
-                                                    <a
-                                                        href="{{ \App\Filament\Resources\Bookings\BookingResource::getUrl('view', ['record' => $row['id']]) }}"
-                                                        @click="open = false"
-                                                        class="block whitespace-nowrap px-3 py-1.5 text-[13px] font-medium leading-5 text-gray-800 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
+                                                    <button
+                                                        type="button"
+                                                        @click="open = false; window.location.assign('{{ \App\Filament\Resources\Bookings\BookingResource::getUrl('view', ['record' => $row['id']]) }}')"
+                                                        class="block w-full whitespace-nowrap px-3 py-1.5 text-left text-[13px] font-medium leading-5 text-gray-800 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
                                                     >
                                                         View
-                                                    </a>
-                                                    <a
-                                                        href="{{ \App\Filament\Resources\Bookings\BookingResource::getUrl('edit', ['record' => $row['id']]) }}"
-                                                        @click="open = false"
-                                                        class="block whitespace-nowrap px-3 py-1.5 text-[13px] font-medium leading-5 text-gray-800 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        @click="open = false; window.location.assign('{{ \App\Filament\Resources\Bookings\BookingResource::getUrl('edit', ['record' => $row['id']]) }}')"
+                                                        class="block w-full whitespace-nowrap px-3 py-1.5 text-left text-[13px] font-medium leading-5 text-gray-800 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
                                                     >
                                                         Edit
-                                                    </a>
+                                                    </button>
 
                                                     @if (($row['can_pay_balance'] ?? false) === true)
                                                         <button
