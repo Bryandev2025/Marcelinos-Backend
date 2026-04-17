@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Mail\BookingReminderMail;
 use App\Models\Booking;
+use App\Services\SemaphoreSmsService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -13,7 +14,7 @@ class SendBookingReminders extends Command
     protected $signature = 'bookings:send-reminders';
     protected $description = 'Send booking reminder emails one day before check-in at 12 noon';
 
-    public function handle(): int
+    public function handle(SemaphoreSmsService $smsService): int
     {
         $now = now('Asia/Manila');
         $tomorrow = $now->copy()->addDay()->toDateString();
@@ -44,7 +45,7 @@ class SendBookingReminders extends Command
 
         foreach ($bookings as $booking) {
             try {
-                if (!$booking->guest || !$booking->guest->email) {
+                if (! $booking->guest || ! $booking->guest->email) {
                     Log::warning('Booking reminder skipped: missing guest email.', [
                         'booking_id' => $booking->id,
                     ]);
@@ -53,25 +54,71 @@ class SendBookingReminders extends Command
 
                 $this->info("Sending reminder to: {$booking->guest->email} for booking ID {$booking->id}");
 
-                $mail = Mail::to($booking->guest->email);
-                $bookingCcAddress = config('mail.booking_cc_address');
+                $emailSent = false;
+                $smsSent = false;
+                $smsSentTo = null;
+                $smsError = null;
 
-                if (filled($bookingCcAddress)) {
-                    $mail->cc($bookingCcAddress);
+                try {
+                    $mail = Mail::to($booking->guest->email);
+                    $bookingCcAddress = config('mail.booking_cc_address');
+
+                    if (filled($bookingCcAddress)) {
+                        $mail->cc($bookingCcAddress);
+                    }
+
+                    $mail->send(new BookingReminderMail($booking));
+                    $emailSent = true;
+                } catch (\Throwable $emailException) {
+                    Log::error('Booking reminder email failed to send.', [
+                        'booking_id' => $booking->id,
+                        'email' => $booking->guest->email,
+                        'error' => $emailException->getMessage(),
+                    ]);
                 }
 
-                $mail->send(new BookingReminderMail($booking));
+                $contactNumber = (string) ($booking->guest->contact_num ?? '');
+                if (trim($contactNumber) !== '') {
+                    try {
+                        $smsSentTo = $smsService->sendBookingReminder($contactNumber, $this->buildReminderSms($booking));
+                        $smsSent = true;
+                    } catch (\Throwable $smsException) {
+                        $smsError = $smsException->getMessage();
+
+                        Log::warning('Booking reminder SMS failed to send.', [
+                            'booking_id' => $booking->id,
+                            'contact_num' => $booking->guest->contact_num,
+                            'error' => $smsError,
+                        ]);
+                    }
+                } else {
+                    $smsError = 'Missing guest contact number.';
+                    Log::warning('Booking reminder SMS skipped: missing guest contact number.', [
+                        'booking_id' => $booking->id,
+                    ]);
+                }
 
                 $booking->update([
-                    'reminder_sent' => true,
-                    'reminder_sent_at' => now(),
+                    'reminder_sent' => $emailSent,
+                    'reminder_sent_at' => $emailSent ? now() : null,
+                    'reminder_sms_sent' => $smsSent,
+                    'reminder_sms_sent_at' => $smsSent ? now() : null,
+                    'reminder_sms_error' => $smsError,
                 ]);
 
-                $sentCount++;
+                if ($emailSent) {
+                    $sentCount++;
+                } else {
+                    $failedCount++;
+                }
 
-                Log::info('Booking reminder sent successfully.', [
+                Log::info('Booking reminder dispatch result.', [
                     'booking_id' => $booking->id,
                     'email' => $booking->guest->email,
+                    'email_sent' => $emailSent,
+                    'sms_sent' => $smsSent,
+                    'sms_sent_to' => $smsSentTo,
+                    'sms_error' => $smsError,
                     'check_in' => $booking->check_in,
                 ]);
             } catch (\Throwable $e) {
@@ -88,5 +135,14 @@ class SendBookingReminders extends Command
         $this->info("Booking reminders complete. Sent: {$sentCount}, Failed: {$failedCount}");
 
         return self::SUCCESS;
+    }
+
+    private function buildReminderSms(Booking $booking): string
+    {
+        $name = trim((string) ($booking->guest?->full_name ?? 'Guest'));
+        $checkIn = $booking->check_in?->timezone('Asia/Manila')->format('M j, Y g:i A') ?? 'tomorrow';
+        $reference = trim((string) $booking->reference_number);
+
+        return "Hi {$name}, this is a reminder that your Marcelino's booking ({$reference}) starts on {$checkIn}. See you soon!";
     }
 }
