@@ -6,6 +6,7 @@ use App\Events\AdminDashboardNotification;
 use App\Events\BookingStatusUpdated;
 use App\Events\FilamentNotificationSound;
 use App\Filament\Resources\Bookings\BookingResource;
+use App\Jobs\SyncBookingToGoogleSheet;
 use App\Mail\TestimonialFeedbackEmail;
 use App\Models\Booking;
 use App\Models\User;
@@ -101,6 +102,11 @@ class BookingObserver
         SlackBookingAlerts::notify(new BookingLifecycleSlackNotification($booking, 'created'));
 
         BookingDoubleBookAlert::scheduleCheckAfterSave($booking);
+
+        SyncBookingToGoogleSheet::dispatch(
+            bookingId: (int) $booking->id,
+            referenceNumber: (string) $booking->reference_number,
+        );
     }
 
     public function updated(Booking $booking): void
@@ -233,6 +239,11 @@ class BookingObserver
         );
 
         BookingDoubleBookAlert::scheduleCheckAfterSave($booking);
+
+        SyncBookingToGoogleSheet::dispatch(
+            bookingId: (int) $booking->id,
+            referenceNumber: (string) $booking->reference_number,
+        );
     }
 
     private function collectBookingChanges(Booking $booking): array
@@ -306,6 +317,12 @@ class BookingObserver
         );
 
         SlackBookingAlerts::notify(new BookingLifecycleSlackNotification($booking, 'deleted'));
+
+        SyncBookingToGoogleSheet::dispatch(
+            bookingId: (int) $booking->id,
+            referenceNumber: (string) $booking->reference_number,
+            removeOnly: true,
+        );
     }
 
     private function safeBroadcast(callable $dispatch, string $eventName, Booking $booking, string $action): void

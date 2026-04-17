@@ -65,4 +65,19 @@ return [
         'invoice_url' => env('XENDIT_INVOICE_URL', 'https://api.xendit.co/v2/invoices'),
     ],
 
+    'google_sheets' => [
+        'enabled' => filter_var(env('GOOGLE_SHEETS_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        'spreadsheet_id' => env('GOOGLE_SHEETS_SPREADSHEET_ID'),
+        'credentials_path' => env('GOOGLE_SHEETS_CREDENTIALS_PATH'),
+        'status_to_sheet' => [
+            'unpaid' => env('GOOGLE_SHEETS_TAB_UNPAID', 'Unpaid'),
+            'partial' => env('GOOGLE_SHEETS_TAB_PARTIAL', 'Partial'),
+            'paid' => env('GOOGLE_SHEETS_TAB_PAID', 'Paid'),
+            'completed' => env('GOOGLE_SHEETS_TAB_COMPLETE', 'Complete'),
+            'occupied' => env('GOOGLE_SHEETS_TAB_CHECKED_IN', 'Checked in'),
+            'cancelled' => env('GOOGLE_SHEETS_TAB_CANCEL', 'Cancel'),
+            'rescheduled' => env('GOOGLE_SHEETS_TAB_RESCHEDULED', 'Rescheduled'),
+        ],
+    ],
+
 ];
