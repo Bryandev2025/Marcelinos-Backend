@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Mail\BookingCreated;
+use App\Mail\TestimonialFeedbackEmail;
 use App\Support\RoomInventoryGroupKey;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -88,20 +90,37 @@ class Booking extends Model
         });
 
         /**
-         * Send testimonial feedback email immediately when status changes to completed
+         * Send testimonial feedback email when status transitions to completed (scheduler or admin).
          */
-        // static::updated(function (Booking $booking) {
-        //     if (
-        //         $booking->status === Booking::STATUS_COMPLETED &&
-        //         $booking->guest && $booking->guest->email &&
-        //         !$booking->testimonial_feedback_sent_at
-        //     ) {
-        //         \Illuminate\Support\Facades\Mail::to($booking->guest->email)
-        //             ->send(new \App\Mail\TestimonialFeedbackEmail($booking));
-        //         $booking->updateQuietly(['testimonial_feedback_sent_at' => now()]);
-        //     }
-        // });
-        // ...existing code...
+        static::updated(function (Booking $booking) {
+            if (! $booking->wasChanged('status') || $booking->status !== Booking::STATUS_COMPLETED) {
+                return;
+            }
+            if ($booking->testimonial_feedback_sent_at !== null) {
+                return;
+            }
+
+            $booking->loadMissing('guest');
+            $email = $booking->guest?->email;
+            if (! $email) {
+                return;
+            }
+
+            try {
+                Mail::to($email)->send(new TestimonialFeedbackEmail($booking));
+            } catch (\Throwable $e) {
+                Log::error('Failed sending testimonial feedback', [
+                    'booking_id' => $booking->id,
+                    'reference_number' => $booking->reference_number,
+                    'guest_email' => $email,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return;
+            }
+
+            $booking->updateQuietly(['testimonial_feedback_sent_at' => now()]);
+        });
     }
 
     /* ================= RELATIONSHIPS ================= */

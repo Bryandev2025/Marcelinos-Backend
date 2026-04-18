@@ -27,8 +27,9 @@ The application uses **Laravel's task scheduling**. A single system cron job run
 
 - `CompleteCheckoutBookings.php` → `bookings:complete-checkouts`
 - `ActivateCheckinBookings.php` → `bookings:activate-checkins`
-- `SendTestimonialFeedback.php` → `testimonials:send-feedback`
 - `CancelPendingBookings.php` → `bookings:cancel-unpaid`
+
+**Testimonial feedback email** is not a scheduled Artisan command. When a booking’s `status` changes to `completed` (including after `bookings:complete-checkouts` or staff/admin updates), `App\Models\Booking` sends `TestimonialFeedbackEmail` once and sets `testimonial_feedback_sent_at`.
 
 ---
 
@@ -91,23 +92,9 @@ The application uses **Laravel's task scheduling**. A single system cron job run
 
 ---
 
-### 4. Send testimonial feedback emails
+### 4. Testimonial feedback emails (not scheduled)
 
-| Item     | Value                            |
-| -------- | -------------------------------- |
-| Command  | `testimonials:send-feedback`     |
-| Schedule | Daily at **12:00** (Asia/Manila) |
-
-**Logic:**
-
-- Selects bookings where:
-    - `status` = `completed`
-    - `check_out <= (now - 1 day)` (effectively "at least 24 hours after check-out time has passed")
-    - `testimonial_feedback_sent_at` is `null`
-- Sends an email to the guest with a signed, expiring link to submit their testimonial.
-- Marks `testimonial_feedback_sent_at` after a successful send.
-
----
+There is no `testimonials:send-feedback` command or scheduler entry. When a booking transitions to **`completed`**, the `Booking` model’s `updated` hook sends the testimonial email (if the guest has an email and `testimonial_feedback_sent_at` is still null) and then records the send timestamp.
 
 ---
 
