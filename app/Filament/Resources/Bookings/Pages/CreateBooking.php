@@ -9,6 +9,7 @@ use App\Models\Booking;
 use App\Models\Guest;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Resources\Pages\CreateRecord\Concerns\HasWizard;
+use Filament\Schemas\Components\Component;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 
@@ -27,7 +28,7 @@ class CreateBooking extends CreateRecord
         return BookingCreateWizard::steps();
     }
 
-    public function getWizardComponent(): \Filament\Schemas\Components\Component
+    public function getWizardComponent(): Component
     {
         return $this->traitGetWizardComponent()
             ->persistStepInQueryString('step');
@@ -123,5 +124,17 @@ class CreateBooking extends CreateRecord
     public function getWizardPendingPaymentAmount(): ?int
     {
         return $this->pendingPaymentAmount;
+    }
+
+    protected function getRedirectUrl(): string
+    {
+        $record = $this->getRecord();
+        if ($record instanceof Booking) {
+            $record->refresh();
+
+            return BookingResource::calendarUrlForBooking($record);
+        }
+
+        return parent::getRedirectUrl();
     }
 }

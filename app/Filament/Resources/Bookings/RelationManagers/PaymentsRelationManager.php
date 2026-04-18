@@ -6,6 +6,7 @@ use App\Filament\Actions\TypedDeleteAction;
 use App\Filament\Actions\TypedDeleteBulkAction;
 use App\Filament\Actions\TypedForceDeleteAction;
 use App\Filament\Actions\TypedForceDeleteBulkAction;
+use App\Filament\Resources\Bookings\BookingResource;
 use App\Models\Booking;
 use App\Models\Payment;
 use Filament\Actions\BulkActionGroup;
@@ -39,6 +40,7 @@ class PaymentsRelationManager extends RelationManager
                     ->prefix('₱'),
                 TextInput::make('partial_amount')
                     ->label('Amount Paid (Cash)')
+                    ->default(fn (RelationManager $livewire): int|float => max(0, $livewire->getOwnerRecord()->balance))
                     ->required()
                     ->numeric()
                     ->prefix('₱')
@@ -77,8 +79,9 @@ class PaymentsRelationManager extends RelationManager
             ->headerActions([
                 CreateAction::make()
                     ->visible(fn (): bool => ! $this->getOwnerRecord()->trashed())
-                    ->label('Add Payment')
-                    ->modalHeading('Record New Cash Payment')
+                    ->label('Record cash payment')
+                    ->modalHeading('Record cash payment')
+                    ->modalDescription('Enter a partial or full cash amount. To settle only the remaining balance in one step and mark Paid, use Settle remaining balance on the booking instead.')
                     ->mutateFormDataUsing(function (array $data, RelationManager $livewire): array {
                         $booking = $livewire->getOwnerRecord();
                         $totalPaidSoFar = collect($livewire->getRelationship()->get())->sum('partial_amount');
@@ -90,19 +93,22 @@ class PaymentsRelationManager extends RelationManager
                     })
                     ->after(function (array $data, RelationManager $livewire) {
                         $booking = $livewire->getOwnerRecord();
-                        if (in_array($booking->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true)) {
+                        if (! $booking instanceof Booking) {
                             return;
                         }
 
-                        if ($booking->total_paid >= $booking->total_price) {
-                            $booking->update(['status' => Booking::STATUS_PAID]);
+                        $booking->refresh();
 
-                            return;
+                        if (! in_array($booking->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true)) {
+                            if ($booking->total_paid >= $booking->total_price) {
+                                $booking->update(['status' => Booking::STATUS_PAID]);
+                            } elseif ($booking->total_paid > 0 && $booking->total_paid < $booking->total_price) {
+                                $booking->update(['status' => Booking::STATUS_PARTIAL]);
+                            }
                         }
 
-                        if ($booking->total_paid > 0 && $booking->total_paid < $booking->total_price) {
-                            $booking->update(['status' => Booking::STATUS_PARTIAL]);
-                        }
+                        $booking->refresh();
+                        $livewire->redirect(BookingResource::calendarUrlForBooking($booking));
                     }),
             ])
             ->recordActions([

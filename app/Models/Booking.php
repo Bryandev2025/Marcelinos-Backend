@@ -6,6 +6,7 @@ use App\Mail\BookingCreated;
 use App\Mail\TestimonialFeedbackEmail;
 use App\Support\RoomInventoryGroupKey;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -191,6 +192,82 @@ class Booking extends Model
                     'rooms' => ["Guest requested {$need} × {$label}. You assigned {$have} matching room(s)."],
                 ]);
             }
+        }
+    }
+
+    /**
+     * Guest billing includes room lines → staff must assign matching physical rooms before check-in.
+     */
+    public function expectsRoomAssignments(): bool
+    {
+        if (! $this->relationLoaded('roomLines')) {
+            if (! $this->exists) {
+                return false;
+            }
+            $this->loadMissing('roomLines');
+        }
+
+        return $this->roomLines->isNotEmpty();
+    }
+
+    /**
+     * Booking was sold with a venue package (see API create / Filament) → at least one venue must stay attached.
+     */
+    public function expectsVenueAssignments(): bool
+    {
+        return filled($this->venue_event_type);
+    }
+
+    /**
+     * Whether rooms (if required) and venues (if required) satisfy rules for transitioning to {@see STATUS_OCCUPIED}.
+     */
+    public function assignmentsSatisfiedForOccupied(): bool
+    {
+        try {
+            $this->assertAssignmentsSatisfiedForOccupied();
+
+            return true;
+        } catch (ValidationException) {
+            return false;
+        }
+    }
+
+    /**
+     * Ensures physical rooms match room lines and venue package has at least one venue before marking occupied.
+     *
+     * @throws ValidationException
+     */
+    public function assertAssignmentsSatisfiedForOccupied(): void
+    {
+        if (! $this->relationLoaded('roomLines') && $this->exists) {
+            $this->loadMissing('roomLines');
+        }
+        if (! $this->relationLoaded('venues')) {
+            if ($this->exists) {
+                $this->loadMissing('venues');
+            } else {
+                $this->setRelation('venues', collect());
+            }
+        }
+        if (! $this->relationLoaded('rooms')) {
+            if ($this->exists) {
+                $this->loadMissing(['rooms.bedSpecifications']);
+            } else {
+                $this->setRelation('rooms', collect());
+            }
+        } elseif ($this->rooms instanceof Collection) {
+            $this->rooms->loadMissing('bedSpecifications');
+        }
+
+        if ($this->expectsRoomAssignments()) {
+            $roomIds = $this->rooms->pluck('id')->all();
+            self::validateAssignedRoomsFulfillRoomLines($this, $roomIds);
+        }
+
+        if ($this->expectsVenueAssignments() && $this->venues->isEmpty()) {
+            throw ValidationException::withMessages([
+                'venues' => ['Assign at least one venue before check-in.'],
+            ]);
         }
     }
 

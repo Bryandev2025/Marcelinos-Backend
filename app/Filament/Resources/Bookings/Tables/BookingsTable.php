@@ -10,6 +10,10 @@ use App\Filament\Exports\BookingExporter;
 use App\Mail\BookingCreated;
 use App\Models\Booking;
 use App\Models\Room;
+use App\Support\BookingAdminGuidance;
+use App\Support\BookingCheckInEligibility;
+use App\Support\BookingFullBalancePayment;
+use App\Support\BookingLifecycleActions;
 use App\Support\BookingPricing;
 use Carbon\Carbon;
 use Filament\Actions\Action;
@@ -27,6 +31,7 @@ use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Enums\Width;
+use Filament\Support\Exceptions\Halt;
 use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -373,6 +378,12 @@ class BookingsTable
                     ->formatStateUsing(fn (?string $state): string => Booking::statusOptions()[$state] ?? (string) $state)
                     ->sortable(),
 
+                TextColumn::make('next_step')
+                    ->label('Next step')
+                    ->getStateUsing(fn (Booking $record): string => BookingAdminGuidance::listNextActionLabel($record))
+                    ->wrap()
+                    ->toggleable(),
+
                 TextColumn::make('created_at')
                     ->label('Created')
                     ->dateTime()
@@ -536,73 +547,103 @@ class BookingsTable
                     ViewAction::make(),
                     EditAction::make(),
                     Action::make('payBalance')
-                        ->label('Pay Balance')
+                        ->label('Settle remaining balance')
                         ->icon('heroicon-o-banknotes')
                         ->color('info')
                         ->requiresConfirmation()
                         ->modalHeading('Mark booking as fully paid?')
-                        ->modalDescription('This records the remaining balance as payment and updates status to Paid.')
+                        ->modalDescription('Records one payment for the full remaining balance and sets status to Paid. For partial cash amounts, use the Payments tab on the booking.')
                         ->modalSubmitActionLabel('Yes, mark as paid')
                         ->successNotificationTitle('Remaining balance recorded. Booking is now paid.')
-                        ->visible(function (Booking $record): bool {
-                            if ($record->trashed()) {
-                                return false;
-                            }
-
-                            $balance = (float) $record->balance;
-
-                            return $balance > 0.009
-                                && $record->status !== Booking::STATUS_PAID
-                                && $record->status !== Booking::STATUS_CANCELLED
-                                && $record->rooms()->exists();
-                        })
+                        ->visible(fn (Booking $record): bool => BookingFullBalancePayment::assess($record)['allowed'])
                         ->action(function (Booking $record) {
-                            if (! $record->rooms()->exists()) {
+                            try {
+                                BookingFullBalancePayment::record($record);
+                            } catch (\InvalidArgumentException $e) {
                                 Notification::make()
                                     ->title('Cannot mark as paid')
-                                    ->body('Assign at least one room before recording full balance payment.')
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+
+                                throw new Halt;
+                            }
+                        }),
+                    Action::make('checkIn')
+                        ->label('Check in guest')
+                        ->icon('heroicon-o-arrow-right-circle')
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->modalHeading('Check in this guest?')
+                        ->modalDescription('Sets status to Occupied (guest is on site).')
+                        ->visible(fn (Booking $record) => ! $record->trashed() && BookingCheckInEligibility::assess($record)['allowed'])
+                        ->action(function (Booking $record) {
+                            $record->loadMissing(['roomLines', 'venues', 'rooms.bedSpecifications']);
+                            try {
+                                BookingLifecycleActions::checkIn($record);
+                            } catch (\InvalidArgumentException $e) {
+                                Notification::make()
+                                    ->title('Cannot check in')
+                                    ->body($e->getMessage())
                                     ->danger()
                                     ->send();
 
                                 return;
                             }
 
-                            if (in_array($record->status, [Booking::STATUS_PAID, Booking::STATUS_CANCELLED], true)) {
-                                return;
-                            }
-
-                            if ((float) $record->balance <= 0.009) {
-                                return;
-                            }
-
-                            $record->payments()->create([
-                                'total_amount' => $record->total_price,
-                                'partial_amount' => $record->balance,
-                                'is_fullypaid' => true,
-                            ]);
-                            $record->update(['status' => Booking::STATUS_PAID]);
+                            Notification::make()
+                                ->title('Booking checked in.')
+                                ->success()
+                                ->send();
                         }),
-                    Action::make('checkIn')
-                        ->label('Check-in')
-                        ->icon('heroicon-o-arrow-right-circle')
-                        ->color('warning')
-                        ->requiresConfirmation()
-                        ->visible(fn (Booking $record) => ! $record->trashed() && $record->status === Booking::STATUS_PAID)
-                        ->action(fn (Booking $record) => $record->update(['status' => Booking::STATUS_OCCUPIED])),
                     Action::make('complete')
-                        ->label('Complete')
+                        ->label('Mark stay complete')
                         ->icon('heroicon-o-flag')
                         ->color('secondary')
                         ->requiresConfirmation()
                         ->visible(fn (Booking $record) => ! $record->trashed() && $record->status === Booking::STATUS_OCCUPIED)
-                        ->action(fn (Booking $record) => $record->update(['status' => Booking::STATUS_COMPLETED])),
+                        ->action(function (Booking $record) {
+                            try {
+                                BookingLifecycleActions::complete($record);
+                            } catch (\InvalidArgumentException $e) {
+                                Notification::make()
+                                    ->title('Cannot complete')
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+
+                                return;
+                            }
+
+                            Notification::make()
+                                ->title('Booking marked as completed.')
+                                ->success()
+                                ->send();
+                        }),
                     Action::make('cancel')
-                        ->label('Cancel')
+                        ->label('Cancel booking')
                         ->icon('heroicon-o-x-circle')
                         ->color('danger')
                         ->requiresConfirmation()
                         ->visible(fn (Booking $record) => ! $record->trashed() && ! in_array($record->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true))
-                        ->action(fn (Booking $record) => $record->update(['status' => Booking::STATUS_CANCELLED])),
+                        ->action(function (Booking $record) {
+                            try {
+                                BookingLifecycleActions::cancel($record);
+                            } catch (\InvalidArgumentException $e) {
+                                Notification::make()
+                                    ->title('Cannot cancel')
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+
+                                return;
+                            }
+
+                            Notification::make()
+                                ->title('Booking cancelled.')
+                                ->success()
+                                ->send();
+                        }),
                     RestoreAction::make(),
                     TypedForceDeleteAction::make(fn (Booking $record): string => $record->reference_number),
                     TypedDeleteAction::make(fn (Booking $record): string => $record->reference_number),
