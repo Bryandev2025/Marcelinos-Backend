@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Support\EnvEditor;
 use App\Support\MaintenancePageVariant;
 use Carbon\Carbon;
+use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Cache;
@@ -32,6 +33,11 @@ class Settings extends Page
     public bool $editingMaintenance = false;
 
     public bool $editingPayment = false;
+
+    public static function canAccess(): bool
+    {
+        return Filament::getCurrentPanel()?->getId() !== 'staff';
+    }
 
     public string $mailHost = '';
 
