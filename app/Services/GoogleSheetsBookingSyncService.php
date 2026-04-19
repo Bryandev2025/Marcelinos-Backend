@@ -144,12 +144,8 @@ class GoogleSheetsBookingSyncService
 
     private function makeSheetsService(): GoogleSheets
     {
-        $credentialsPath = trim((string) config('services.google_sheets.credentials_path', ''));
-        if ($credentialsPath === '') {
-            throw new \RuntimeException('Google Sheets credentials path is missing.');
-        }
+        $resolvedPath = storage_path('app/google-credentials.json');
 
-        $resolvedPath = base_path($credentialsPath);
         if (! is_file($resolvedPath)) {
             throw new \RuntimeException("Google Sheets credentials file not found at [{$resolvedPath}].");
         }
