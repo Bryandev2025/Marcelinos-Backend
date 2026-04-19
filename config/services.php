@@ -69,7 +69,7 @@ return [
     'google_sheets' => [
         'enabled' => filter_var(env('GOOGLE_SHEETS_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
         'spreadsheet_id' => env('GOOGLE_SHEETS_SPREADSHEET_ID'),
-        'credentials_path' => env('GOOGLE_SHEETS_CREDENTIALS_PATH'),
+        'credentials_path' => storage_path('app/google-credentials.json'),
             'status_to_sheet' => [
             'unpaid' => 'Unpaid',
             'partial' => 'Partial',
