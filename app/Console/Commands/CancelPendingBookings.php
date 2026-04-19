@@ -14,7 +14,7 @@ class CancelPendingBookings extends Command
      * @var string
      */
     protected $signature = 'bookings:cancel-unpaid
-                            {--days=3 : Days from booking creation for legacy unpaid rules (see Booking::isExpiredUnpaid)}
+                            {--days=3 : Unused; retained for backward compatibility}
                             {--before= : Optional evaluation time; defaults to now}';
 
     /**
@@ -22,7 +22,7 @@ class CancelPendingBookings extends Command
      *
      * @var string
      */
-    protected $description = 'Evaluate all unpaid bookings and cancel those that exceed Booking::isExpiredUnpaid (e.g. check-in day 12:00 Manila, legacy 3-day rule)';
+    protected $description = 'Evaluate all unpaid bookings and cancel those past 9:00 PM (Asia/Manila) on the check-in calendar day (Booking::isExpiredUnpaid)';
 
     /**
      * Execute the console command.

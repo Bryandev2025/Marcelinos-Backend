@@ -70,7 +70,7 @@ All times below use the **`Asia/Manila`** timezone unless noted.
 | `0 11 * * *` (daily 11:00 Manila) | `bookings:complete-checkouts` | Same completion logic; extra run after the morning window. |
 | `0 12 * * *` (daily 12:00 Manila) | `bookings:activate-checkins` | For **today’s** check-in date, moves **paid** / **partial** bookings to **occupied**. |
 | `0 12 * * *` (daily 12:00 Manila) | `bookings:send-reminders` | Sends reminder emails for guests whose **check-in is tomorrow** (one day before), if not already sent. |
-| `*/15 * * * *` (every 15 minutes) | `bookings:cancel-unpaid` | Cancels **unpaid** bookings older than the grace period (default **3 days**, overridable with `--days`). |
+| `*/15 * * * *` (every 15 minutes) | `bookings:cancel-unpaid` | Cancels **unpaid** bookings when `now` is on or after **9:00 PM (Asia/Manila) on the check-in calendar day** (see `Booking::isExpiredUnpaid`). |
 
 Implementation details:
 
@@ -115,7 +115,7 @@ php artisan bookings:complete-checkouts
 php artisan bookings:cancel-unpaid
 ```
 
-Use `--help` on any command for options (e.g. `bookings:cancel-unpaid --days=`).
+Use `--help` on any command for options (e.g. `bookings:cancel-unpaid --before=`).
 
 ---
 

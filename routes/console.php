@@ -1,9 +1,9 @@
 <?php
 
+use App\Models\ActivityLog;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
-use App\Models\ActivityLog;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -40,7 +40,7 @@ Schedule::command('bookings:complete-checkouts')
 | bookings:activate-checkins  — paid/partial with check-in today → occupied
 | bookings:send-reminders     — reminder email one day before check-in
 |
-| bookings:cancel-unpaid is scheduled separately every 15 minutes (see below).
+| bookings:cancel-unpaid is scheduled separately every 15 minutes (9:00 PM Manila check-in-day rule).
 */
 foreach ([
     'bookings:activate-checkins' => true,
@@ -58,7 +58,7 @@ foreach ([
 |--------------------------------------------------------------------------
 | Every 15 minutes — Manila
 |--------------------------------------------------------------------------
-| Enforce unpaid expiry policy so stale bookings are cancelled quickly.
+| Enforce unpaid settlement deadline (9:00 PM on check-in day, Manila) so cancellations run soon after due.
 */
 Schedule::command('bookings:cancel-unpaid')
     ->everyFifteenMinutes()

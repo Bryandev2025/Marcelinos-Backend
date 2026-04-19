@@ -73,22 +73,20 @@ The application uses **Laravel's task scheduling**. A single system cron job run
 
 ---
 
-### 3. Cancel unpaid bookings (no-show)
+### 3. Cancel unpaid bookings
 
 | Item     | Value                            |
 | -------- | -------------------------------- |
 | Command  | `bookings:cancel-unpaid`         |
-| Schedule | Daily at **12:00** (Asia/Manila) |
+| Schedule | Every **15 minutes** (Asia/Manila) — see `routes/console.php` |
 
 **Logic:**
 
-- Date used: today (Asia/Manila), or `--date=Y-m-d` when run manually.
-- Selects bookings where:
-    - `check_in` date = that date
-    - `status` = `unpaid`
-- Sets `status` to `cancelled`.
+- Evaluation time: `now()`, or `--before=<datetime>` when run manually.
+- For each booking with `status` = `unpaid`, `Booking::isExpiredUnpaid` is true when that time is **on or after 9:00 PM (Asia/Manila) on the check-in calendar day**.
+- Sets `status` to `cancelled` when the rule matches.
 
-**Purpose:** Cancel unpaid bookings that reach the check-in date.
+**Purpose:** Auto-cancel unpaid bookings after the check-in-day settlement deadline.
 
 ---
 
@@ -155,7 +153,9 @@ php artisan bookings:cancel-unpaid
 # Use a specific date (Y-m-d)
 php artisan bookings:complete-checkouts --date=2025-02-09
 php artisan bookings:activate-checkins --date=2025-02-09
-php artisan bookings:cancel-unpaid --date=2025-02-09
+
+# Simulate “as of” time for cancel-unpaid (ISO 8601 or strtotime)
+php artisan bookings:cancel-unpaid --before="2025-02-09 21:00:00"
 ```
 
 ### List booking-related commands
