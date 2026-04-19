@@ -27,8 +27,9 @@ The application uses **Laravel's task scheduling**. A single system cron job run
 
 - `CompleteCheckoutBookings.php` → `bookings:complete-checkouts`
 - `ActivateCheckinBookings.php` → `bookings:activate-checkins`
-- `SendTestimonialFeedback.php` → `testimonials:send-feedback`
 - `CancelPendingBookings.php` → `bookings:cancel-unpaid`
+
+**Testimonial feedback email** is not a scheduled Artisan command. When a booking’s `status` changes to `completed` (including after `bookings:complete-checkouts` or staff/admin updates), `App\Models\Booking` sends `TestimonialFeedbackEmail` once and sets `testimonial_feedback_sent_at`.
 
 ---
 
@@ -72,42 +73,26 @@ The application uses **Laravel's task scheduling**. A single system cron job run
 
 ---
 
-### 3. Cancel unpaid bookings (no-show)
+### 3. Cancel unpaid bookings
 
 | Item     | Value                            |
 | -------- | -------------------------------- |
 | Command  | `bookings:cancel-unpaid`         |
-| Schedule | Daily at **12:00** (Asia/Manila) |
+| Schedule | Every **15 minutes** (Asia/Manila) — see `routes/console.php` |
 
 **Logic:**
 
-- Date used: today (Asia/Manila), or `--date=Y-m-d` when run manually.
-- Selects bookings where:
-    - `check_in` date = that date
-    - `status` = `unpaid`
-- Sets `status` to `cancelled`.
+- Evaluation time: `now()`, or `--before=<datetime>` when run manually.
+- For each booking with `status` = `unpaid`, `Booking::isExpiredUnpaid` is true when that time is **on or after 9:00 PM (Asia/Manila) on the check-in calendar day**.
+- Sets `status` to `cancelled` when the rule matches.
 
-**Purpose:** Cancel unpaid bookings that reach the check-in date.
+**Purpose:** Auto-cancel unpaid bookings after the check-in-day settlement deadline.
 
 ---
 
-### 4. Send testimonial feedback emails
+### 4. Testimonial feedback emails (not scheduled)
 
-| Item     | Value                            |
-| -------- | -------------------------------- |
-| Command  | `testimonials:send-feedback`     |
-| Schedule | Daily at **12:00** (Asia/Manila) |
-
-**Logic:**
-
-- Selects bookings where:
-    - `status` = `completed`
-    - `check_out <= (now - 1 day)` (effectively "at least 24 hours after check-out time has passed")
-    - `testimonial_feedback_sent_at` is `null`
-- Sends an email to the guest with a signed, expiring link to submit their testimonial.
-- Marks `testimonial_feedback_sent_at` after a successful send.
-
----
+There is no `testimonials:send-feedback` command or scheduler entry. When a booking transitions to **`completed`**, the `Booking` model’s `updated` hook sends the testimonial email (if the guest has an email and `testimonial_feedback_sent_at` is still null) and then records the send timestamp.
 
 ---
 
@@ -168,7 +153,9 @@ php artisan bookings:cancel-unpaid
 # Use a specific date (Y-m-d)
 php artisan bookings:complete-checkouts --date=2025-02-09
 php artisan bookings:activate-checkins --date=2025-02-09
-php artisan bookings:cancel-unpaid --date=2025-02-09
+
+# Simulate “as of” time for cancel-unpaid (ISO 8601 or strtotime)
+php artisan bookings:cancel-unpaid --before="2025-02-09 21:00:00"
 ```
 
 ### List booking-related commands

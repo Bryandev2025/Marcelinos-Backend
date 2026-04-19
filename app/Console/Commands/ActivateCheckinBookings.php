@@ -5,6 +5,8 @@ namespace App\Console\Commands;
 use App\Models\Booking;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class ActivateCheckinBookings extends Command
 {
@@ -42,18 +44,37 @@ class ActivateCheckinBookings extends Command
         $bookings = Booking::query()
             ->whereDate('check_in', $date)
             ->whereIn('status', [Booking::STATUS_PAID, Booking::STATUS_PARTIAL])
+            ->with(['roomLines', 'venues', 'rooms.bedSpecifications'])
             ->get();
 
         $count = 0;
+        $skipped = 0;
         foreach ($bookings as $booking) {
+            try {
+                $booking->assertAssignmentsSatisfiedForOccupied();
+            } catch (ValidationException $e) {
+                $skipped++;
+                $reason = collect($e->errors())->flatten()->first() ?? $e->getMessage();
+                Log::warning('Skipped auto check-in: assignments incomplete', [
+                    'reference_number' => $booking->reference_number,
+                    'booking_id' => $booking->id,
+                    'reason' => $reason,
+                ]);
+                $this->warn("Skipped {$booking->reference_number}: {$reason}");
+
+                continue;
+            }
             $booking->update(['status' => Booking::STATUS_OCCUPIED]);
             $count++;
         }
 
         if ($count > 0) {
             $this->info("Marked {$count} booking(s) as occupied for check-in date {$date}.");
-        } else {
+        } elseif ($bookings->isEmpty()) {
             $this->comment("No paid/partial bookings with check-in on {$date}.");
+        }
+        if ($skipped > 0) {
+            $this->comment("Skipped {$skipped} booking(s) with incomplete room/venue assignments.");
         }
 
         return self::SUCCESS;

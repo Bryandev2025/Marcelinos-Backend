@@ -368,10 +368,16 @@
                                                 class="relative"
                                                 x-data="{
                                                     open: false,
+                                                    payOpen: false,
+                                                    payId: {{ (int) $row['id'] }},
                                                     delOpen: false,
                                                     delVal: '',
                                                     delRef: @js($row['reference_number']),
                                                     delId: {{ (int) $row['id'] }},
+                                                    submitPayBalance() {
+                                                        $wire.payBalance(this.payId);
+                                                        this.payOpen = false;
+                                                    },
                                                     submitDelete() {
                                                         $wire.deleteBooking(this.delId, this.delVal);
                                                         this.delOpen = false;
@@ -410,18 +416,17 @@
                                                         Edit
                                                     </a>
 
-                                                    @if (($row['status'] ?? null) !== Booking::STATUS_CANCELLED)
+                                                    @if (($row['can_pay_balance'] ?? false) === true)
                                                         <button
                                                             type="button"
-                                                            wire:click="payBalance({{ $row['id'] }})"
-                                                            @click="open = false"
+                                                            @click="open = false; payOpen = true"
                                                             class="block w-full whitespace-nowrap px-3 py-1.5 text-left text-[13px] font-medium leading-5 text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-sky-500/10"
                                                         >
                                                             Pay Balance
                                                         </button>
                                                     @endif
 
-                                                    @if (($row['status'] ?? null) === Booking::STATUS_PAID)
+                                                    @if (($row['status'] ?? null) === Booking::STATUS_PAID && (($row['can_check_in'] ?? false) === true))
                                                         <button
                                                             type="button"
                                                             wire:click="checkInBooking({{ $row['id'] }})"
@@ -463,6 +468,44 @@
                                                         Delete
                                                     </button>
                                                 </div>
+
+                                                <template x-teleport="body">
+                                                    <div
+                                                        x-show="payOpen"
+                                                        x-cloak
+                                                        class="fixed inset-0 z-[100] flex items-center justify-center p-4"
+                                                        style="display: none;"
+                                                    >
+                                                        <div class="absolute inset-0 bg-black/50" @click="payOpen = false"></div>
+                                                        <div
+                                                            class="relative z-10 w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-xl dark:border-white/10 dark:bg-gray-900"
+                                                            @click.stop
+                                                        >
+                                                            <h3 class="text-base font-semibold text-gray-900 dark:text-white">
+                                                                {{ __('Pay remaining balance') }}
+                                                            </h3>
+                                                            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                                                                {{ __('Are you sure you want to record the remaining balance as paid for this booking?') }}
+                                                            </p>
+                                                            <div class="mt-4 flex justify-end gap-2">
+                                                                <button
+                                                                    type="button"
+                                                                    class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5"
+                                                                    @click="payOpen = false"
+                                                                >
+                                                                    {{ __('No, go back') }}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    class="rounded-lg bg-sky-600 px-3 py-2 text-sm font-medium text-white hover:bg-sky-700"
+                                                                    @click="submitPayBalance()"
+                                                                >
+                                                                    {{ __('Yes, mark as paid') }}
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </template>
 
                                                 <template x-teleport="body">
                                                     <div

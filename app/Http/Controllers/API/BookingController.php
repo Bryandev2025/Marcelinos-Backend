@@ -638,6 +638,10 @@ class BookingController extends Controller
             ]);
 
             if (! empty($validated['status'])) {
+                if ($validated['status'] === Booking::STATUS_OCCUPIED) {
+                    $booking->loadMissing(['rooms.bedSpecifications', 'venues', 'roomLines']);
+                    $booking->assertAssignmentsSatisfiedForOccupied();
+                }
                 $booking->update([
                     'status' => $validated['status'],
                 ]);
@@ -1003,8 +1007,7 @@ class BookingController extends Controller
         Guest $guest,
         string $paymentPlan,
         ?float $overrideAmount = null
-    ): array
-    {
+    ): array {
         $secretKey = trim((string) config('services.xendit.secret_key'));
         if ($secretKey === '') {
             return [];

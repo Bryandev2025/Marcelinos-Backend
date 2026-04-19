@@ -536,18 +536,18 @@
                                                             @click="open = false; payOpen = true"
                                                             class="block w-full whitespace-nowrap px-3 py-1.5 text-left text-[13px] font-medium leading-5 text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-sky-500/10"
                                                         >
-                                                            Pay Balance
+                                                            {{ __('Settle remaining balance') }}
                                                         </button>
                                                     @endif
 
-                                                    @if (($row['status'] ?? null) === Booking::STATUS_PAID)
+                                                    @if (($row['status'] ?? null) === Booking::STATUS_PAID && (($row['can_check_in'] ?? false) === true))
                                                         <button
                                                             type="button"
                                                             wire:click="checkInBooking({{ $row['id'] }})"
                                                             @click="open = false"
                                                             class="block w-full whitespace-nowrap px-3 py-1.5 text-left text-[13px] font-medium leading-5 text-amber-700 hover:bg-amber-50 dark:text-amber-300 dark:hover:bg-amber-500/10"
                                                         >
-                                                            Check-in
+                                                            {{ __('Check in guest') }}
                                                         </button>
                                                     @endif
 
@@ -594,10 +594,10 @@
                                                             @click.stop
                                                         >
                                                             <h3 class="text-base font-semibold text-gray-900 dark:text-white">
-                                                                {{ __('Pay remaining balance') }}
+                                                                {{ __('Settle remaining balance') }}
                                                             </h3>
                                                             <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                                                                {{ __('Are you sure you want to record the remaining balance as paid for this booking?') }}
+                                                                {{ __('This records one payment for the full remaining balance and sets status to Paid. For partial cash, use the Payments tab on the booking.') }}
                                                             </p>
                                                             <div class="mt-4 flex justify-end gap-2">
                                                                 <button

@@ -6,6 +6,9 @@ use App\Filament\Resources\Bookings\BookingResource;
 use App\Models\Booking;
 use App\Models\Room;
 use App\Models\Venue;
+use App\Support\BookingCheckInEligibility;
+use App\Support\BookingFullBalancePayment;
+use App\Support\BookingLifecycleActions;
 use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
@@ -338,7 +341,7 @@ class RoomCalendar extends Page
     }
 
     /**
-     * @return list<array{id: int, reference_number: string, guest_name: string, check_in: string, check_out: string, rooms: string, venues: string, status: string, has_assigned_rooms: bool, can_pay_balance: bool}>
+     * @return list<array{id: int, reference_number: string, guest_name: string, check_in: string, check_out: string, rooms: string, venues: string, status: string, has_assigned_rooms: bool, can_pay_balance: bool, can_check_in: bool}>
      */
     #[Computed]
     public function modalBookingRows(): array
@@ -371,6 +374,7 @@ class RoomCalendar extends Page
             ->get()
             ->map(function (Booking $b) {
                 $hasAssignedRooms = $b->rooms->isNotEmpty();
+                $canCheckIn = BookingCheckInEligibility::assess($b)['allowed'];
 
                 return [
                     'id' => $b->id,
@@ -382,30 +386,17 @@ class RoomCalendar extends Page
                     'venues' => $b->venues->pluck('name')->filter()->implode(', ') ?: '—',
                     'status' => $b->status,
                     'has_assigned_rooms' => $hasAssignedRooms,
-                    'can_pay_balance' => $this->canPayBalanceForBooking($b, $hasAssignedRooms),
+                    'can_pay_balance' => $this->canPayBalanceForBooking($b),
+                    'can_check_in' => $canCheckIn,
                 ];
             })
             ->values()
             ->all();
     }
 
-    protected function canPayBalanceForBooking(Booking $booking, ?bool $hasAssignedRooms = null): bool
+    protected function canPayBalanceForBooking(Booking $booking): bool
     {
-        $hasAssignedRooms = $hasAssignedRooms ?? $booking->rooms()->exists();
-
-        if (! $hasAssignedRooms) {
-            return false;
-        }
-
-        if (in_array($booking->status, [
-            Booking::STATUS_CANCELLED,
-            Booking::STATUS_COMPLETED,
-            Booking::STATUS_PAID,
-        ], true)) {
-            return false;
-        }
-
-        return (float) $booking->balance > 0;
+        return BookingFullBalancePayment::assess($booking)['allowed'];
     }
 
     public function modalHeadingLabel(): string
@@ -458,16 +449,17 @@ class RoomCalendar extends Page
             return;
         }
 
-        if (! $this->canPayBalanceForBooking($booking)) {
+        try {
+            BookingFullBalancePayment::record($booking);
+        } catch (\InvalidArgumentException $e) {
+            Notification::make()
+                ->title('Cannot record payment')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+
             return;
         }
-
-        $booking->payments()->create([
-            'total_amount' => $booking->total_price,
-            'partial_amount' => $booking->balance,
-            'is_fullypaid' => true,
-        ]);
-        $booking->update(['status' => Booking::STATUS_PAID]);
 
         Notification::make()
             ->title('Balance paid successfully.')
@@ -477,13 +469,25 @@ class RoomCalendar extends Page
 
     public function checkInBooking(int $bookingId): void
     {
-        $booking = Booking::query()->find($bookingId);
+        $booking = Booking::query()
+            ->with(['roomLines', 'venues', 'rooms.bedSpecifications'])
+            ->find($bookingId);
 
-        if (! $booking || $booking->status !== Booking::STATUS_PAID) {
+        if (! $booking) {
             return;
         }
 
-        $booking->update(['status' => Booking::STATUS_OCCUPIED]);
+        try {
+            BookingLifecycleActions::checkIn($booking);
+        } catch (\InvalidArgumentException $e) {
+            Notification::make()
+                ->title('Cannot check in')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+
+            return;
+        }
 
         Notification::make()
             ->title('Booking checked in.')
@@ -495,11 +499,21 @@ class RoomCalendar extends Page
     {
         $booking = Booking::query()->find($bookingId);
 
-        if (! $booking || $booking->status !== Booking::STATUS_OCCUPIED) {
+        if (! $booking) {
             return;
         }
 
-        $booking->update(['status' => Booking::STATUS_COMPLETED]);
+        try {
+            BookingLifecycleActions::complete($booking);
+        } catch (\InvalidArgumentException $e) {
+            Notification::make()
+                ->title('Cannot complete')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+
+            return;
+        }
 
         Notification::make()
             ->title('Booking marked as completed.')
@@ -511,11 +525,21 @@ class RoomCalendar extends Page
     {
         $booking = Booking::query()->find($bookingId);
 
-        if (! $booking || in_array($booking->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true)) {
+        if (! $booking) {
             return;
         }
 
-        $booking->update(['status' => Booking::STATUS_CANCELLED]);
+        try {
+            BookingLifecycleActions::cancel($booking);
+        } catch (\InvalidArgumentException $e) {
+            Notification::make()
+                ->title('Cannot cancel')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+
+            return;
+        }
 
         Notification::make()
             ->title('Booking cancelled.')

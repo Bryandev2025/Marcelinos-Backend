@@ -66,17 +66,15 @@ All times below use the **`Asia/Manila`** timezone unless noted.
 
 | Schedule (cron) | Artisan command | Purpose |
 |----------------|-----------------|---------|
-| `0,10,20,30,40,50 10 * * *` (10:00–10:50 Manila, every 10 minutes) | `bookings:complete-checkouts` | Sets **occupied** bookings to **completed** when `check_out` is due. |
+| `0,10,20,30,40,50 10 * * *` (10:00–10:50 Manila, every 10 minutes) | `bookings:complete-checkouts` | Sets **occupied** bookings to **completed** when `check_out` is due. Completing a stay triggers the testimonial email from `App\Models\Booking` (not a separate scheduled command). |
 | `0 11 * * *` (daily 11:00 Manila) | `bookings:complete-checkouts` | Same completion logic; extra run after the morning window. |
-| *(after each successful `bookings:complete-checkouts` run above)* | `testimonials:send-feedback` | Sends testimonial feedback emails for **completed** stays where checkout was at least one day ago and email was not sent yet. **Not shown** as its own line in `schedule:list`; it is chained via `->after(...)`. |
 | `0 12 * * *` (daily 12:00 Manila) | `bookings:activate-checkins` | For **today’s** check-in date, moves **paid** / **partial** bookings to **occupied**. |
 | `0 12 * * *` (daily 12:00 Manila) | `bookings:send-reminders` | Sends reminder emails for guests whose **check-in is tomorrow** (one day before), if not already sent. |
-| `*/15 * * * *` (every 15 minutes) | `bookings:cancel-unpaid` | Cancels **unpaid** bookings older than the grace period (default **3 days**, overridable with `--days`). |
+| `*/15 * * * *` (every 15 minutes) | `bookings:cancel-unpaid` | Cancels **unpaid** bookings when `now` is on or after **9:00 PM (Asia/Manila) on the check-in calendar day** (see `Booking::isExpiredUnpaid`). |
 
 Implementation details:
 
 - **`bookings:complete-checkouts`** — `app/Console/Commands/CompleteCheckoutBookings.php`
-- **`testimonials:send-feedback`** — `app/Console/Commands/SendTestimonialFeedback.php`
 - **`bookings:activate-checkins`** — `app/Console/Commands/ActivateCheckinBookings.php`
 - **`bookings:send-reminders`** — `app/Console/Commands/SendBookingReminders.php`
 - **`bookings:cancel-unpaid`** — `app/Console/Commands/CancelPendingBookings.php`
@@ -115,10 +113,9 @@ php artisan schedule:run
 # Dry-run a specific scheduled command
 php artisan bookings:complete-checkouts
 php artisan bookings:cancel-unpaid
-php artisan testimonials:send-feedback
 ```
 
-Use `--help` on any command for options (e.g. `bookings:cancel-unpaid --days=`).
+Use `--help` on any command for options (e.g. `bookings:cancel-unpaid --before=`).
 
 ---
 
@@ -128,7 +125,7 @@ Use `--help` on any command for options (e.g. `bookings:cancel-unpaid --days=`).
 |---------|----------------|
 | No booking status changes, no reminder emails | Cron not calling `schedule:run` every minute; server timezone vs `Asia/Manila` in definitions; `php artisan schedule:list` |
 | Emails never send for queued mailables | `QUEUE_CONNECTION`, queue worker cron / process, `failed_jobs` table, logs |
-| `testimonials:send-feedback` never runs | It only runs **after** a successful `bookings:complete-checkouts` scheduled run; verify checkout completion schedule and mail config |
+| Testimonial email not received after stay completed | Guest must have an email; check `testimonial_feedback_sent_at` and application logs for mail errors; testimonial is sent when status becomes **completed** (scheduler or manual), not on a separate cron |
 
 ---
 
