@@ -229,6 +229,10 @@ class BookingController extends Controller
         $balance = max(0, (float) $bookingPayload->balance);
         $amountDueNow = $this->resolveAmountDueNow($bookingPayload);
 
+        $paymentSettings = $this->paymentSettingsConfig();
+        $partialOptions = $paymentSettings['partial_payment_options'] ?? [];
+        $downPaymentPercent = isset($partialOptions[0]) ? (int) $partialOptions[0] : 30;
+
         return response()->json([
             'booking' => $bookingPayload,
             'payment' => [
@@ -246,6 +250,7 @@ class BookingController extends Controller
             'use_messenger_deposit_instructions' => $bookingPayload->useMessengerDepositInstructions(),
             'down_payment_notice_applies' => $bookingPayload->downPaymentNoticeApplies(),
             'down_payment_notice_min_lead_days' => Booking::DOWN_PAYMENT_NOTICE_MIN_LEAD_DAYS,
+            'down_payment_percent' => $downPaymentPercent,
             'qr_code_url' => $filename ? url("/qr-image/{$filename}") : null,
             'has_testimonial' => $hasTestimonial,
         ], 200);
