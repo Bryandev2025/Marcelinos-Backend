@@ -69,9 +69,9 @@ class RecycleBin extends Page
 
     public static function canAccess(): bool
     {
-        $role = strtolower(trim((string) (auth()->user()?->role ?? '')));
+        $user = auth()->user();
 
-        return $role === 'admin';
+        return $user?->hasPrivilege('manage_recycle_bin') ?? false;
     }
 
     public static function primaryTrashedTotal(): int

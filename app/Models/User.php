@@ -134,6 +134,9 @@ class User extends Authenticatable implements FilamentUser
 
             // Management
             'manage_contact_messages' => 'Management · Contact messages',
+            'manage_staff' => 'Management · Staff accounts',
+            'manage_settings' => 'Management · Settings',
+            'manage_recycle_bin' => 'Management · Recycle bin',
 
             // Content
             'manage_galleries' => 'Content · Gallery',
@@ -170,6 +173,9 @@ class User extends Authenticatable implements FilamentUser
             ],
             'Management' => [
                 'manage_contact_messages' => 'Contact messages',
+                'manage_staff' => 'Staff accounts',
+                'manage_settings' => 'Settings',
+                'manage_recycle_bin' => 'Recycle bin',
             ],
             'Content' => [
                 'manage_galleries' => 'Gallery',

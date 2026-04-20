@@ -71,6 +71,7 @@ All times below use the **`Asia/Manila`** timezone unless noted.
 | `0 12 * * *` (daily 12:00 Manila) | `bookings:activate-checkins` | For **today’s** check-in date, moves **paid** / **partial** bookings to **occupied**. |
 | `0 12 * * *` (daily 12:00 Manila) | `bookings:send-reminders` | Sends reminder emails for guests whose **check-in is tomorrow** (one day before), if not already sent. |
 | `*/15 * * * *` (every 15 minutes) | `bookings:cancel-unpaid` | Cancels **unpaid** bookings when `now` is on or after **9:00 PM (Asia/Manila) on the check-in calendar day** (see `Booking::isExpiredUnpaid`). |
+| `0 1 * * 0` (weekly Sunday 1:00 Manila) | Closure task (`activity-log-retention-cleanup`) | Deletes entries in `activity_logs` older than 7 days. |
 
 Implementation details:
 

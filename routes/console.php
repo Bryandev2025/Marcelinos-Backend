@@ -67,16 +67,18 @@ Schedule::command('bookings:cancel-unpaid')
 
 /*
 |--------------------------------------------------------------------------
-| Daily activity-log retention cleanup
+| Weekly activity-log retention cleanup
 |--------------------------------------------------------------------------
-| Keep only the latest 60 days of audit records.
+| Runs every 7 days and keeps only the latest 7 days of audit records.
 */
 Schedule::call(function (): void {
     ActivityLog::query()
-        ->where('created_at', '<', now()->subDays(60))
+        ->where('created_at', '<', now()->subDays(7))
         ->delete();
 })
     ->name('activity-log-retention-cleanup')
-    ->daily()
+    ->weekly()
+    ->sundays()
+    ->at('01:00')
     ->timezone($manila)
     ->withoutOverlapping();

@@ -5,7 +5,6 @@ namespace App\Filament\Pages;
 use App\Support\EnvEditor;
 use App\Support\MaintenancePageVariant;
 use Carbon\Carbon;
-use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Cache;
@@ -36,7 +35,9 @@ class Settings extends Page
 
     public static function canAccess(): bool
     {
-        return Filament::getCurrentPanel()?->getId() !== 'staff';
+        $user = auth()->user();
+
+        return $user?->hasPrivilege('manage_settings') ?? false;
     }
 
     public string $mailHost = '';

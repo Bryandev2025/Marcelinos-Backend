@@ -96,6 +96,21 @@ There is no `testimonials:send-feedback` command or scheduler entry. When a book
 
 ---
 
+### 5. Activity log cleanup
+
+| Item     | Value |
+| -------- | ----- |
+| Task     | `activity-log-retention-cleanup` (closure in `routes/console.php`) |
+| Schedule | Weekly, **Sunday 01:00** (Asia/Manila) |
+
+**Logic:**
+
+- Deletes rows from `activity_logs` where `created_at` is older than **7 days**.
+
+**Purpose:** Keep audit storage lean by enforcing a rolling 7-day retention window.
+
+---
+
 ## Server setup (cron)
 
 ### Option A: Single-command services (recommended on cPanel)
