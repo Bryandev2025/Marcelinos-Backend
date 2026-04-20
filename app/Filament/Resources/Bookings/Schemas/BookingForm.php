@@ -422,9 +422,16 @@ class BookingForm
         try {
             $startDate = Carbon::parse($checkIn);
             $endDate = Carbon::parse($checkOut);
-            $days = (int) $startDate->diffInDays($endDate);
+            if ($endDate->lessThanOrEqualTo($startDate)) {
+                $set('no_of_days', 0);
 
-            $set('no_of_days', max(1, $days)); // Store integer 1, 2, etc.
+                return;
+            }
+
+            // Nights should follow calendar lodging nights, not elapsed 24-hour blocks.
+            $days = (int) $startDate->copy()->startOfDay()->diffInDays($endDate->copy()->startOfDay());
+
+            $set('no_of_days', max(1, $days));
         } catch (\Exception $e) {
             $set('no_of_days', 0);
         }
