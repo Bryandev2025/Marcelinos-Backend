@@ -74,7 +74,7 @@ return [
             'unpaid' => 'Unpaid',
             'partial' => 'Partial',
             'paid' => 'Paid',
-            'completed' => 'Complete',
+            'completed' => 'Completed',
             'occupied' => 'Checked in',
             'cancelled' => 'Cancelled',
             'rescheduled' => 'Rescheduled',
