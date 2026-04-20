@@ -24,10 +24,6 @@ class LogStaffPanelActions
             return $response;
         }
 
-        if ($request->isMethod('GET')) {
-            return $response;
-        }
-
         if (! $this->isPanelRequest($request)) {
             return $response;
         }
@@ -62,6 +58,10 @@ class LogStaffPanelActions
 
     private function resolveEvent(Request $request): string
     {
+        if ($request->isMethod('GET')) {
+            return 'panel_action.page_viewed';
+        }
+
         if ($request->is('livewire/update')) {
             return 'panel_action.livewire_called';
         }
@@ -74,6 +74,10 @@ class LogStaffPanelActions
         $path = '/'.$request->path();
         $method = strtoupper($request->method());
         $panel = $this->detectPanel($request);
+
+        if ($event === 'panel_action.page_viewed') {
+            return sprintf('viewed %s in %s panel.', $path, $panel);
+        }
 
         if ($event === 'panel_action.livewire_called') {
             $action = $this->resolveLivewireAction($request);
