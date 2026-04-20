@@ -46,10 +46,10 @@ class RoomCalendar extends Page
                 ->color('gray')
                 ->url(BookingResource::getUrl('list')),
             Action::make('importLegacyCsv')
-                ->label('Import Old Bookings')
+                ->label('Import')
                 ->icon('heroicon-o-arrow-up-tray')
                 ->color('warning')
-                ->modalHeading('Import Old Bookings')
+                ->modalHeading('Import')
                 ->modalDescription('Step 1: Upload your CSV file. Step 2: Keep "Check file only" turned on and click import. Step 3: If results look correct, turn it off and import again to save.')
                 ->form([
                     Placeholder::make('template_path')
@@ -106,7 +106,7 @@ class RoomCalendar extends Page
 
                     $output = trim(Artisan::output());
                     $notification = Notification::make()
-                        ->title($exitCode === 0 ? 'Legacy CSV processed.' : 'Legacy CSV import failed.')
+                        ->title($exitCode === 0 ? 'Import processed.' : 'Import failed.')
                         ->body($output !== '' ? $output : 'No command output.');
 
                     if ($exitCode === 0) {

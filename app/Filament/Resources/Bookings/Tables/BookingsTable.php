@@ -25,6 +25,8 @@ use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
@@ -41,6 +43,8 @@ use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Artisan;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class BookingsTable
 {
@@ -533,6 +537,76 @@ class BookingsTable
             ])
             ->defaultSort('created_at', 'desc')
             ->headerActions([
+                Action::make('import')
+                    ->label('Import')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->color('warning')
+                    ->modalHeading('Import')
+                    ->modalDescription('Step 1: Upload your CSV file. Step 2: Keep "Check file only" turned on and click import. Step 3: If results look correct, turn it off and import again to save.')
+                    ->form([
+                        Placeholder::make('template_path')
+                            ->label('CSV Template')
+                            ->content('Copy this template format: `storage/app/examples/legacy-bookings-template.csv`.'),
+                        FileUpload::make('csv_file')
+                            ->label('CSV File')
+                            ->disk('local')
+                            ->directory('imports/legacy-bookings')
+                            ->storeFiles(false)
+                            ->acceptedFileTypes([
+                                'text/csv',
+                                'text/plain',
+                                'application/vnd.ms-excel',
+                            ])
+                            ->required(),
+                        Toggle::make('dry_run')
+                            ->label('Check file only (do not save yet)')
+                            ->default(true),
+                        Toggle::make('allow_duplicates')
+                            ->label('Import even if booking may already exist')
+                            ->helperText('Keep this OFF in normal use to avoid duplicate bookings.')
+                            ->default(false),
+                    ])
+                    ->action(function (array $data): void {
+                        $uploaded = $data['csv_file'] ?? null;
+                        $absolutePath = null;
+
+                        if ($uploaded instanceof TemporaryUploadedFile) {
+                            $absolutePath = $uploaded->getRealPath();
+                        } elseif (is_string($uploaded) && trim($uploaded) !== '') {
+                            $candidate = storage_path('app/'.$uploaded);
+                            $absolutePath = is_file($candidate) ? $candidate : $uploaded;
+                        }
+
+                        if (! is_string($absolutePath) || trim($absolutePath) === '' || ! is_readable($absolutePath)) {
+                            Notification::make()
+                                ->title('Uploaded CSV file is not readable.')
+                                ->body('Please upload the file again and retry import.')
+                                ->danger()
+                                ->send();
+
+                            return;
+                        }
+
+                        $dryRun = (bool) ($data['dry_run'] ?? true);
+                        $allowDuplicates = (bool) ($data['allow_duplicates'] ?? false);
+
+                        $exitCode = Artisan::call('bookings:import-legacy-csv', [
+                            'file' => $absolutePath,
+                            '--dry-run' => $dryRun,
+                            '--allow-duplicates' => $allowDuplicates,
+                        ]);
+
+                        $output = trim(Artisan::output());
+                        $notification = Notification::make()
+                            ->title($exitCode === 0 ? 'Import processed.' : 'Import failed.')
+                            ->body($output !== '' ? $output : 'No command output.');
+
+                        if ($exitCode === 0) {
+                            $notification->success()->send();
+                        } else {
+                            $notification->danger()->send();
+                        }
+                    }),
                 ExportAction::make()
                     ->label('Export')
                     ->icon('heroicon-o-arrow-down-tray')
