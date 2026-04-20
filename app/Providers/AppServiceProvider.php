@@ -82,6 +82,7 @@ class AppServiceProvider extends ServiceProvider
 
         $this->configureRateLimiting();
         $this->registerTableTotalsHooks();
+        $this->registerPwaHooks();
         $this->registerFilamentNotificationSoundHook();
 
         Booking::observe(BookingObserver::class);
@@ -166,6 +167,19 @@ class AppServiceProvider extends ServiceProvider
         FilamentView::registerRenderHook(
             PanelsRenderHook::BODY_END,
             fn (): string => view('filament.hooks.notification-sound')->render(),
+        );
+    }
+
+    protected function registerPwaHooks(): void
+    {
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::HEAD_END,
+            fn (): string => view('filament.hooks.pwa-meta')->render(),
+        );
+
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::BODY_END,
+            fn (): string => view('filament.hooks.pwa-register-sw')->render(),
         );
     }
 
