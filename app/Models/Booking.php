@@ -508,6 +508,21 @@ class Booking extends Model
     }
 
     /**
+     * Scope: bookings whose calendar span includes this date (check-in date through check-out date, inclusive).
+     * Used by the staff booking calendar grid and day-detail modal so the check-out day is included in the range
+     * (distinct from {@see scopeOverlappingLodgingNight}, which excludes the check-out night).
+     */
+    public function scopeOverlappingCalendarInclusiveDisplay($query, $date): Builder
+    {
+        $d = Carbon::parse($date)->toDateString();
+
+        return $query
+            ->whereNotIn('status', [self::STATUS_CANCELLED])
+            ->whereDate('check_in', '<=', $d)
+            ->whereDate('check_out', '>=', $d);
+    }
+
+    /**
      * Get bookings overlapping a date, with guest and assignable names for display.
      * Used by blocked-dates flow to show "contact customer first" info.
      *
