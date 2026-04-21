@@ -10,7 +10,7 @@ class VenueCalendar extends RoomCalendar
 
     public function mount(): void
     {
-        $this->inventory = self::INVENTORY_VENUES;
+        $this->reservationFilter = self::RESERVATION_VENUE;
 
         parent::mount();
     }

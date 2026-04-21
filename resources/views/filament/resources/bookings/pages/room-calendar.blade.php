@@ -1,6 +1,11 @@
 @php
     use App\Models\Booking;
     $legendItems = $this->calendarLegendItems;
+    $reservationFilterLabels = [
+        'room' => __('Rooms only'),
+        'venue' => __('Venue only'),
+        'both' => __('Room + Venue'),
+    ];
     $statusPill = [
         Booking::STATUS_UNPAID => 'bg-violet-100 text-violet-800 ring-1 ring-inset ring-violet-600/15 dark:bg-violet-500/15 dark:text-violet-200 dark:ring-violet-400/25',
         Booking::STATUS_PAID => 'bg-emerald-100 text-emerald-800 ring-1 ring-inset ring-emerald-600/15 dark:bg-emerald-500/15 dark:text-emerald-200 dark:ring-emerald-400/25',
@@ -15,7 +20,7 @@
     <div
         class="mx-auto max-w-6xl space-y-5 px-1 pb-8 transition-opacity duration-200 sm:space-y-8 sm:px-0 sm:pb-10"
         wire:loading.class="pointer-events-none opacity-60"
-        wire:target="previousMonth,nextMonth,month,year"
+        wire:target="previousMonth,nextMonth,month,year,reservationFilter"
     >
         {{-- Page hero --}}
         <div
@@ -46,11 +51,7 @@
                                 {{ __('Booking Calendar') }}
                             </h1>
                             <p class="text-sm text-gray-600 dark:text-gray-400">
-                                @if ($this->isVenueMode())
-                                    {{ __('Overlapping bookings by venue. Cancelled reservations are excluded.') }}
-                                @else
-                                    {{ __('Overlapping stays by room category (assigned rooms, or guest selection until rooms are assigned). Cancelled reservations are excluded.') }}
-                                @endif
+                                {{ __('Each calendar day from check-in through check-out is included. Use reservation type to separate Rooms only, Venue only, and Room + Venue bookings.') }}
                             </p>
                         </div>
                     </div>
@@ -80,9 +81,7 @@
             icon="heroicon-o-squares-2x2"
             icon-color="primary"
             :heading="$this->currentPeriodLabel()"
-            :description="$this->isVenueMode()
-                ? __('Use the controls to change month. Each badge is a venue; the number is how many bookings overlap that day.')
-                : __('Use the controls to change month. Each badge is a room category; the number is how many bookings overlap that day.')"
+            :description="__('Use the controls to change month and reservation type. Each badge count shows how many bookings overlap that day for the selected reservation type.')"
         >
             <div class="space-y-6">
                 {{-- Toolbar: prev/next aligned with select controls (bottom edge) --}}
@@ -153,29 +152,24 @@
                         </div>
                     </div>
 
-                    <div class="grid w-full grid-cols-2 gap-2 sm:w-auto sm:min-w-[14rem]">
-                        <button
-                            type="button"
-                            wire:click="switchInventory('rooms')"
-                            @class([
-                                'inline-flex items-center justify-center rounded-lg px-3 py-2 text-xs font-semibold transition',
-                                'bg-primary-600 text-white shadow-sm dark:bg-primary-500' => ! $this->isVenueMode(),
-                                'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-white/5' => $this->isVenueMode(),
-                            ])
+                    <div class="min-w-0 sm:w-[14rem]">
+                        <label
+                            class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
+                            for="room-cal-reservation-filter"
                         >
-                            {{ __('Rooms') }}
-                        </button>
-                        <button
-                            type="button"
-                            wire:click="switchInventory('venues')"
-                            @class([
-                                'inline-flex items-center justify-center rounded-lg px-3 py-2 text-xs font-semibold transition',
-                                'bg-primary-600 text-white shadow-sm dark:bg-primary-500' => $this->isVenueMode(),
-                                'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-white/5' => ! $this->isVenueMode(),
-                            ])
-                        >
-                            {{ __('Venues') }}
-                        </button>
+                            {{ __('Reservation type') }}
+                        </label>
+                        <x-filament::input.wrapper>
+                            <x-filament::input.select
+                                id="room-cal-reservation-filter"
+                                wire:model.live="reservationFilter"
+                                class="w-full"
+                            >
+                                <option value="room">{{ __('Rooms only') }}</option>
+                                <option value="venue">{{ __('Venue only') }}</option>
+                                <option value="both">{{ __('Room + Venue') }}</option>
+                            </x-filament::input.select>
+                        </x-filament::input.wrapper>
                     </div>
                 </div>
 
@@ -192,7 +186,7 @@
                             {{ __('Legend') }}
                         </span>
                         @foreach ($legendItems as $type => $label)
-                            @if ($this->isVenueMode())
+                            @if ($this->reservationFilter === 'venue')
                                 <span
                                     class="inline-flex w-[calc(50%-0.3rem)] flex-none items-center gap-1.5 rounded-full bg-gradient-to-r from-sky-100 to-cyan-100 px-2.5 py-1 text-[11px] font-semibold text-sky-800 ring-1 ring-inset ring-sky-600/20 dark:from-sky-500/15 dark:to-cyan-400/10 dark:text-sky-200 dark:ring-sky-400/25 sm:w-auto sm:max-w-[14rem]"
                                 >
@@ -264,39 +258,29 @@
                                             </span>
                                         </div>
                                     </div>
-                                    <div class="grid grid-cols-3 gap-1.5 sm:flex sm:min-h-0 sm:flex-1 sm:flex-col sm:gap-1">
+                                    <div class="flex flex-wrap content-start gap-1.5 sm:min-h-0 sm:flex-1 sm:flex-col sm:gap-1">
                                         @foreach ($legendItems as $type => $label)
                                             @php $cnt = $cell['typeCounts'][$type] ?? 0; @endphp
+                                            @if ($cnt === 0)
+                                                @continue
+                                            @endif
                                             <button
                                                 type="button"
                                                 wire:click="openDayType('{{ $cell['dateStr'] }}', '{{ $type }}')"
                                                 class="group w-full cursor-pointer appearance-none rounded-lg border-0 bg-transparent p-0 text-left shadow-none transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-gray-900"
                                             >
-                                                @if ($this->isVenueMode())
+                                                @if ($this->reservationFilter === 'venue')
                                                     <span
                                                         @class([
                                                             'inline-flex w-full items-center justify-between rounded-lg px-2 py-1 text-[11px] font-medium ring-1 ring-inset transition',
-                                                            'bg-gray-100 text-gray-500 ring-gray-300/50 dark:bg-white/[0.06] dark:text-gray-400 dark:ring-white/10' => $cnt === 0,
                                                             'bg-gradient-to-r from-sky-100 to-cyan-100 text-sky-900 ring-sky-600/25 shadow-sm dark:from-sky-500/20 dark:to-cyan-400/10 dark:text-sky-100 dark:ring-sky-400/30' => $cnt > 0,
                                                         ])
                                                     >
                                                         <span class="inline-flex min-w-0 items-center gap-1.5 pe-2">
-                                                            <span
-                                                                @class([
-                                                                    'h-1.5 w-1.5 rounded-full',
-                                                                    'bg-gray-400 dark:bg-gray-500' => $cnt === 0,
-                                                                    'bg-sky-500 dark:bg-sky-300' => $cnt > 0,
-                                                                ])
-                                                            ></span>
+                                                            <span class="h-1.5 w-1.5 rounded-full bg-sky-500 dark:bg-sky-300"></span>
                                                             <span class="truncate">{{ $label }}</span>
                                                         </span>
-                                                        <span
-                                                            @class([
-                                                                'inline-flex h-4 min-w-[1.1rem] items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums',
-                                                                'bg-gray-200 text-gray-600 dark:bg-white/10 dark:text-gray-400' => $cnt === 0,
-                                                                'bg-white/80 text-sky-800 ring-1 ring-sky-700/10 dark:bg-sky-900/50 dark:text-sky-100 dark:ring-sky-300/20' => $cnt > 0,
-                                                            ])
-                                                        >
+                                                        <span class="inline-flex h-4 min-w-[1.1rem] items-center justify-center rounded-full bg-white/80 px-1 text-[10px] font-semibold tabular-nums text-sky-800 ring-1 ring-sky-700/10 dark:bg-sky-900/50 dark:text-sky-100 dark:ring-sky-300/20">
                                                             {{ $cnt }}
                                                         </span>
                                                     </span>
@@ -319,6 +303,45 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </x-filament::section>
+
+        <x-filament::section
+            icon="heroicon-o-clock"
+            icon-color="success"
+            :heading="__('Current active bookings')"
+            :description="__('Bookings overlapping today, excluding cancelled and completed. Filter: :filter', ['filter' => $reservationFilterLabels[$this->reservationFilter] ?? ucfirst($this->reservationFilter)])"
+        >
+            @php
+                $activeRows = $this->activeBookingRows;
+                $activeCount = count($activeRows);
+            @endphp
+            <div class="space-y-3">
+                <div class="inline-flex w-fit items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 ring-1 ring-gray-950/5 dark:bg-white/10 dark:text-gray-200 dark:ring-white/10">
+                    <span class="tabular-nums">{{ $activeCount }}</span>
+                    <span class="ms-1">{{ $activeCount === 1 ? __('active booking') : __('active bookings') }}</span>
+                </div>
+                @if ($activeCount === 0)
+                    <p class="rounded-xl border border-dashed border-gray-200 bg-gray-50/70 px-4 py-6 text-sm text-gray-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-300">
+                        {{ __('No active bookings for today under the selected reservation type.') }}
+                    </p>
+                @else
+                    <ul class="space-y-3">
+                        @foreach ($activeRows as $row)
+                            <li class="rounded-xl border border-gray-200/90 bg-white px-4 py-3 text-sm shadow-sm dark:border-white/10 dark:bg-gray-950/50">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <p class="font-mono font-semibold text-primary-600 dark:text-primary-400">{{ $row['reference_number'] }}</p>
+                                        <p class="truncate text-gray-700 dark:text-gray-200">{{ $row['guest_name'] }}</p>
+                                    </div>
+                                    <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-700 dark:bg-white/10 dark:text-gray-200">
+                                        {{ Booking::statusOptions()[$row['status']] ?? $row['status'] }}
+                                    </span>
+                                </div>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
             </div>
         </x-filament::section>
     </div>
@@ -360,11 +383,7 @@
                                 </p>
                             </div>
                             <p class="text-xs text-gray-500 dark:text-gray-400">
-                                @if ($this->isVenueMode())
-                                    {{ __('Bookings that include this venue on the selected night.') }}
-                                @else
-                                    {{ __('Bookings that include this room type on the selected night.') }}
-                                @endif
+                                {{ __('Bookings for this reservation type on the selected day.') }}
                             </p>
                         </div>
                         <x-filament::icon-button
@@ -384,7 +403,7 @@
 
                     <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                         <div class="min-w-0 max-w-full sm:max-w-md">
-                            @if ($this->isVenueMode())
+                            @if ($this->reservationFilter === 'venue')
                                 <span
                                     @class([
                                         'inline-flex w-full items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ring-inset sm:w-auto sm:min-w-[14rem]',
@@ -392,13 +411,6 @@
                                         'bg-gradient-to-r from-sky-100 to-cyan-100 text-sky-900 ring-sky-600/25 dark:from-sky-500/20 dark:to-cyan-400/10 dark:text-sky-100 dark:ring-sky-400/30' => $count > 0,
                                     ])
                                 >
-                                    <span
-                                        @class([
-                                            'h-2 w-2 rounded-full',
-                                            'bg-gray-400 dark:bg-gray-500' => $count === 0,
-                                            'bg-sky-500 dark:bg-sky-300' => $count > 0,
-                                        ])
-                                    ></span>
                                     {{ $this->modalTypeLabel() }}
                                 </span>
                             @else
@@ -434,7 +446,7 @@
                                     {{ __('No bookings for this date') }}
                                 </p>
                                 <p class="max-w-xs text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-                                    {{ __('This room type is available for the selected night.') }}
+                                    {{ __('No bookings found for this reservation type on the selected day.') }}
                                 </p>
                             </div>
                         </div>
@@ -457,6 +469,30 @@
                                             </button>
                                             <p class="mt-0.5 break-words text-sm text-gray-700 dark:text-gray-200">
                                                 {{ $row['guest_name'] }}
+                                            </p>
+                                            @php
+                                                $badgeKind = $row['booking_badge_kind'] ?? 'room';
+                                            @endphp
+                                            <p class="mt-2">
+                                                @if ($badgeKind === 'both')
+                                                    <span
+                                                        class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-500/15 dark:text-amber-100 dark:ring-amber-400/25"
+                                                    >
+                                                        {{ __('Room + Venue') }}
+                                                    </span>
+                                                @elseif ($badgeKind === 'venue')
+                                                    <span
+                                                        class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-900 ring-1 ring-inset ring-sky-600/20 dark:bg-sky-500/15 dark:text-sky-100 dark:ring-sky-400/25"
+                                                    >
+                                                        {{ __('Venue') }}
+                                                    </span>
+                                                @else
+                                                    <span
+                                                        class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-900 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/15 dark:text-emerald-100 dark:ring-emerald-400/25"
+                                                    >
+                                                        {{ __('Room') }}
+                                                    </span>
+                                                @endif
                                             </p>
                                         </div>
                                         <div class="flex shrink-0 items-start justify-between gap-2 sm:justify-start">
