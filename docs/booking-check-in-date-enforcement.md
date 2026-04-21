@@ -43,6 +43,7 @@ public function isCheckInTodayManila(?Carbon $at = null): bool
 **Purpose:** Single source of truth for whether today is the booking's check-in date. Used by all validation and visibility conditions.
 
 **Key Details:**
+
 - Compares calendar days (ignores time component)
 - Always uses Manila timezone via `Booking::timezoneManila()` constant
 - Optional `$at` parameter for testing (allows clock control)
@@ -55,11 +56,13 @@ public function isCheckInTodayManila(?Carbon $at = null): bool
 **File:** `app/Support/BookingCheckInEligibility.php` (Lines 19 & 35)
 
 **Added constant:**
+
 ```php
 public const REASON_OUTSIDE_CHECK_IN_DAY = 'outside_check_in_day';
 ```
 
 **Gate logic in `assess()` method:**
+
 ```php
 // Check 1: Verify today is the check-in date
 if (! $booking->isCheckInTodayManila()) {
@@ -88,16 +91,16 @@ public static function complete(Booking $booking): void
     if ($booking->trashed()) {
         throw new \InvalidArgumentException(__('Cannot complete a deleted booking.'));
     }
-    
+
     // NEW: Block completion if today is not check-out date
     if (! $booking->isCheckOutTodayManila()) {
         throw new \InvalidArgumentException(__('Booking can only be completed on the check-out date.'));
     }
-    
+
     if ($booking->status !== Booking::STATUS_OCCUPIED) {
         throw new \InvalidArgumentException(__('Booking must be occupied before completion.'));
     }
-    
+
     $booking->update(['status' => Booking::STATUS_COMPLETED]);
 }
 ```
@@ -113,9 +116,9 @@ public static function complete(Booking $booking): void
 The **"Mark stay complete"** action in the bookings table now includes date visibility:
 
 ```php
-->visible(fn (Booking $record) => 
-    ! $record->trashed() 
-    && $record->status === Booking::STATUS_OCCUPIED 
+->visible(fn (Booking $record) =>
+    ! $record->trashed()
+    && $record->status === Booking::STATUS_OCCUPIED
     && $record->isCheckOutTodayManila()  // NEW
 )
 ```
@@ -178,11 +181,13 @@ The modal rows now include a computed `can_complete` flag:
 **File:** `resources/views/filament/resources/bookings/pages/room-calendar.blade.php` (Line 554)
 
 The complete button visibility changed from:
+
 ```blade
 @if (($row['status'] ?? null) === Booking::STATUS_OCCUPIED)
 ```
 
 To:
+
 ```blade
 @if (($row['can_complete'] ?? false) === true)
 ```
@@ -206,29 +211,32 @@ Same update as room calendar (same structure, same logic).
 Three comprehensive test cases covering all critical paths:
 
 ### Test 1: Check-in Blocked When Date Not Today
+
 ```php
 public function check_in_is_blocked_when_check_in_date_is_not_today()
 {
     $booking = Booking::factory()->create(['check_in' => now()->addDay()]);
     $eligibility = BookingCheckInEligibility::assess($booking);
-    
+
     $this->assertFalse($eligibility['allowed']);
     $this->assertEqual($eligibility['reason'], BookingCheckInEligibility::REASON_OUTSIDE_CHECK_IN_DAY);
 }
 ```
 
 ### Test 2: Date Predicate Works Correctly
+
 ```php
 public function check_in_day_predicate_returns_true_when_check_in_date_is_today()
 {
     $today = now();
     $booking = Booking::factory()->create(['check_in' => $today]);
-    
+
     $this->assertTrue($booking->isCheckInTodayManila($today));
 }
 ```
 
 ### Test 3: Completion Blocked When Date Not Today
+
 ```php
 public function complete_is_blocked_when_check_out_date_is_not_today()
 {
@@ -236,7 +244,7 @@ public function complete_is_blocked_when_check_out_date_is_not_today()
         'status' => Booking::STATUS_OCCUPIED,
         'check_in' => now()->addDay(),
     ]);
-    
+
     $this->expectException(\InvalidArgumentException::class);
     BookingLifecycleActions::complete($booking);
 }
@@ -256,6 +264,7 @@ Instead of adding date checks to each individual Filament action, we enforce the
 2. **BookingLifecycleActions::complete()** — Completion mutation (consulted by all completion flows)
 
 **Benefits:**
+
 - Single source of truth (changes propagate everywhere automatically)
 - Prevents bypasses via direct API/database mutations
 - Consistent behavior across all entry points
@@ -266,6 +275,7 @@ Instead of adding date checks to each individual Filament action, we enforce the
 Filament visibility conditions hide buttons when the rule fails:
 
 **Benefits:**
+
 - Better UX (users see why buttons are disabled)
 - Fail-fast feedback (no confusing API errors)
 - Prevents unnecessary server round trips
@@ -274,29 +284,31 @@ Filament visibility conditions hide buttons when the rule fails:
 
 ## Files Modified
 
-| File | Changes | Purpose |
-|------|---------|---------|
-| `app/Models/Booking.php` | Added `isCheckInTodayManila()` and `isCheckOutTodayManila()` methods | Model-level date predicates |
-| `app/Support/BookingCheckInEligibility.php` | Added date check before status checks | Check-in gate enforcement |
-| `app/Support/BookingLifecycleActions.php` | Added date check to `complete()` | Completion gate enforcement |
-| `app/Filament/Resources/Bookings/Tables/BookingsTable.php` | Added date visibility to complete action | Table action visibility |
-| `app/Filament/Resources/Bookings/Concerns/InteractsWithBookingOperations.php` | Added date visibility to edit & view actions | Edit/view form visibility |
-| `app/Filament/Resources/Bookings/Pages/RoomCalendar.php` | Added `can_complete` flag to modal rows | Calendar modal logic |
-| `resources/views/filament/resources/bookings/pages/room-calendar.blade.php` | Changed button visibility to use `can_complete` | Room calendar template |
-| `resources/views/filament/resources/bookings/pages/venue-calendar.blade.php` | Changed button visibility to use `can_complete` | Venue calendar template |
-| `tests/Unit/BookingCheckInEligibilityTest.php` | Created new test file with 3 test cases | Regression coverage |
+| File                                                                          | Changes                                                              | Purpose                     |
+| ----------------------------------------------------------------------------- | -------------------------------------------------------------------- | --------------------------- |
+| `app/Models/Booking.php`                                                      | Added `isCheckInTodayManila()` and `isCheckOutTodayManila()` methods | Model-level date predicates |
+| `app/Support/BookingCheckInEligibility.php`                                   | Added date check before status checks                                | Check-in gate enforcement   |
+| `app/Support/BookingLifecycleActions.php`                                     | Added date check to `complete()`                                     | Completion gate enforcement |
+| `app/Filament/Resources/Bookings/Tables/BookingsTable.php`                    | Added date visibility to complete action                             | Table action visibility     |
+| `app/Filament/Resources/Bookings/Concerns/InteractsWithBookingOperations.php` | Added date visibility to edit & view actions                         | Edit/view form visibility   |
+| `app/Filament/Resources/Bookings/Pages/RoomCalendar.php`                      | Added `can_complete` flag to modal rows                              | Calendar modal logic        |
+| `resources/views/filament/resources/bookings/pages/room-calendar.blade.php`   | Changed button visibility to use `can_complete`                      | Room calendar template      |
+| `resources/views/filament/resources/bookings/pages/venue-calendar.blade.php`  | Changed button visibility to use `can_complete`                      | Venue calendar template     |
+| `tests/Unit/BookingCheckInEligibilityTest.php`                                | Created new test file with 3 test cases                              | Regression coverage         |
 
 ---
 
 ## Testing & Validation
 
 **Automated Tests:**
+
 ```bash
 php artisan test --filter=BookingCheckInEligibilityTest
 # Result: 3 passed (5 assertions)
 ```
 
 **Error Checking:**
+
 ```bash
 php artisan tinker
 > get_errors() on all modified files
@@ -304,6 +316,7 @@ php artisan tinker
 ```
 
 **Manual Testing:**
+
 - ✅ Verified check-in button disappears when not check-in date
 - ✅ Verified completion button disappears when not check-in date
 - ✅ Verified buttons appear normally on actual check-in date
