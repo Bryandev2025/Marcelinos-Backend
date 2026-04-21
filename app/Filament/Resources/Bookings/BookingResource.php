@@ -101,21 +101,29 @@ class BookingResource extends Resource
         $year = (int) $checkIn->year;
         $modalDate = $checkIn->toDateString();
 
-        $inventory = RoomCalendar::INVENTORY_ROOMS;
+        $reservationFilter = RoomCalendar::RESERVATION_ROOM;
         $modalType = null;
 
+        $hasRooms = $booking->rooms->isNotEmpty() || $booking->roomLines->isNotEmpty();
+        $hasVenues = $booking->venues->isNotEmpty();
+
+        if ($hasRooms && $hasVenues) {
+            $reservationFilter = RoomCalendar::RESERVATION_BOTH;
+        } elseif ($hasVenues) {
+            $reservationFilter = RoomCalendar::RESERVATION_VENUE;
+        }
+
         $roomType = $booking->rooms->first()?->type ?: $booking->roomLines->first()?->room_type;
-        if (is_string($roomType) && trim($roomType) !== '') {
+        if ($reservationFilter !== RoomCalendar::RESERVATION_VENUE && is_string($roomType) && trim($roomType) !== '') {
             $modalType = $roomType;
-        } elseif ($booking->venues->isNotEmpty()) {
-            $inventory = RoomCalendar::INVENTORY_VENUES;
+        } elseif ($hasVenues) {
             $modalType = (string) $booking->venues->first()->id;
         }
 
         return static::getUrl('index', array_filter([
             'month' => $month,
             'year' => $year,
-            'inventory' => $inventory,
+            'reservationFilter' => $reservationFilter,
             'modalDate' => $modalDate,
             'modalType' => $modalType,
         ], fn ($v) => $v !== null && $v !== ''));

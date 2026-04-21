@@ -236,15 +236,6 @@ class RoomCalendar extends Page
         $this->closeModal();
     }
 
-    public function setReservationFilter(string $filter): void
-    {
-        $this->reservationFilter = in_array($filter, $this->reservationFilterOptions(), true)
-            ? $filter
-            : self::RESERVATION_ROOM;
-
-        $this->closeModal();
-    }
-
     /**
      * Counts per room category for one booking. Prefers assigned physical rooms; otherwise uses
      * guest room lines (frontend bookings before staff assigns specific rooms).
