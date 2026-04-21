@@ -163,7 +163,6 @@
                             <x-filament::input.select
                                 id="room-cal-reservation-filter"
                                 wire:model.live="reservationFilter"
-                                wire:change="setReservationFilter($event.target.value)"
                                 class="w-full"
                             >
                                 <option value="room">{{ __('Rooms only') }}</option>
