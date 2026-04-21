@@ -233,7 +233,7 @@ class GuestDemographics extends Page
                 $type = $arguments['type'] ?? 'unpaid';
 
                 $statuses = $type === 'unpaid'
-                    ? [Booking::STATUS_UNPAID]
+                    ? [Booking::STATUS_UNPAID, Booking::STATUS_PARTIAL]
                     : [Booking::STATUS_PAID, Booking::STATUS_COMPLETED, Booking::STATUS_OCCUPIED];
 
                 $dates = $this->getDateRangeForPeriod($period);
