@@ -19,7 +19,7 @@ final class BookingLifecycleActions
             throw new \InvalidArgumentException($assessment['message'] ?? __('Cannot check in this booking.'));
         }
 
-        $booking->update(['status' => Booking::STATUS_OCCUPIED]);
+        $booking->update(['booking_status' => Booking::BOOKING_STATUS_OCCUPIED]);
     }
 
     /**
@@ -35,11 +35,11 @@ final class BookingLifecycleActions
             throw new \InvalidArgumentException(__('Booking can only be completed on the check-out date.'));
         }
 
-        if ($booking->status !== Booking::STATUS_OCCUPIED) {
+        if ($booking->booking_status !== Booking::BOOKING_STATUS_OCCUPIED) {
             throw new \InvalidArgumentException(__('Booking must be checked in (occupied) before it can be completed.'));
         }
 
-        $booking->update(['status' => Booking::STATUS_COMPLETED]);
+        $booking->update(['booking_status' => Booking::BOOKING_STATUS_COMPLETED]);
     }
 
     /**
@@ -51,10 +51,10 @@ final class BookingLifecycleActions
             throw new \InvalidArgumentException(__('Cannot cancel a deleted booking.'));
         }
 
-        if (in_array($booking->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true)) {
+        if (in_array($booking->booking_status, [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED], true)) {
             throw new \InvalidArgumentException(__('This booking is already cancelled or completed.'));
         }
 
-        $booking->update(['status' => Booking::STATUS_CANCELLED]);
+        $booking->update(['booking_status' => Booking::BOOKING_STATUS_CANCELLED]);
     }
 }

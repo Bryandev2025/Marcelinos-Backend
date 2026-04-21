@@ -68,7 +68,7 @@ class BlockedDateController extends Controller
                     $otherVenueBookings = Booking::query()
                         ->with('venues:id')
                         ->where('id', '!=', $booking->id)
-                        ->where('status', '!=', Booking::STATUS_CANCELLED)
+                        ->where('booking_status', '!=', Booking::BOOKING_STATUS_CANCELLED)
                         ->where('check_in', '<', $horizonEnd)
                         ->where('check_out', '>', $todayCarbon)
                         ->whereHas('venues', fn($q) => $q->whereIn('venues.id', $venueIds))
@@ -140,11 +140,12 @@ class BlockedDateController extends Controller
             $horizonEnd = $today->copy()->addDays(365);
 
             $bookings = Booking::with(['rooms:id', 'venues:id'])
-                ->whereIn('status', [
-                    Booking::STATUS_PAID,
-                    Booking::STATUS_PARTIAL,
-                    Booking::STATUS_OCCUPIED,
-                ])
+                ->where(function ($q): void {
+                    $q->whereIn('payment_status', [
+                        Booking::PAYMENT_STATUS_PARTIAL,
+                        Booking::PAYMENT_STATUS_PAID,
+                    ])->orWhere('booking_status', Booking::BOOKING_STATUS_OCCUPIED);
+                })
                 ->where('check_in', '<', $horizonEnd)
                 ->where('check_out', '>', $today)
                 ->get(['id', 'check_in', 'check_out']);

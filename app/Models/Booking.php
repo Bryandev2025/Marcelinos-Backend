@@ -31,7 +31,8 @@ class Booking extends Model
         'check_in',
         'check_out',
         'total_price',
-        'status',
+        'booking_status',
+        'payment_status',
         'payment_method',
         'online_payment_plan',
         'xendit_invoice_id',
@@ -69,6 +70,12 @@ class Booking extends Model
             if (! Str::isUuid((string) $booking->receipt_token)) {
                 $booking->receipt_token = (string) Str::uuid();
             }
+            if (empty($booking->booking_status)) {
+                $booking->booking_status = self::BOOKING_STATUS_RESERVED;
+            }
+            if (empty($booking->payment_status)) {
+                $booking->payment_status = self::PAYMENT_STATUS_UNPAID;
+            }
         });
 
         /**
@@ -91,13 +98,19 @@ class Booking extends Model
         });
 
         /**
-         * Send testimonial feedback email when status transitions to completed (scheduler or admin).
+         * Send testimonial feedback email when stay is completed and fully paid (paid + completed).
          */
         static::updated(function (Booking $booking) {
-            if (! $booking->wasChanged('status') || $booking->status !== Booking::STATUS_COMPLETED) {
+            if ($booking->testimonial_feedback_sent_at !== null) {
                 return;
             }
-            if ($booking->testimonial_feedback_sent_at !== null) {
+
+            $origBooking = $booking->getOriginal('booking_status');
+            $origPayment = $booking->getOriginal('payment_status');
+            $wasEligible = $origBooking === self::BOOKING_STATUS_COMPLETED
+                && $origPayment === self::PAYMENT_STATUS_PAID;
+
+            if (! $booking->isEligibleForTestimonialFeedback() || $wasEligible) {
                 return;
             }
 
@@ -219,7 +232,7 @@ class Booking extends Model
     }
 
     /**
-     * Whether rooms (if required) and venues (if required) satisfy rules for transitioning to {@see STATUS_OCCUPIED}.
+     * Whether rooms (if required) and venues (if required) satisfy rules for transitioning to occupied.
      */
     public function assignmentsSatisfiedForOccupied(): bool
     {
@@ -286,21 +299,34 @@ class Booking extends Model
         return $this->hasMany(Payment::class);
     }
 
-    /* ================= STATUSES ================= */
+    /* ================= BOOKING (STAY) STATUS ================= */
 
-    const STATUS_UNPAID = 'unpaid';
+    const BOOKING_STATUS_RESERVED = 'reserved';
 
-    const STATUS_PARTIAL = 'partial';
+    const BOOKING_STATUS_OCCUPIED = 'occupied';
 
-    const STATUS_OCCUPIED = 'occupied';
+    const BOOKING_STATUS_COMPLETED = 'completed';
 
-    const STATUS_COMPLETED = 'completed';
+    const BOOKING_STATUS_CANCELLED = 'cancelled';
 
-    const STATUS_PAID = 'paid';
+    const BOOKING_STATUS_RESCHEDULED = 'rescheduled';
 
-    const STATUS_CANCELLED = 'cancelled';
+    /* ================= PAYMENT STATUS ================= */
 
-    const STATUS_RESCHEDULED = 'rescheduled';
+    const PAYMENT_STATUS_UNPAID = 'unpaid';
+
+    const PAYMENT_STATUS_PARTIAL = 'partial';
+
+    const PAYMENT_STATUS_PAID = 'paid';
+
+    /**
+     * Testimonial email / review eligibility: fully paid stay marked completed.
+     */
+    public function isEligibleForTestimonialFeedback(): bool
+    {
+        return $this->booking_status === self::BOOKING_STATUS_COMPLETED
+            && $this->payment_status === self::PAYMENT_STATUS_PAID;
+    }
 
     const UNPAID_EXPIRY_DAYS = 3;
 
@@ -388,16 +414,23 @@ class Booking extends Model
         );
     }
 
-    public static function statusOptions(): array
+    public static function bookingStatusOptions(): array
     {
         return [
-            self::STATUS_UNPAID => 'Unpaid',
-            self::STATUS_PARTIAL => 'Partial',
-            self::STATUS_OCCUPIED => 'Occupied',
-            self::STATUS_PAID => 'Paid',
-            self::STATUS_COMPLETED => 'Completed',
-            self::STATUS_CANCELLED => 'Cancelled',
-            self::STATUS_RESCHEDULED => 'Rescheduled',
+            self::BOOKING_STATUS_RESERVED => 'Reserved',
+            self::BOOKING_STATUS_OCCUPIED => 'Occupied',
+            self::BOOKING_STATUS_COMPLETED => 'Completed',
+            self::BOOKING_STATUS_CANCELLED => 'Cancelled',
+            self::BOOKING_STATUS_RESCHEDULED => 'Rescheduled',
+        ];
+    }
+
+    public static function paymentStatusOptions(): array
+    {
+        return [
+            self::PAYMENT_STATUS_UNPAID => 'Unpaid',
+            self::PAYMENT_STATUS_PARTIAL => 'Partial',
+            self::PAYMENT_STATUS_PAID => 'Paid',
         ];
     }
 
@@ -442,7 +475,8 @@ class Booking extends Model
      */
     public function isExpiredUnpaid(?Carbon $at = null, ?int $days = null): bool
     {
-        if ($this->status !== self::STATUS_UNPAID) {
+        if ($this->payment_status !== self::PAYMENT_STATUS_UNPAID
+            || $this->booking_status !== self::BOOKING_STATUS_RESERVED) {
             return false;
         }
 
@@ -472,23 +506,36 @@ class Booking extends Model
                 return false;
             }
 
-            $fresh->update(['status' => self::STATUS_CANCELLED]);
+            $fresh->update(['booking_status' => self::BOOKING_STATUS_CANCELLED]);
             $this->refresh();
 
             return true;
         });
     }
 
-    public static function statusColors(): array
+    /**
+     * @return array<string, string> color => booking_status value
+     */
+    public static function bookingStatusColors(): array
     {
         return [
-            'primary' => self::STATUS_UNPAID,
-            'info' => self::STATUS_PARTIAL,
-            'success' => self::STATUS_PAID,
-            'warning' => self::STATUS_OCCUPIED,
-            'secondary' => self::STATUS_COMPLETED,
-            'danger' => self::STATUS_CANCELLED,
-            'default' => self::STATUS_RESCHEDULED,
+            'primary' => self::BOOKING_STATUS_RESERVED,
+            'warning' => self::BOOKING_STATUS_OCCUPIED,
+            'secondary' => self::BOOKING_STATUS_COMPLETED,
+            'danger' => self::BOOKING_STATUS_CANCELLED,
+            'default' => self::BOOKING_STATUS_RESCHEDULED,
+        ];
+    }
+
+    /**
+     * @return array<string, string> color => payment_status value
+     */
+    public static function paymentStatusColors(): array
+    {
+        return [
+            'primary' => self::PAYMENT_STATUS_UNPAID,
+            'info' => self::PAYMENT_STATUS_PARTIAL,
+            'success' => self::PAYMENT_STATUS_PAID,
         ];
     }
 
@@ -505,7 +552,7 @@ class Booking extends Model
         $dateEnd = $date->copy()->endOfDay();
 
         return $query
-            ->whereNotIn('status', [self::STATUS_CANCELLED])
+            ->whereNotIn('booking_status', [self::BOOKING_STATUS_CANCELLED])
             ->where('check_in', '<=', $dateEnd)
             ->where('check_out', '>', $dateStart);
     }
@@ -519,7 +566,7 @@ class Booking extends Model
         $d = Carbon::parse($date)->toDateString();
 
         return $query
-            ->whereNotIn('status', [self::STATUS_CANCELLED])
+            ->whereNotIn('booking_status', [self::BOOKING_STATUS_CANCELLED])
             ->whereDate('check_in', '<=', $d)
             ->whereDate('check_out', '>', $d);
     }
@@ -534,7 +581,7 @@ class Booking extends Model
         $d = Carbon::parse($date)->toDateString();
 
         return $query
-            ->whereNotIn('status', [self::STATUS_CANCELLED])
+            ->whereNotIn('booking_status', [self::BOOKING_STATUS_CANCELLED])
             ->whereDate('check_in', '<=', $d)
             ->whereDate('check_out', '>=', $d);
     }
@@ -543,7 +590,7 @@ class Booking extends Model
      * Get bookings overlapping a date, with guest and assignable names for display.
      * Used by blocked-dates flow to show "contact customer first" info.
      *
-     * @return array<int, array{id: int, reference_number: string, guest_name: string, email: string, contact_num: string, rooms: string, venues: string, check_in: string, check_out: string, status: string}>
+     * @return array<int, array{id: int, reference_number: string, guest_name: string, email: string, contact_num: string, rooms: string, venues: string, check_in: string, check_out: string, booking_status: string, payment_status: string}>
      */
     public static function getConflictsForDate($date): array
     {
@@ -563,7 +610,8 @@ class Booking extends Model
                 'venues' => $b->venues->pluck('name')->join(', ') ?: '—',
                 'check_in' => $b->check_in?->format('M j, Y g:i A') ?? '—',
                 'check_out' => $b->check_out?->format('M j, Y g:i A') ?? '—',
-                'status' => $b->status,
+                'booking_status' => $b->booking_status,
+                'payment_status' => $b->payment_status,
             ];
         })->values()->all();
     }
@@ -571,7 +619,7 @@ class Booking extends Model
     /**
      * Bookings overlapping a calendar day that include a given room (for staff block warnings).
      *
-     * @return array<int, array{id: int, reference_number: string, guest_name: string, email: string, contact_num: string, rooms: string, venues: string, check_in: string, check_out: string, status: string}>
+     * @return array<int, array{id: int, reference_number: string, guest_name: string, email: string, contact_num: string, rooms: string, venues: string, check_in: string, check_out: string, booking_status: string, payment_status: string}>
      */
     public static function getConflictsForRoomOnDate(int $roomId, $date): array
     {
@@ -592,7 +640,8 @@ class Booking extends Model
                 'venues' => $b->venues->pluck('name')->join(', ') ?: '—',
                 'check_in' => $b->check_in?->format('M j, Y g:i A') ?? '—',
                 'check_out' => $b->check_out?->format('M j, Y g:i A') ?? '—',
-                'status' => $b->status,
+                'booking_status' => $b->booking_status,
+                'payment_status' => $b->payment_status,
             ];
         })->values()->all();
     }
@@ -600,7 +649,7 @@ class Booking extends Model
     /**
      * Bookings overlapping a calendar day that include a given venue (for staff block warnings).
      *
-     * @return array<int, array{id: int, reference_number: string, guest_name: string, email: string, contact_num: string, rooms: string, venues: string, check_in: string, check_out: string, status: string}>
+     * @return array<int, array{id: int, reference_number: string, guest_name: string, email: string, contact_num: string, rooms: string, venues: string, check_in: string, check_out: string, booking_status: string, payment_status: string}>
      */
     public static function getConflictsForVenueOnDate(int $venueId, $date): array
     {
@@ -621,7 +670,8 @@ class Booking extends Model
                 'venues' => $b->venues->pluck('name')->join(', ') ?: '—',
                 'check_in' => $b->check_in?->format('M j, Y g:i A') ?? '—',
                 'check_out' => $b->check_out?->format('M j, Y g:i A') ?? '—',
-                'status' => $b->status,
+                'booking_status' => $b->booking_status,
+                'payment_status' => $b->payment_status,
             ];
         })->values()->all();
     }

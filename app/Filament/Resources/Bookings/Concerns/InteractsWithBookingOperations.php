@@ -34,7 +34,7 @@ trait InteractsWithBookingOperations
                         ->color('info')
                         ->requiresConfirmation()
                         ->modalHeading(__('Mark booking as fully paid?'))
-                        ->modalDescription(__('Records one payment for the full remaining balance and sets status to Paid. For partial cash amounts, use Payments instead.'))
+                        ->modalDescription(__('Records one payment for the full remaining balance and sets payment to Paid. For partial cash amounts, use Payments instead.'))
                         ->modalSubmitActionLabel(__('Yes, mark as paid'))
                         ->successNotificationTitle(__('Remaining balance recorded. Booking is now paid.'))
                         ->visible(fn (): bool => $this->shouldShowPayBalanceForRecord())
@@ -49,7 +49,7 @@ trait InteractsWithBookingOperations
                         ->color('warning')
                         ->requiresConfirmation()
                         ->modalHeading(__('Check in this guest?'))
-                        ->modalDescription(__('Sets status to Occupied (guest is on site).'))
+                        ->modalDescription(__('Sets stay status to Occupied (guest is on site).'))
                         ->visible(fn (): bool => $this->record instanceof Booking && BookingCheckInEligibility::assess($this->record)['allowed'])
                         ->action(function (): void {
                             $this->runBookingCheckIn();
@@ -61,7 +61,7 @@ trait InteractsWithBookingOperations
                         ->requiresConfirmation()
                         ->visible(fn (): bool => $this->record instanceof Booking
                             && ! $this->record->trashed()
-                            && $this->record->status === Booking::STATUS_OCCUPIED
+                            && $this->record->booking_status === Booking::BOOKING_STATUS_OCCUPIED
                             && $this->record->isCheckOutTodayManila())
                         ->action(function (): void {
                             $this->runBookingComplete();
@@ -74,7 +74,7 @@ trait InteractsWithBookingOperations
                         ->modalHeading(__('Cancel this booking?'))
                         ->visible(fn (): bool => $this->record instanceof Booking
                             && ! $this->record->trashed()
-                            && ! in_array($this->record->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true))
+                            && ! in_array($this->record->booking_status, [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED], true))
                         ->action(function (): void {
                             $this->runBookingCancel();
                         }),
@@ -130,7 +130,7 @@ trait InteractsWithBookingOperations
                 ->color('secondary')
                 ->requiresConfirmation()
                 ->visible(fn (): bool => $this->record instanceof Booking
-                    && $this->record->status === Booking::STATUS_OCCUPIED
+                    && $this->record->booking_status === Booking::BOOKING_STATUS_OCCUPIED
                     && $this->record->isCheckOutTodayManila())
                 ->action(function (): void {
                     $this->runBookingComplete();
@@ -142,7 +142,7 @@ trait InteractsWithBookingOperations
                 ->requiresConfirmation()
                 ->modalHeading(__('Cancel this booking?'))
                 ->visible(fn (): bool => $this->record instanceof Booking
-                    && ! in_array($this->record->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true))
+                    && ! in_array($this->record->booking_status, [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED], true))
                 ->action(function (): void {
                     $this->runBookingCancel();
                 }),
@@ -156,7 +156,8 @@ trait InteractsWithBookingOperations
             return false;
         }
 
-        if (in_array($record->status, [Booking::STATUS_PAID, Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true)) {
+        if ($record->payment_status === Booking::PAYMENT_STATUS_PAID
+            || in_array($record->booking_status, [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED], true)) {
             return false;
         }
 

@@ -391,9 +391,15 @@ class BookingsTable
                         ->orderBy('payment_method', $direction)
                         ->orderBy('online_payment_plan', $direction)),
 
-                BadgeColumn::make('status')
-                    ->colors(Booking::statusColors())
-                    ->formatStateUsing(fn (?string $state): string => Booking::statusOptions()[$state] ?? (string) $state)
+                BadgeColumn::make('booking_status')
+                    ->label('Stay')
+                    ->colors(Booking::bookingStatusColors())
+                    ->formatStateUsing(fn (?string $state): string => Booking::bookingStatusOptions()[$state] ?? (string) $state)
+                    ->sortable(),
+                BadgeColumn::make('payment_status')
+                    ->label('Payment')
+                    ->colors(Booking::paymentStatusColors())
+                    ->formatStateUsing(fn (?string $state): string => Booking::paymentStatusOptions()[$state] ?? (string) $state)
                     ->sortable(),
 
                 TextColumn::make('next_step')
@@ -409,8 +415,12 @@ class BookingsTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                SelectFilter::make('status')
-                    ->options(Booking::statusOptions()),
+                SelectFilter::make('booking_status')
+                    ->label('Stay status')
+                    ->options(Booking::bookingStatusOptions()),
+                SelectFilter::make('payment_status')
+                    ->label('Payment status')
+                    ->options(Booking::paymentStatusOptions()),
                 SelectFilter::make('payment_method')
                     ->label('Payment intent')
                     ->options([
@@ -640,7 +650,7 @@ class BookingsTable
                         ->color('info')
                         ->requiresConfirmation()
                         ->modalHeading('Mark booking as fully paid?')
-                        ->modalDescription('Records one payment for the full remaining balance and sets status to Paid. For partial cash amounts, use the Payments tab on the booking.')
+                        ->modalDescription('Records one payment for the full remaining balance and sets payment to Paid. For partial cash amounts, use the Payments tab on the booking.')
                         ->modalSubmitActionLabel('Yes, mark as paid')
                         ->successNotificationTitle('Remaining balance recorded. Booking is now paid.')
                         ->visible(fn (Booking $record): bool => BookingFullBalancePayment::assess($record)['allowed'])
@@ -663,7 +673,7 @@ class BookingsTable
                         ->color('warning')
                         ->requiresConfirmation()
                         ->modalHeading('Check in this guest?')
-                        ->modalDescription('Sets status to Occupied (guest is on site).')
+                        ->modalDescription('Sets stay status to Occupied (guest is on site).')
                         ->visible(fn (Booking $record) => ! $record->trashed() && BookingCheckInEligibility::assess($record)['allowed'])
                         ->action(function (Booking $record) {
                             $record->loadMissing(['roomLines', 'venues', 'rooms.bedSpecifications']);
@@ -689,7 +699,7 @@ class BookingsTable
                         ->icon('heroicon-o-flag')
                         ->color('secondary')
                         ->requiresConfirmation()
-                        ->visible(fn (Booking $record) => ! $record->trashed() && $record->status === Booking::STATUS_OCCUPIED && $record->isCheckOutTodayManila())
+                        ->visible(fn (Booking $record) => ! $record->trashed() && $record->booking_status === Booking::BOOKING_STATUS_OCCUPIED && $record->isCheckOutTodayManila())
                         ->action(function (Booking $record) {
                             try {
                                 BookingLifecycleActions::complete($record);
@@ -713,7 +723,7 @@ class BookingsTable
                         ->icon('heroicon-o-x-circle')
                         ->color('danger')
                         ->requiresConfirmation()
-                        ->visible(fn (Booking $record) => ! $record->trashed() && ! in_array($record->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true))
+                        ->visible(fn (Booking $record) => ! $record->trashed() && ! in_array($record->booking_status, [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED], true))
                         ->action(function (Booking $record) {
                             try {
                                 BookingLifecycleActions::cancel($record);

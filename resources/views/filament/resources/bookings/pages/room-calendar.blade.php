@@ -7,12 +7,11 @@
         'both' => __('Room + Venue'),
     ];
     $statusPill = [
-        Booking::STATUS_UNPAID => 'bg-violet-100 text-violet-800 ring-1 ring-inset ring-violet-600/15 dark:bg-violet-500/15 dark:text-violet-200 dark:ring-violet-400/25',
-        Booking::STATUS_PAID => 'bg-emerald-100 text-emerald-800 ring-1 ring-inset ring-emerald-600/15 dark:bg-emerald-500/15 dark:text-emerald-200 dark:ring-emerald-400/25',
-        Booking::STATUS_OCCUPIED => 'bg-amber-100 text-amber-900 ring-1 ring-inset ring-amber-600/15 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-400/25',
-        Booking::STATUS_COMPLETED => 'bg-gray-100 text-gray-800 ring-1 ring-inset ring-gray-600/15 dark:bg-white/10 dark:text-gray-200 dark:ring-white/15',
-        Booking::STATUS_CANCELLED => 'bg-rose-100 text-rose-800 ring-1 ring-inset ring-rose-600/15 dark:bg-rose-500/15 dark:text-rose-200 dark:ring-rose-400/25',
-        Booking::STATUS_RESCHEDULED => 'bg-blue-100 text-blue-800 ring-1 ring-inset ring-blue-600/15 dark:bg-blue-500/15 dark:text-blue-200 dark:ring-blue-400/25',
+        Booking::BOOKING_STATUS_RESERVED => 'bg-violet-100 text-violet-800 ring-1 ring-inset ring-violet-600/15 dark:bg-violet-500/15 dark:text-violet-200 dark:ring-violet-400/25',
+        Booking::BOOKING_STATUS_OCCUPIED => 'bg-amber-100 text-amber-900 ring-1 ring-inset ring-amber-600/15 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-400/25',
+        Booking::BOOKING_STATUS_COMPLETED => 'bg-gray-100 text-gray-800 ring-1 ring-inset ring-gray-600/15 dark:bg-white/10 dark:text-gray-200 dark:ring-white/15',
+        Booking::BOOKING_STATUS_CANCELLED => 'bg-rose-100 text-rose-800 ring-1 ring-inset ring-rose-600/15 dark:bg-rose-500/15 dark:text-rose-200 dark:ring-rose-400/25',
+        Booking::BOOKING_STATUS_RESCHEDULED => 'bg-blue-100 text-blue-800 ring-1 ring-inset ring-blue-600/15 dark:bg-blue-500/15 dark:text-blue-200 dark:ring-blue-400/25',
     ];
 @endphp
 
@@ -335,7 +334,7 @@
                                         <p class="truncate text-gray-700 dark:text-gray-200">{{ $row['guest_name'] }}</p>
                                     </div>
                                     <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-700 dark:bg-white/10 dark:text-gray-200">
-                                        {{ Booking::statusOptions()[$row['status']] ?? $row['status'] }}
+                                        {{ $row['status_display'] ?? '—' }}
                                     </span>
                                 </div>
                             </li>
@@ -497,7 +496,7 @@
                                         </div>
                                         <div class="flex shrink-0 items-start justify-between gap-2 sm:justify-start">
                                             @php
-                                                $pill = $statusPill[$row['status']] ?? 'bg-gray-100 text-gray-800 ring-1 ring-inset ring-gray-600/15 dark:bg-white/10 dark:text-gray-200';
+                                                $pill = $statusPill[$row['booking_status'] ?? ''] ?? 'bg-gray-100 text-gray-800 ring-1 ring-inset ring-gray-600/15 dark:bg-white/10 dark:text-gray-200';
                                             @endphp
                                             <span
                                                 @class([
@@ -505,7 +504,7 @@
                                                     $pill,
                                                 ])
                                             >
-                                                {{ Booking::statusOptions()[$row['status']] ?? $row['status'] }}
+                                                {{ $row['status_display'] ?? '—' }}
                                             </span>
 
                                             <div
@@ -576,7 +575,7 @@
                                                         </button>
                                                     @endif
 
-                                                    @if (($row['status'] ?? null) === Booking::STATUS_PAID && (($row['can_check_in'] ?? false) === true))
+                                                    @if (($row['payment_status'] ?? null) === Booking::PAYMENT_STATUS_PAID && (($row['can_check_in'] ?? false) === true))
                                                         <button
                                                             type="button"
                                                             wire:click="checkInBooking({{ $row['id'] }})"
@@ -598,7 +597,7 @@
                                                         </button>
                                                     @endif
 
-                                                    @if (! in_array(($row['status'] ?? null), [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true))
+                                                    @if (! in_array(($row['booking_status'] ?? null), [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED], true))
                                                         <button
                                                             type="button"
                                                             @click="open = false; cancelOpen = true"
@@ -633,7 +632,7 @@
                                                                 {{ __('Settle remaining balance') }}
                                                             </h3>
                                                             <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                                                                {{ __('This records one payment for the full remaining balance and sets status to Paid. For partial cash, use the Payments tab on the booking.') }}
+                                                                {{ __('This records one payment for the full remaining balance and sets payment to Paid. For partial cash, use the Payments tab on the booking.') }}
                                                             </p>
                                                             <div class="mt-4 flex justify-end gap-2">
                                                                 <button

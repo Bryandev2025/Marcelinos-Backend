@@ -28,7 +28,7 @@ final class BookingDoubleBookAlert
                 return;
             }
 
-            if ($booking->trashed() || $booking->status === Booking::STATUS_CANCELLED) {
+            if ($booking->trashed() || $booking->booking_status === Booking::BOOKING_STATUS_CANCELLED) {
                 return;
             }
 
@@ -55,7 +55,8 @@ final class BookingDoubleBookAlert
                     'guest_name' => trim((string) ($b->guest?->full_name ?? '')) ?: '—',
                     'check_in' => $b->check_in?->timezone(Booking::timezoneManila())->format('M j, Y g:i A') ?? '—',
                     'check_out' => $b->check_out?->timezone(Booking::timezoneManila())->format('M j, Y g:i A') ?? '—',
-                    'status' => (string) $b->status,
+                    'booking_status' => (string) $b->booking_status,
+                    'payment_status' => (string) $b->payment_status,
                 ];
             })->values()->all();
 

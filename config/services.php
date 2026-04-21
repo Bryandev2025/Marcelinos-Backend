@@ -71,11 +71,9 @@ return [
         'spreadsheet_id' => env('GOOGLE_SHEETS_SPREADSHEET_ID'),
         'credentials_path' => storage_path('app/google-credentials.json'),
             'status_to_sheet' => [
-            'unpaid' => 'Unpaid',
-            'partial' => 'Partial',
-            'paid' => 'Paid',
-            'completed' => 'Completed',
+            'reserved' => 'Reserved',
             'occupied' => 'Checked in',
+            'completed' => 'Completed',
             'cancelled' => 'Cancelled',
             'rescheduled' => 'Rescheduled',
     ],

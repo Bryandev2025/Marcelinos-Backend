@@ -7,7 +7,6 @@ use App\Events\BookingStatusUpdated;
 use App\Events\FilamentNotificationSound;
 use App\Filament\Resources\Bookings\BookingResource;
 use App\Jobs\SyncBookingToGoogleSheet;
-use App\Mail\TestimonialFeedbackEmail;
 use App\Models\Booking;
 use App\Models\User;
 use App\Notifications\Slack\BookingLifecycleSlackNotification;
@@ -17,7 +16,6 @@ use App\Support\SlackBookingAlerts;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 class BookingObserver
@@ -139,9 +137,9 @@ class BookingObserver
             }
         }
 
-        if ($booking->wasChanged('status')) {
+        if ($booking->wasChanged('booking_status') || $booking->wasChanged('payment_status')) {
 
-            $statusConfig = [
+            $bookingStatusConfig = [
                 'cancelled' => [
                     'title' => 'Booking Cancelled',
                     'body' => "Booking {$booking->reference_number} has been cancelled.",
@@ -162,12 +160,12 @@ class BookingObserver
                 ],
             ];
 
-            if (array_key_exists($booking->status, $statusConfig)) {
+            if (array_key_exists((string) $booking->booking_status, $bookingStatusConfig)) {
                 $users = User::whereIn('role', ['admin', 'staff'])
                     ->where('is_active', true)
                     ->get();
 
-                $config = $statusConfig[$booking->status];
+                $config = $bookingStatusConfig[(string) $booking->booking_status];
 
                 foreach ($users as $user) {
                     Notification::make()
@@ -191,12 +189,12 @@ class BookingObserver
                 }
             }
 
-            if (array_key_exists($booking->status, $statusConfig)) {
-                SlackBookingAlerts::notify(new BookingLifecycleSlackNotification($booking, $booking->status));
+            if (array_key_exists((string) $booking->booking_status, $bookingStatusConfig)) {
+                SlackBookingAlerts::notify(new BookingLifecycleSlackNotification($booking, (string) $booking->booking_status));
             }
 
-            if (in_array($booking->status, [Booking::STATUS_PAID, Booking::STATUS_PARTIAL], true)) {
-                SlackBookingAlerts::notify(new BookingLifecycleSlackNotification($booking, $booking->status));
+            if (in_array((string) $booking->payment_status, [Booking::PAYMENT_STATUS_PAID, Booking::PAYMENT_STATUS_PARTIAL], true)) {
+                SlackBookingAlerts::notify(new BookingLifecycleSlackNotification($booking, (string) $booking->payment_status));
             }
 
             // Only log if an authenticated user with staff/admin role is present
@@ -205,28 +203,25 @@ class BookingObserver
                     category: 'booking',
                     event: 'booking.status_changed',
                     description: sprintf(
-                        '%s changed booking %s status from %s to %s.',
+                        '%s changed booking %s (stay %s → %s, payment %s → %s).',
                         $user->name,
                         $booking->reference_number,
-                        (string) $booking->getOriginal('status'),
-                        (string) $booking->status,
+                        (string) $booking->getOriginal('booking_status'),
+                        (string) $booking->booking_status,
+                        (string) $booking->getOriginal('payment_status'),
+                        (string) $booking->payment_status,
                     ),
                     subject: $booking,
                     meta: [
                         'reference_number' => $booking->reference_number,
                         'changed_by_user_id' => (int) $user->id,
                         'changed_by_user_name' => (string) $user->name,
-                        'old_status' => (string) $booking->getOriginal('status'),
-                        'new_status' => (string) $booking->status,
+                        'old_booking_status' => (string) $booking->getOriginal('booking_status'),
+                        'new_booking_status' => (string) $booking->booking_status,
+                        'old_payment_status' => (string) $booking->getOriginal('payment_status'),
+                        'new_payment_status' => (string) $booking->payment_status,
                     ],
                     userId: $user->id,
-                );
-            }
-
-            if ($booking->status === Booking::STATUS_COMPLETED) {
-                $this->sendEligibleTestimonialFeedback(
-                    $booking,
-                    (string) $booking->getOriginal('status') === Booking::STATUS_OCCUPIED
                 );
             }
         }
@@ -363,40 +358,4 @@ class BookingObserver
         }
     }
 
-    private function sendEligibleTestimonialFeedback(Booking $booking, bool $sendImmediately = false): void
-    {
-        if ($booking->testimonial_feedback_sent_at) {
-            return;
-        }
-
-        $booking->loadMissing('guest');
-
-        $email = $booking->guest?->email;
-        if (! $email || ! $booking->check_out) {
-            return;
-        }
-
-        if (! $sendImmediately) {
-            $timezone = config('app.timezone', 'Asia/Manila');
-            $cutoff = now($timezone)->subDay();
-            $checkOut = $booking->check_out->copy()->timezone($timezone);
-
-            if ($checkOut->gt($cutoff)) {
-                return;
-            }
-        }
-
-        try {
-            Mail::to($email)->send(new TestimonialFeedbackEmail($booking));
-            $booking->updateQuietly(['testimonial_feedback_sent_at' => now()]);
-        } catch (\Throwable $exception) {
-            Log::error('Failed sending testimonial feedback', [
-                'booking_id' => $booking->id,
-                'reference_number' => $booking->reference_number,
-                'guest_email' => $email,
-                'send_immediately' => $sendImmediately,
-                'error' => $exception->getMessage(),
-            ]);
-        }
-    }
 }

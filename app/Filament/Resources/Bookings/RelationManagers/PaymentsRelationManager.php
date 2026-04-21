@@ -100,11 +100,11 @@ class PaymentsRelationManager extends RelationManager
 
                         $booking->refresh();
 
-                        if (! in_array($booking->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true)) {
+                        if (! in_array($booking->booking_status, [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED], true)) {
                             if ($booking->total_paid >= $booking->total_price) {
-                                $booking->update(['status' => Booking::STATUS_PAID]);
+                                $booking->update(['payment_status' => Booking::PAYMENT_STATUS_PAID]);
                             } elseif ($booking->total_paid > 0 && $booking->total_paid < $booking->total_price) {
-                                $booking->update(['status' => Booking::STATUS_PARTIAL]);
+                                $booking->update(['payment_status' => Booking::PAYMENT_STATUS_PARTIAL]);
                             }
                         }
 

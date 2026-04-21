@@ -37,7 +37,7 @@ final class BookingCheckInEligibility
             ];
         }
 
-        if ($booking->status !== Booking::STATUS_PAID) {
+        if ($booking->payment_status !== Booking::PAYMENT_STATUS_PAID) {
             return [
                 'allowed' => false,
                 'reason' => self::REASON_INVALID_STATUS,
