@@ -463,6 +463,7 @@ class RoomCalendar extends Page
                     'has_assigned_rooms' => $hasAssignedRooms,
                     'can_pay_balance' => $this->canPayBalanceForBooking($b),
                     'can_check_in' => $canCheckIn,
+                    'can_complete' => $b->status === Booking::STATUS_OCCUPIED && $b->isCheckOutTodayManila(),
                 ];
             })
             ->values()
