@@ -43,7 +43,8 @@ class ActivateCheckinBookings extends Command
 
         $bookings = Booking::query()
             ->whereDate('check_in', $date)
-            ->whereIn('status', [Booking::STATUS_PAID, Booking::STATUS_PARTIAL])
+            ->where('stay_status', Booking::STAY_STATUS_RESERVED)
+            ->whereIn('payment_status', [Booking::PAYMENT_STATUS_PAID, Booking::PAYMENT_STATUS_PARTIAL])
             ->with(['roomLines', 'venues', 'rooms.bedSpecifications'])
             ->get();
 
@@ -64,14 +65,14 @@ class ActivateCheckinBookings extends Command
 
                 continue;
             }
-            $booking->update(['status' => Booking::STATUS_OCCUPIED]);
+            $booking->update(['stay_status' => Booking::STAY_STATUS_OCCUPIED]);
             $count++;
         }
 
         if ($count > 0) {
             $this->info("Marked {$count} booking(s) as occupied for check-in date {$date}.");
         } elseif ($bookings->isEmpty()) {
-            $this->comment("No paid/partial bookings with check-in on {$date}.");
+            $this->comment("No reserved paid/partial bookings with check-in on {$date}.");
         }
         if ($skipped > 0) {
             $this->comment("Skipped {$skipped} booking(s) with incomplete room/venue assignments.");

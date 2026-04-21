@@ -58,11 +58,10 @@ class EditBooking extends EditRecord
 
         $record = $this->record;
         if ($record instanceof Booking) {
-            $nextStatus = (string) $record->status;
             $rooms = is_array($data['rooms'] ?? null) ? $data['rooms'] : [];
-            $requiresAssignedRooms = in_array($nextStatus, [
-                Booking::STATUS_OCCUPIED,
-                Booking::STATUS_COMPLETED,
+            $requiresAssignedRooms = in_array((string) ($data['stay_status'] ?? $record->stay_status), [
+                Booking::STAY_STATUS_OCCUPIED,
+                Booking::STAY_STATUS_COMPLETED,
             ], true);
 
             // Allow status/payment updates on frontend-created bookings that do not

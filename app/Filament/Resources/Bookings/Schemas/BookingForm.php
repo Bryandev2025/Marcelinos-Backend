@@ -548,7 +548,7 @@ class BookingForm
 
         if (Booking::query()
             ->when($record, fn ($query) => $query->where('id', '!=', $record->id))
-            ->whereNotIn('status', [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED])
+            ->whereNotIn('stay_status', [Booking::STAY_STATUS_CANCELLED, Booking::STAY_STATUS_COMPLETED])
             ->where('check_in', '<', $end)
             ->where('check_out', '>', $start)
             ->whereHas('rooms', fn ($query) => $query->whereIn('rooms.id', $roomIds))
@@ -589,7 +589,7 @@ class BookingForm
 
         return Booking::query()
             ->when($record, fn ($query) => $query->where('id', '!=', $record->id))
-            ->whereNotIn('status', [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED])
+            ->whereNotIn('stay_status', [Booking::STAY_STATUS_CANCELLED, Booking::STAY_STATUS_COMPLETED])
             ->where('check_in', '<', $end)
             ->where('check_out', '>', $start)
             ->whereHas('venues', fn ($query) => $query->whereIn('venues.id', $venueIds))

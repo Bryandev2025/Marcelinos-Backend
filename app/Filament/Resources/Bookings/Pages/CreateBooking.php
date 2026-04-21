@@ -108,14 +108,15 @@ class CreateBooking extends CreateRecord
         $data['venue_event_type'] = null;
 
         $totalInt = (int) round($total);
+        $data['stay_status'] = Booking::STAY_STATUS_RESERVED;
         if ($total <= 0) {
-            $data['status'] = Booking::STATUS_UNPAID;
+            $data['payment_status'] = Booking::PAYMENT_STATUS_UNPAID;
         } elseif ($this->pendingPaymentAmount >= $totalInt && $totalInt > 0) {
-            $data['status'] = Booking::STATUS_PAID;
+            $data['payment_status'] = Booking::PAYMENT_STATUS_PAID;
         } elseif ($this->pendingPaymentAmount > 0) {
-            $data['status'] = Booking::STATUS_PARTIAL;
+            $data['payment_status'] = Booking::PAYMENT_STATUS_PARTIAL;
         } else {
-            $data['status'] = Booking::STATUS_UNPAID;
+            $data['payment_status'] = Booking::PAYMENT_STATUS_UNPAID;
         }
 
         return $data;

@@ -31,11 +31,13 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Enums\Width;
 use Filament\Support\Exceptions\Halt;
 use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
@@ -54,10 +56,20 @@ class BookingsTable
             ->recordAction('view')
             ->poll('10s')
             ->striped()
+            // Open filters as a right-side slide-over panel.
+            ->filtersLayout(FiltersLayout::Modal)
+            ->filtersTriggerAction(fn (Action $action): Action => $action
+                ->label('Audit & filters')
+                ->icon('heroicon-o-funnel')
+                ->color('gray')
+                ->slideOver()
+                ->modalHeading('Audit & filters')
+                ->modalWidth(Width::TwoExtraLarge))
             ->filtersFormColumns([
+                // Slide-over is narrow: keep filter UI single-column and structured via sections.
                 'default' => 1,
-                'sm' => 2,
-                'lg' => 3,
+                'sm' => 1,
+                'lg' => 1,
             ])
             ->filtersFormWidth(Width::TwoExtraLarge)
             ->filtersFormMaxHeight('min(75dvh, 32rem)')
@@ -350,22 +362,32 @@ class BookingsTable
                         : '—')
                     ->toggleable(isToggledHiddenByDefault: true),
 
-                TextColumn::make('total_price')
-                    ->label('Total')
-                    ->money('PHP', true)
-                    ->description(fn ($record) => 'Paid: '.number_format((float) ($record->total_paid ?? 0), 2).' · Balance: '.number_format((float) ($record->balance ?? 0), 2))
-                    ->sortable(),
+                TextColumn::make('billing')
+                    ->label('Billing')
+                    ->getStateUsing(function (Booking $record): string {
+                        $total = (float) ($record->total_price ?? 0);
+
+                        return '₱'.number_format($total, 2);
+                    })
+                    ->description(function (Booking $record): string {
+                        $paid = (float) ($record->total_paid ?? 0);
+                        $balance = (float) ($record->balance ?? 0);
+
+                        return 'Paid: ₱'.number_format($paid, 2).' · Balance: ₱'.number_format($balance, 2);
+                    })
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy('total_price', $direction)),
 
                 TextColumn::make('total_paid')
                     ->label('Paid')
                     ->money('PHP', true)
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('balance')
                     ->label('Balance')
                     ->money('PHP', true)
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 BadgeColumn::make('payment_method')
                     ->label('Payment intent')
@@ -389,18 +411,77 @@ class BookingsTable
                     ])
                     ->sortable(query: fn (Builder $query, string $direction): Builder => $query
                         ->orderBy('payment_method', $direction)
-                        ->orderBy('online_payment_plan', $direction)),
+                        ->orderBy('online_payment_plan', $direction))
+                    ->toggleable(isToggledHiddenByDefault: true),
 
-                BadgeColumn::make('status')
-                    ->colors(Booking::statusColors())
-                    ->formatStateUsing(fn (?string $state): string => Booking::statusOptions()[$state] ?? (string) $state)
-                    ->sortable(),
+                TextColumn::make('status_compact')
+                    ->label('Status')
+                    ->badge()
+                    ->getStateUsing(fn (Booking $record): string => $record->auditStatusLabel())
+                    ->color(function (Booking $record): string {
+                        return match ((string) $record->stay_status) {
+                            Booking::STAY_STATUS_CANCELLED => 'danger',
+                            Booking::STAY_STATUS_COMPLETED => 'secondary',
+                            Booking::STAY_STATUS_OCCUPIED => 'warning',
+                            Booking::STAY_STATUS_RESCHEDULED => 'gray',
+                            default => match ((string) $record->payment_status) {
+                                Booking::PAYMENT_STATUS_PAID => 'success',
+                                Booking::PAYMENT_STATUS_PARTIAL => 'info',
+                                default => 'danger',
+                            },
+                        };
+                    })
+                    ->description(function (Booking $record): string {
+                        $method = (string) ($record->payment_method ?? 'cash');
+                        $plan = (string) ($record->online_payment_plan ?? '');
+                        if ($method === 'online' && preg_match('/^partial_([1-9]|[1-9][0-9])$/', $plan, $matches) === 1) {
+                            return 'Online · Partial '.$matches[1].'%';
+                        }
+                        if ($method === 'online') {
+                            return 'Online · Full';
+                        }
+
+                        return 'Cash';
+                    })
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query
+                        ->orderBy('stay_status', $direction)
+                        ->orderBy('payment_status', $direction)),
+
+                BadgeColumn::make('payment_status')
+                    ->label('Payment')
+                    ->formatStateUsing(fn (?string $state): string => Booking::paymentStatusOptions()[$state] ?? (string) $state)
+                    ->colors([
+                        'danger' => Booking::PAYMENT_STATUS_UNPAID,
+                        'info' => Booking::PAYMENT_STATUS_PARTIAL,
+                        'success' => Booking::PAYMENT_STATUS_PAID,
+                    ])
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                BadgeColumn::make('stay_status')
+                    ->label('Stay')
+                    ->formatStateUsing(fn (?string $state): string => Booking::stayStatusOptions()[$state] ?? (string) $state)
+                    ->colors([
+                        'primary' => Booking::STAY_STATUS_RESERVED,
+                        'warning' => Booking::STAY_STATUS_OCCUPIED,
+                        'secondary' => Booking::STAY_STATUS_COMPLETED,
+                        'danger' => Booking::STAY_STATUS_CANCELLED,
+                        'gray' => Booking::STAY_STATUS_RESCHEDULED,
+                    ])
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('audit_status')
+                    ->label('Audit')
+                    ->getStateUsing(fn (Booking $record): string => $record->auditStatusLabel())
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('next_step')
                     ->label('Next step')
                     ->getStateUsing(fn (Booking $record): string => BookingAdminGuidance::listNextActionLabel($record))
-                    ->wrap()
-                    ->toggleable(),
+                    ->limit(32)
+                    ->tooltip(fn (Booking $record): string => BookingAdminGuidance::listNextActionLabel($record))
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('created_at')
                     ->label('Created')
@@ -409,10 +490,44 @@ class BookingsTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                SelectFilter::make('status')
-                    ->options(Booking::statusOptions()),
+                SelectFilter::make('payment_status')
+                    ->label('Payment status')
+                    ->placeholder('All')
+                    ->native(false)
+                    ->options(Booking::paymentStatusOptions()),
+                SelectFilter::make('stay_status')
+                    ->label('Stay status')
+                    ->placeholder('All')
+                    ->native(false)
+                    ->options(Booking::stayStatusOptions()),
+                Filter::make('exceptions_unpaid_stays')
+                    ->label('Exceptions')
+                    ->form([
+                        Toggle::make('enabled')
+                            ->label('Show only: Stay started but not fully paid')
+                            ->helperText('Find Occupied/Completed bookings where payment is Unpaid or Partial.')
+                            ->default(false),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (! (bool) ($data['enabled'] ?? false)) {
+                            return $query;
+                        }
+
+                        return $query
+                            ->whereIn('stay_status', [Booking::STAY_STATUS_OCCUPIED, Booking::STAY_STATUS_COMPLETED])
+                            ->whereIn('payment_status', [Booking::PAYMENT_STATUS_UNPAID, Booking::PAYMENT_STATUS_PARTIAL]);
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        if (! (bool) ($data['enabled'] ?? false)) {
+                            return [];
+                        }
+
+                        return ['Exceptions: stay started but not fully paid'];
+                    }),
                 SelectFilter::make('payment_method')
-                    ->label('Payment intent')
+                    ->label('Payment channel')
+                    ->placeholder('All')
+                    ->native(false)
                     ->options([
                         'cash' => 'Cash',
                         'online_full' => 'Online · Full',
@@ -455,7 +570,7 @@ class BookingsTable
                     ->searchable()
                     ->columnSpanFull(),
                 Filter::make('booking_dates')
-                    ->label('Filter by Dates')
+                    ->label('Date range')
                     ->columnSpanFull()
                     ->schema([
                         Grid::make([
@@ -548,6 +663,44 @@ class BookingsTable
                     }),
 
                 TrashedFilter::make(),
+            ])
+            ->filtersFormSchema(fn (array $filters): array => [
+                Section::make('Audit')
+                    ->description('Payment + stay status checks.')
+                    ->collapsible()
+                    ->schema([
+                        Grid::make(['default' => 1, 'sm' => 2])
+                            ->schema([
+                                $filters['payment_status'],
+                                $filters['stay_status'],
+                                $filters['payment_method'],
+                            ]),
+                        $filters['exceptions_unpaid_stays'],
+                    ]),
+                Section::make('Inventory')
+                    ->description('Assigned rooms / included venues.')
+                    ->collapsible()
+                    ->collapsed()
+                    ->schema([
+                        Grid::make(['default' => 1, 'sm' => 2])
+                            ->schema([
+                                $filters['room'],
+                                $filters['venue'],
+                            ]),
+                    ]),
+                Section::make('Dates')
+                    ->description('Filter bookings that overlap a date range.')
+                    ->collapsible()
+                    ->collapsed()
+                    ->schema([
+                        $filters['booking_dates'],
+                    ]),
+                Section::make('Deleted')
+                    ->collapsible()
+                    ->collapsed()
+                    ->schema([
+                        $filters['trashed'],
+                    ]),
             ])
             ->defaultSort('created_at', 'desc')
             ->headerActions([
@@ -689,7 +842,7 @@ class BookingsTable
                         ->icon('heroicon-o-flag')
                         ->color('secondary')
                         ->requiresConfirmation()
-                        ->visible(fn (Booking $record) => ! $record->trashed() && $record->status === Booking::STATUS_OCCUPIED)
+                        ->visible(fn (Booking $record) => ! $record->trashed() && (string) $record->stay_status === Booking::STAY_STATUS_OCCUPIED)
                         ->action(function (Booking $record) {
                             try {
                                 BookingLifecycleActions::complete($record);
@@ -713,7 +866,7 @@ class BookingsTable
                         ->icon('heroicon-o-x-circle')
                         ->color('danger')
                         ->requiresConfirmation()
-                        ->visible(fn (Booking $record) => ! $record->trashed() && ! in_array($record->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true))
+                        ->visible(fn (Booking $record) => ! $record->trashed() && ! in_array((string) $record->stay_status, [Booking::STAY_STATUS_CANCELLED, Booking::STAY_STATUS_COMPLETED], true))
                         ->action(function (Booking $record) {
                             try {
                                 BookingLifecycleActions::cancel($record);

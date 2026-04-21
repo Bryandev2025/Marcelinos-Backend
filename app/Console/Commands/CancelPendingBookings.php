@@ -38,7 +38,8 @@ class CancelPendingBookings extends Command
         $count = 0;
 
         Booking::query()
-            ->where('status', Booking::STATUS_UNPAID)
+            ->where('stay_status', Booking::STAY_STATUS_RESERVED)
+            ->where('payment_status', Booking::PAYMENT_STATUS_UNPAID)
             ->orderBy('id')
             ->chunkById(100, function ($bookings) use (&$count, $before, $days): void {
                 foreach ($bookings as $booking) {

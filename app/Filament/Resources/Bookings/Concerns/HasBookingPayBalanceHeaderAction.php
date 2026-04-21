@@ -51,7 +51,10 @@ trait HasBookingPayBalanceHeaderAction
             return false;
         }
 
-        if (in_array($record->status, [Booking::STATUS_PAID, Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true)) {
+        if (in_array((string) $record->stay_status, [Booking::STAY_STATUS_CANCELLED, Booking::STAY_STATUS_COMPLETED], true)) {
+            return false;
+        }
+        if ((string) $record->payment_status === Booking::PAYMENT_STATUS_PAID) {
             return false;
         }
 

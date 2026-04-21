@@ -61,7 +61,11 @@ trait InteractsWithBookingOperations
                         ->requiresConfirmation()
                         ->visible(fn (): bool => $this->record instanceof Booking
                             && ! $this->record->trashed()
-                            && $this->record->status === Booking::STATUS_OCCUPIED)
+                            && (string) $this->record->stay_status === Booking::STAY_STATUS_OCCUPIED)
+                        ->disabled(fn (): bool => $this->record instanceof Booking && (string) $this->record->payment_status !== Booking::PAYMENT_STATUS_PAID)
+                        ->tooltip(fn (): ?string => $this->record instanceof Booking && (string) $this->record->payment_status !== Booking::PAYMENT_STATUS_PAID
+                            ? __('Settle the remaining balance before completing.')
+                            : null)
                         ->action(function (): void {
                             $this->runBookingComplete();
                         }),
@@ -73,7 +77,7 @@ trait InteractsWithBookingOperations
                         ->modalHeading(__('Cancel this booking?'))
                         ->visible(fn (): bool => $this->record instanceof Booking
                             && ! $this->record->trashed()
-                            && ! in_array($this->record->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true))
+                            && ! in_array((string) $this->record->stay_status, [Booking::STAY_STATUS_CANCELLED, Booking::STAY_STATUS_COMPLETED], true))
                         ->action(function (): void {
                             $this->runBookingCancel();
                         }),
@@ -129,7 +133,11 @@ trait InteractsWithBookingOperations
                 ->color('secondary')
                 ->requiresConfirmation()
                 ->visible(fn (): bool => $this->record instanceof Booking
-                    && $this->record->status === Booking::STATUS_OCCUPIED)
+                    && (string) $this->record->stay_status === Booking::STAY_STATUS_OCCUPIED)
+                ->disabled(fn (): bool => $this->record instanceof Booking && (string) $this->record->payment_status !== Booking::PAYMENT_STATUS_PAID)
+                ->tooltip(fn (): ?string => $this->record instanceof Booking && (string) $this->record->payment_status !== Booking::PAYMENT_STATUS_PAID
+                    ? __('Settle the remaining balance before completing.')
+                    : null)
                 ->action(function (): void {
                     $this->runBookingComplete();
                 }),
@@ -140,7 +148,7 @@ trait InteractsWithBookingOperations
                 ->requiresConfirmation()
                 ->modalHeading(__('Cancel this booking?'))
                 ->visible(fn (): bool => $this->record instanceof Booking
-                    && ! in_array($this->record->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true))
+                    && ! in_array((string) $this->record->stay_status, [Booking::STAY_STATUS_CANCELLED, Booking::STAY_STATUS_COMPLETED], true))
                 ->action(function (): void {
                     $this->runBookingCancel();
                 }),
@@ -154,7 +162,10 @@ trait InteractsWithBookingOperations
             return false;
         }
 
-        if (in_array($record->status, [Booking::STATUS_PAID, Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true)) {
+        if (in_array((string) $record->stay_status, [Booking::STAY_STATUS_CANCELLED, Booking::STAY_STATUS_COMPLETED], true)) {
+            return false;
+        }
+        if ((string) $record->payment_status === Booking::PAYMENT_STATUS_PAID) {
             return false;
         }
 

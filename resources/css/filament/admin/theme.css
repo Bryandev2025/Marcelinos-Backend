@@ -26,14 +26,37 @@
     }
 }
 
-/* Bookings list tabs: keep “All / statuses” usable on narrow widths */
-.fi-resource-bookings .fi-tabs {
-    flex-wrap: wrap;
-    row-gap: 0.5rem;
-}
-
+/* Bookings list tabs: responsive, no awkward wrapping on small screens */
 .fi-resource-bookings .fi-tabs-item {
     border-radius: 9999px;
+}
+
+@media (max-width: 639px) {
+    .fi-resource-bookings .fi-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        gap: 0.5rem;
+        padding-bottom: 0.25rem;
+    }
+
+    .fi-resource-bookings .fi-tabs::-webkit-scrollbar {
+        height: 6px;
+    }
+
+    .fi-resource-bookings .fi-tabs::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .fi-resource-bookings .fi-tabs::-webkit-scrollbar-thumb {
+        border-radius: 9999px;
+        background: rgba(0, 0, 0, 0.18);
+    }
+
+    .dark .fi-resource-bookings .fi-tabs::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.22);
+    }
 }
 
 /* Bookings filters: one safe spacing rule only. */
@@ -69,6 +92,26 @@
 .fi-modal-window code {
     white-space: pre-wrap;
     word-break: break-word;
+}
+
+/* Responsive slide-over (right drawer) sizing. */
+.fi-modal.fi-modal-slide-over > .fi-modal-window-ctn > .fi-modal-window {
+    width: min(40rem, 92vw);
+    max-width: 40rem;
+}
+
+@media (max-width: 639px) {
+    .fi-modal.fi-modal-slide-over > .fi-modal-window-ctn > .fi-modal-window {
+        width: 100vw;
+        max-width: 100vw;
+    }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+    .fi-modal.fi-modal-slide-over > .fi-modal-window-ctn > .fi-modal-window {
+        width: min(32rem, 92vw);
+        max-width: 32rem;
+    }
 }
 
 .fi-btn {

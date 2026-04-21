@@ -96,26 +96,24 @@ class ListBookings extends ListRecords
                 ->badge(Booking::query()->count()),
         ];
 
-        $statusOrder = [
-            Booking::STATUS_UNPAID,
-            Booking::STATUS_PARTIAL,
-            Booking::STATUS_PAID,
-            Booking::STATUS_OCCUPIED,
-            Booking::STATUS_COMPLETED,
-            Booking::STATUS_CANCELLED,
-            Booking::STATUS_RESCHEDULED,
+        $stayOrder = [
+            Booking::STAY_STATUS_RESERVED,
+            Booking::STAY_STATUS_OCCUPIED,
+            Booking::STAY_STATUS_COMPLETED,
+            Booking::STAY_STATUS_CANCELLED,
+            Booking::STAY_STATUS_RESCHEDULED,
         ];
 
-        $statusOptions = Booking::statusOptions();
+        $stayOptions = Booking::stayStatusOptions();
 
-        foreach ($statusOrder as $status) {
-            if (! array_key_exists($status, $statusOptions)) {
+        foreach ($stayOrder as $stay) {
+            if (! array_key_exists($stay, $stayOptions)) {
                 continue;
             }
 
-            $tabs[$status] = Tab::make($statusOptions[$status])
-                ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('status', $status))
-                ->badge(Booking::query()->where('status', $status)->count());
+            $tabs[$stay] = Tab::make($stayOptions[$stay])
+                ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('stay_status', $stay))
+                ->badge(Booking::query()->where('stay_status', $stay)->count());
         }
 
         return $tabs;

@@ -174,7 +174,7 @@ class BookingController extends Controller
             'payment_mode' => ['nullable', 'string', 'regex:/^(full|partial_([1-9]|[1-9][0-9]))$/'],
         ]);
 
-        if (in_array($booking->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true)) {
+        if (in_array((string) $booking->stay_status, [Booking::STAY_STATUS_CANCELLED, Booking::STAY_STATUS_COMPLETED], true)) {
             return response()->json([
                 'message' => 'Booking cannot be updated for payment in its current state.',
             ], 422);
@@ -199,12 +199,12 @@ class BookingController extends Controller
         $chargeAmount = $this->plannedPaymentAmountForMode($booking, $paymentMode);
         $this->upsertConfirmedPaymentRecord($booking, $invoiceId, $chargeAmount);
 
-        $nextStatus = $this->extractPartialPercentage($paymentMode) !== null
-            ? Booking::STATUS_PARTIAL
-            : Booking::STATUS_PAID;
+        $nextPaymentStatus = $this->extractPartialPercentage($paymentMode) !== null
+            ? Booking::PAYMENT_STATUS_PARTIAL
+            : Booking::PAYMENT_STATUS_PAID;
 
-        if ($booking->status !== $nextStatus) {
-            $booking->update(['status' => $nextStatus]);
+        if ((string) $booking->payment_status !== $nextPaymentStatus) {
+            $booking->update(['payment_status' => $nextPaymentStatus]);
         }
         Cache::forget($this->pendingOnlinePaymentCacheKey((int) $booking->id));
 
@@ -377,7 +377,8 @@ class BookingController extends Controller
                     'no_of_days' => $validated['days'],
                     'venue_event_type' => $venueEventType,
                     'total_price' => $expectedTotal,
-                    'status' => Booking::STATUS_UNPAID,
+                    'stay_status' => Booking::STAY_STATUS_RESERVED,
+                    'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
                     'payment_method' => (string) ($validated['payment_method'] ?? 'cash'),
                     'online_payment_plan' => (string) ($validated['online_payment_plan'] ?? ''),
                 ]);
@@ -710,16 +711,7 @@ class BookingController extends Controller
         ]);
 
         try {
-            $allowedStatuses = [
-                Booking::STATUS_UNPAID,
-                Booking::STATUS_PAID,
-            ];
-
-            if (defined(Booking::class.'::STATUS_RESCHEDULED')) {
-                $allowedStatuses[] = Booking::STATUS_RESCHEDULED;
-            }
-
-            if (! in_array($booking->status, $allowedStatuses, true)) {
+            if (! in_array((string) $booking->stay_status, [Booking::STAY_STATUS_RESERVED, Booking::STAY_STATUS_RESCHEDULED], true)) {
                 return response()->json([
                     'message' => 'Booking cannot be cancelled in its current state.',
                 ], 422);
@@ -736,7 +728,7 @@ class BookingController extends Controller
             }
 
             $booking->update([
-                'status' => Booking::STATUS_CANCELLED,
+                'stay_status' => Booking::STAY_STATUS_CANCELLED,
             ]);
 
             broadcast(new BookingCancelled($booking))->toOthers();

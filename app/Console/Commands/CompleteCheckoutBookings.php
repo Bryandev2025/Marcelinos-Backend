@@ -54,19 +54,20 @@ class CompleteCheckoutBookings extends Command
 
         $bookings = Booking::query()
             ->where('check_out', '<=', $before)
-            ->where('status', Booking::STATUS_OCCUPIED)
+            ->where('stay_status', Booking::STAY_STATUS_OCCUPIED)
+            ->where('payment_status', Booking::PAYMENT_STATUS_PAID)
             ->get();
 
         $count = 0;
         foreach ($bookings as $booking) {
-            $booking->update(['status' => Booking::STATUS_COMPLETED]);
+            $booking->update(['stay_status' => Booking::STAY_STATUS_COMPLETED]);
             $count++;
         }
 
         if ($count > 0) {
             $this->info('Marked ' . $count . ' booking(s) as complete (check_out <= ' . $before->toDateTimeString() . ').');
         } else {
-            $this->comment('No occupied bookings eligible for completion (check_out <= ' . $before->toDateTimeString() . ').');
+            $this->comment('No fully-paid occupied bookings eligible for completion (check_out <= ' . $before->toDateTimeString() . ').');
         }
 
         return self::SUCCESS;

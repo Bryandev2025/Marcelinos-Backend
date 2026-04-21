@@ -27,11 +27,19 @@ final class BookingCheckInEligibility
             return ['allowed' => false, 'reason' => self::REASON_TRASHED, 'message' => null];
         }
 
-        if ($booking->status !== Booking::STATUS_PAID) {
+        if (! in_array((string) $booking->stay_status, [Booking::STAY_STATUS_RESERVED], true)) {
             return [
                 'allowed' => false,
                 'reason' => self::REASON_INVALID_STATUS,
-                'message' => __('Booking must be fully paid before check-in.'),
+                'message' => __('Booking must be reserved (not yet occupied/completed) to check in.'),
+            ];
+        }
+
+        if (! in_array((string) $booking->payment_status, [Booking::PAYMENT_STATUS_PAID, Booking::PAYMENT_STATUS_PARTIAL], true)) {
+            return [
+                'allowed' => false,
+                'reason' => self::REASON_INVALID_STATUS,
+                'message' => __('Booking must have at least a partial payment before check-in.'),
             ];
         }
 

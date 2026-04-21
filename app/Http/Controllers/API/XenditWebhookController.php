@@ -99,7 +99,7 @@ class XenditWebhookController extends Controller
             ], 404);
         }
 
-        if (in_array($booking->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true)) {
+        if (in_array((string) $booking->stay_status, [Booking::STAY_STATUS_CANCELLED, Booking::STAY_STATUS_COMPLETED], true)) {
             $this->recordWebhookEvent($eventKey, $payload);
             $this->storeDebugSnapshot($payload, [
                 'result' => 'ignored',
@@ -117,9 +117,9 @@ class XenditWebhookController extends Controller
 
         $bookingTotal = $this->toNumericAmount($booking->total_price);
 
-        $nextStatus = ($paidAmount >= $bookingTotal && $bookingTotal > 0)
-            ? Booking::STATUS_PAID
-            : Booking::STATUS_PARTIAL;
+        $nextPaymentStatus = ($paidAmount >= $bookingTotal && $bookingTotal > 0)
+            ? Booking::PAYMENT_STATUS_PAID
+            : Booking::PAYMENT_STATUS_PARTIAL;
 
         $invoiceUrl = (string) ($payload['invoice_url'] ?? '');
         $paymentMode = (string) ($payload['metadata']['payment_mode'] ?? '');
@@ -148,8 +148,8 @@ class XenditWebhookController extends Controller
         $this->recordWebhookEvent($eventKey, $payload);
         Cache::forget($this->pendingOnlinePaymentCacheKey((int) $booking->id));
 
-        if ($booking->status !== $nextStatus) {
-            $booking->update(['status' => $nextStatus]);
+        if ((string) $booking->payment_status !== $nextPaymentStatus) {
+            $booking->update(['payment_status' => $nextPaymentStatus]);
         }
         $freshBooking = $booking->fresh();
         $this->storeDebugSnapshot($payload, [
@@ -159,6 +159,8 @@ class XenditWebhookController extends Controller
             'booking_reference' => $freshBooking?->reference_number,
             'booking_receipt_token' => $freshBooking?->receipt_token,
             'booking_status' => $freshBooking?->status,
+            'payment_status' => $freshBooking?->payment_status,
+            'stay_status' => $freshBooking?->stay_status,
         ]);
 
         return response()->json([
@@ -167,7 +169,10 @@ class XenditWebhookController extends Controller
             'data' => [
                 'reference_number' => $freshBooking?->reference_number,
                 'receipt_token' => $freshBooking?->receipt_token,
+                // legacy field retained for client compatibility
                 'status' => $freshBooking?->status,
+                'payment_status' => $freshBooking?->payment_status,
+                'stay_status' => $freshBooking?->stay_status,
             ],
         ]);
     }

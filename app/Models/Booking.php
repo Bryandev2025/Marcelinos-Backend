@@ -31,7 +31,9 @@ class Booking extends Model
         'check_in',
         'check_out',
         'total_price',
-        'status',
+        'status', // legacy (kept for backward compatibility)
+        'payment_status',
+        'stay_status',
         'payment_method',
         'online_payment_plan',
         'xendit_invoice_id',
@@ -60,6 +62,13 @@ class Booking extends Model
 
     protected static function booted()
     {
+        /**
+         * Keep legacy `status` synchronized from new axes on any save.
+         */
+        static::saving(function (Booking $booking): void {
+            $booking->syncLegacyStatusFromAxes();
+        });
+
         /**
          * Generate reference number before create
          */
@@ -94,7 +103,7 @@ class Booking extends Model
          * Send testimonial feedback email when status transitions to completed (scheduler or admin).
          */
         static::updated(function (Booking $booking) {
-            if (! $booking->wasChanged('status') || $booking->status !== Booking::STATUS_COMPLETED) {
+            if (! $booking->wasChanged('stay_status') || $booking->stay_status !== Booking::STAY_STATUS_COMPLETED) {
                 return;
             }
             if ($booking->testimonial_feedback_sent_at !== null) {
@@ -288,6 +297,24 @@ class Booking extends Model
 
     /* ================= STATUSES ================= */
 
+    // -----------------------------
+    // New two-axis statuses
+    // -----------------------------
+
+    public const PAYMENT_STATUS_UNPAID = 'unpaid';
+    public const PAYMENT_STATUS_PARTIAL = 'partial';
+    public const PAYMENT_STATUS_PAID = 'paid';
+
+    public const STAY_STATUS_RESERVED = 'reserved';
+    public const STAY_STATUS_OCCUPIED = 'occupied';
+    public const STAY_STATUS_COMPLETED = 'completed';
+    public const STAY_STATUS_CANCELLED = 'cancelled';
+    public const STAY_STATUS_RESCHEDULED = 'rescheduled';
+
+    // -----------------------------
+    // Legacy single status (deprecated)
+    // -----------------------------
+
     const STATUS_UNPAID = 'unpaid';
 
     const STATUS_PARTIAL = 'partial';
@@ -376,6 +403,26 @@ class Booking extends Model
         ];
     }
 
+    public static function paymentStatusOptions(): array
+    {
+        return [
+            self::PAYMENT_STATUS_UNPAID => 'Unpaid',
+            self::PAYMENT_STATUS_PARTIAL => 'Partial',
+            self::PAYMENT_STATUS_PAID => 'Paid',
+        ];
+    }
+
+    public static function stayStatusOptions(): array
+    {
+        return [
+            self::STAY_STATUS_RESERVED => 'Reserved',
+            self::STAY_STATUS_OCCUPIED => 'Occupied',
+            self::STAY_STATUS_COMPLETED => 'Completed',
+            self::STAY_STATUS_CANCELLED => 'Cancelled',
+            self::STAY_STATUS_RESCHEDULED => 'Rescheduled',
+        ];
+    }
+
     /**
      * Payment settlement deadline on the receipt: 9:00 PM Asia/Manila on the check-in calendar day
      * (same moment as unpaid auto-cancel). Null when the booking has no check-in datetime.
@@ -417,7 +464,14 @@ class Booking extends Model
      */
     public function isExpiredUnpaid(?Carbon $at = null, ?int $days = null): bool
     {
-        if ($this->status !== self::STATUS_UNPAID) {
+        $paymentStatus = $this->effectivePaymentStatusForRules();
+        $stayStatus = $this->effectiveStayStatusForRules();
+
+        // Only reserved, unpaid bookings are eligible for unpaid expiry enforcement.
+        if ($paymentStatus !== self::PAYMENT_STATUS_UNPAID) {
+            return false;
+        }
+        if ($stayStatus !== self::STAY_STATUS_RESERVED) {
             return false;
         }
 
@@ -429,6 +483,49 @@ class Booking extends Model
         $deadline = $this->checkInDayUnpaidSettlementDeadlineManila();
 
         return $deadline !== null && $at->gte($deadline);
+    }
+
+    /**
+     * Backward-compatible status normalization for rules during migration.
+     */
+    private function effectivePaymentStatusForRules(): string
+    {
+        if (in_array((string) ($this->payment_status ?? ''), [
+            self::PAYMENT_STATUS_UNPAID,
+            self::PAYMENT_STATUS_PARTIAL,
+            self::PAYMENT_STATUS_PAID,
+        ], true)) {
+            return (string) $this->payment_status;
+        }
+
+        // Fallback: legacy `status` stored the payment state for reserved bookings.
+        return match ((string) ($this->status ?? self::STATUS_UNPAID)) {
+            self::STATUS_PAID => self::PAYMENT_STATUS_PAID,
+            self::STATUS_PARTIAL => self::PAYMENT_STATUS_PARTIAL,
+            default => self::PAYMENT_STATUS_UNPAID,
+        };
+    }
+
+    private function effectiveStayStatusForRules(): string
+    {
+        if (in_array((string) ($this->stay_status ?? ''), [
+            self::STAY_STATUS_RESERVED,
+            self::STAY_STATUS_OCCUPIED,
+            self::STAY_STATUS_COMPLETED,
+            self::STAY_STATUS_CANCELLED,
+            self::STAY_STATUS_RESCHEDULED,
+        ], true)) {
+            return (string) $this->stay_status;
+        }
+
+        // Fallback: legacy `status` also encoded lifecycle.
+        return match ((string) ($this->status ?? self::STATUS_UNPAID)) {
+            self::STATUS_OCCUPIED => self::STAY_STATUS_OCCUPIED,
+            self::STATUS_COMPLETED => self::STAY_STATUS_COMPLETED,
+            self::STATUS_CANCELLED => self::STAY_STATUS_CANCELLED,
+            self::STATUS_RESCHEDULED => self::STAY_STATUS_RESCHEDULED,
+            default => self::STAY_STATUS_RESERVED,
+        };
     }
 
     /**
@@ -447,7 +544,11 @@ class Booking extends Model
                 return false;
             }
 
-            $fresh->update(['status' => self::STATUS_CANCELLED]);
+            $fresh->update([
+                'stay_status' => self::STAY_STATUS_CANCELLED,
+                // legacy sync
+                'status' => self::STATUS_CANCELLED,
+            ]);
             $this->refresh();
 
             return true;
@@ -480,7 +581,7 @@ class Booking extends Model
         $dateEnd = $date->copy()->endOfDay();
 
         return $query
-            ->whereNotIn('status', [self::STATUS_CANCELLED])
+            ->whereNotIn('stay_status', [self::STAY_STATUS_CANCELLED])
             ->where('check_in', '<=', $dateEnd)
             ->where('check_out', '>', $dateStart);
     }
@@ -494,9 +595,47 @@ class Booking extends Model
         $d = Carbon::parse($date)->toDateString();
 
         return $query
-            ->whereNotIn('status', [self::STATUS_CANCELLED])
+            ->whereNotIn('stay_status', [self::STAY_STATUS_CANCELLED])
             ->whereDate('check_in', '<=', $d)
             ->whereDate('check_out', '>', $d);
+    }
+
+    /**
+     * Human-readable combined audit label for admin views.
+     * Example: "Partial · Occupied"
+     */
+    public function auditStatusLabel(): string
+    {
+        $payment = self::paymentStatusOptions()[(string) ($this->payment_status ?? self::PAYMENT_STATUS_UNPAID)] ?? '—';
+        $stay = self::stayStatusOptions()[(string) ($this->stay_status ?? self::STAY_STATUS_RESERVED)] ?? '—';
+
+        return "{$payment} · {$stay}";
+    }
+
+    /**
+     * Keep the legacy `status` column in sync with the new two-axis model.
+     * This reduces breakage while call-sites are migrated.
+     */
+    public function syncLegacyStatusFromAxes(): void
+    {
+        $stay = (string) ($this->stay_status ?? self::STAY_STATUS_RESERVED);
+        $pay = (string) ($this->payment_status ?? self::PAYMENT_STATUS_UNPAID);
+
+        $legacy = match ($stay) {
+            self::STAY_STATUS_CANCELLED => self::STATUS_CANCELLED,
+            self::STAY_STATUS_RESCHEDULED => self::STATUS_RESCHEDULED,
+            self::STAY_STATUS_COMPLETED => self::STATUS_COMPLETED,
+            self::STAY_STATUS_OCCUPIED => self::STATUS_OCCUPIED,
+            default => match ($pay) {
+                self::PAYMENT_STATUS_PAID => self::STATUS_PAID,
+                self::PAYMENT_STATUS_PARTIAL => self::STATUS_PARTIAL,
+                default => self::STATUS_UNPAID,
+            },
+        };
+
+        if ((string) ($this->status ?? '') !== $legacy) {
+            $this->status = $legacy;
+        }
     }
 
     /**

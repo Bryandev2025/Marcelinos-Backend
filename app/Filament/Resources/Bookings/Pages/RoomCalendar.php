@@ -298,7 +298,7 @@ class RoomCalendar extends Page
         $isVenueMode = $this->inventory === self::INVENTORY_VENUES;
 
         $bookings = Booking::query()
-            ->whereNotIn('status', [Booking::STATUS_CANCELLED])
+            ->whereNotIn('stay_status', [Booking::STAY_STATUS_CANCELLED])
             ->where('check_in', '<=', $monthEnd)
             ->when(
                 $isVenueMode,

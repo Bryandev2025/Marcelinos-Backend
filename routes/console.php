@@ -67,6 +67,17 @@ Schedule::command('bookings:cancel-unpaid')
 
 /*
 |--------------------------------------------------------------------------
+| Every 30 minutes — Manila
+|--------------------------------------------------------------------------
+| Flag occupied stays that remain unpaid/partial after the 9:00 PM check-in-day settlement deadline.
+*/
+Schedule::command('bookings:alert-unsettled-stays')
+    ->everyThirtyMinutes()
+    ->timezone($manila)
+    ->withoutOverlapping();
+
+/*
+|--------------------------------------------------------------------------
 | Weekly activity-log retention cleanup
 |--------------------------------------------------------------------------
 | Runs every 7 days and keeps only the latest 7 days of audit records.
