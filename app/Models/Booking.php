@@ -320,6 +320,23 @@ class Booking extends Model
     }
 
     /**
+     * Whether the booking check-in date is today in Asia/Manila.
+     */
+    public function isCheckInTodayManila(?Carbon $at = null): bool
+    {
+        if (! $this->check_in) {
+            return false;
+        }
+
+        $at = $at ?? now();
+        $tz = self::timezoneManila();
+        $checkInDay = $this->check_in->copy()->timezone($tz)->startOfDay();
+        $today = $at->copy()->timezone($tz)->startOfDay();
+
+        return $checkInDay->equalTo($today);
+    }
+
+    /**
      * Check-in calendar date in Manila is strictly after "today" in Manila (receipt: messenger instructions).
      */
     public function isCheckInStrictlyAfterTodayManila(?Carbon $at = null): bool
@@ -648,5 +665,22 @@ class Booking extends Model
         $this->updateQuietly([
             'qr_code' => $path,
         ]);
+    }
+
+    /**
+     * Whether the booking check-out date is today in Asia/Manila.
+     */
+    public function isCheckOutTodayManila(?Carbon $at = null): bool
+    {
+        if (! $this->check_out) {
+            return false;
+        }
+
+        $at = $at ?? now();
+        $tz = self::timezoneManila();
+        $checkOutDay = $this->check_out->copy()->timezone($tz)->startOfDay();
+        $today = $at->copy()->timezone($tz)->startOfDay();
+
+        return $checkOutDay->equalTo($today);
     }
 }

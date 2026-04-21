@@ -551,7 +551,7 @@
                                                         </button>
                                                     @endif
 
-                                                    @if (($row['status'] ?? null) === Booking::STATUS_OCCUPIED)
+                                                    @if (($row['can_complete'] ?? false) === true)
                                                         <button
                                                             type="button"
                                                             wire:click="completeBooking({{ $row['id'] }})"

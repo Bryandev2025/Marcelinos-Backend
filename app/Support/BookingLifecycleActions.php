@@ -31,6 +31,10 @@ final class BookingLifecycleActions
             throw new \InvalidArgumentException(__('Cannot complete a deleted booking.'));
         }
 
+        if (! $booking->isCheckOutTodayManila()) {
+            throw new \InvalidArgumentException(__('Booking can only be completed on the check-out date.'));
+        }
+
         if ($booking->status !== Booking::STATUS_OCCUPIED) {
             throw new \InvalidArgumentException(__('Booking must be checked in (occupied) before it can be completed.'));
         }

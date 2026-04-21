@@ -61,7 +61,8 @@ trait InteractsWithBookingOperations
                         ->requiresConfirmation()
                         ->visible(fn (): bool => $this->record instanceof Booking
                             && ! $this->record->trashed()
-                            && $this->record->status === Booking::STATUS_OCCUPIED)
+                            && $this->record->status === Booking::STATUS_OCCUPIED
+                            && $this->record->isCheckOutTodayManila())
                         ->action(function (): void {
                             $this->runBookingComplete();
                         }),
@@ -129,7 +130,8 @@ trait InteractsWithBookingOperations
                 ->color('secondary')
                 ->requiresConfirmation()
                 ->visible(fn (): bool => $this->record instanceof Booking
-                    && $this->record->status === Booking::STATUS_OCCUPIED)
+                    && $this->record->status === Booking::STATUS_OCCUPIED
+                    && $this->record->isCheckOutTodayManila())
                 ->action(function (): void {
                     $this->runBookingComplete();
                 }),

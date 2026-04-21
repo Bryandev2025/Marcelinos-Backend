@@ -16,6 +16,8 @@ final class BookingCheckInEligibility
 
     public const REASON_INVALID_STATUS = 'invalid_status';
 
+    public const REASON_OUTSIDE_CHECK_IN_DAY = 'outside_check_in_day';
+
     public const REASON_ASSIGNMENTS = 'assignments';
 
     /**
@@ -25,6 +27,14 @@ final class BookingCheckInEligibility
     {
         if ($booking->trashed()) {
             return ['allowed' => false, 'reason' => self::REASON_TRASHED, 'message' => null];
+        }
+
+        if (! $booking->isCheckInTodayManila()) {
+            return [
+                'allowed' => false,
+                'reason' => self::REASON_OUTSIDE_CHECK_IN_DAY,
+                'message' => __('Booking can only be checked in on the check-in date.'),
+            ];
         }
 
         if ($booking->status !== Booking::STATUS_PAID) {

@@ -689,7 +689,7 @@ class BookingsTable
                         ->icon('heroicon-o-flag')
                         ->color('secondary')
                         ->requiresConfirmation()
-                        ->visible(fn (Booking $record) => ! $record->trashed() && $record->status === Booking::STATUS_OCCUPIED)
+                        ->visible(fn (Booking $record) => ! $record->trashed() && $record->status === Booking::STATUS_OCCUPIED && $record->isCheckOutTodayManila())
                         ->action(function (Booking $record) {
                             try {
                                 BookingLifecycleActions::complete($record);
