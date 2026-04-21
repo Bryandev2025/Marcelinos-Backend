@@ -29,7 +29,8 @@ class ImportLegacyBookingsCsvTest extends TestCase
 
         $booking = Booking::query()->with('guest')->first();
         $this->assertNotNull($booking);
-        $this->assertSame(Booking::STATUS_COMPLETED, $booking->status);
+        $this->assertSame(Booking::BOOKING_STATUS_COMPLETED, $booking->booking_status);
+        $this->assertSame(Booking::PAYMENT_STATUS_PAID, $booking->payment_status);
         $this->assertSame('juan@example.com', $booking->guest?->email);
         $this->assertSame('cash', $booking->payment_method);
     }

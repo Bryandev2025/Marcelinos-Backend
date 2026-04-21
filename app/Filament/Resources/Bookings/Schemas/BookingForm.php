@@ -415,6 +415,14 @@ class BookingForm
             Section::make('Status and reference')
                 ->columns(2)
                 ->schema([
+                    Select::make('booking_status')
+                        ->label('Stay status')
+                        ->options(Booking::bookingStatusOptions())
+                        ->required(),
+                    Select::make('payment_status')
+                        ->label('Payment status')
+                        ->options(Booking::paymentStatusOptions())
+                        ->required(),
                     TextInput::make('reference_number')
                         ->label('Reference number')
                         ->disabled()
@@ -548,7 +556,7 @@ class BookingForm
 
         if (Booking::query()
             ->when($record, fn ($query) => $query->where('id', '!=', $record->id))
-            ->whereNotIn('status', [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED])
+            ->whereNotIn('booking_status', [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED])
             ->where('check_in', '<', $end)
             ->where('check_out', '>', $start)
             ->whereHas('rooms', fn ($query) => $query->whereIn('rooms.id', $roomIds))
@@ -589,7 +597,7 @@ class BookingForm
 
         return Booking::query()
             ->when($record, fn ($query) => $query->where('id', '!=', $record->id))
-            ->whereNotIn('status', [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED])
+            ->whereNotIn('booking_status', [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED])
             ->where('check_in', '<', $end)
             ->where('check_out', '>', $start)
             ->whereHas('venues', fn ($query) => $query->whereIn('venues.id', $venueIds))

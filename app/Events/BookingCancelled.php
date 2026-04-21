@@ -30,7 +30,7 @@ class BookingCancelled implements ShouldBroadcast
          return 'booking.cancelled' ;     
     }
      public function broadcastWith (): array     {
-         return [ 'reference_number' => $this->booking->reference_number, 'status' => $this->booking->status,         
+         return [ 'reference_number' => $this->booking->reference_number, 'booking_status' => $this->booking->booking_status, 'payment_status' => $this->booking->payment_status,
          ];     
     }
 }  

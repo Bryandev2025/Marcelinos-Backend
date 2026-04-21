@@ -65,9 +65,9 @@ class ReviewController extends Controller
     private function storeReviewForBooking(Request $request, Booking $booking): JsonResponse
     {
         try {
-            if ($booking->status !== Booking::STATUS_COMPLETED) {
+            if (! $booking->isEligibleForTestimonialFeedback()) {
                 return response()->json(
-                    ['message' => 'Reviews can only be submitted for completed stays.'],
+                    ['message' => 'Reviews can only be submitted for completed stays that are fully paid.'],
                     422
                 );
             }

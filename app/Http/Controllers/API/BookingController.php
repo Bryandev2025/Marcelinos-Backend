@@ -51,22 +51,23 @@ class BookingController extends Controller
         $purpose = (string) $request->input('purpose');
 
         if ($purpose === BookingActionOtpService::PURPOSE_CANCEL) {
-            $allowedStatuses = [
-                Booking::STATUS_UNPAID,
-                Booking::STATUS_PAID,
-            ];
+            $canCancel = $booking->booking_status === Booking::BOOKING_STATUS_RESCHEDULED
+                || (
+                    $booking->booking_status === Booking::BOOKING_STATUS_RESERVED
+                    && in_array($booking->payment_status, [
+                        Booking::PAYMENT_STATUS_UNPAID,
+                        Booking::PAYMENT_STATUS_PARTIAL,
+                        Booking::PAYMENT_STATUS_PAID,
+                    ], true)
+                );
 
-            if (defined(Booking::class.'::STATUS_RESCHEDULED')) {
-                $allowedStatuses[] = Booking::STATUS_RESCHEDULED;
-            }
-
-            if (! in_array($booking->status, $allowedStatuses, true)) {
+            if (! $canCancel) {
                 return response()->json([
                     'message' => 'Booking cannot be cancelled in its current state.',
                 ], 422);
             }
         } else {
-            if (in_array($booking->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true)) {
+            if (in_array($booking->booking_status, [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED], true)) {
                 return response()->json([
                     'message' => 'Cannot reschedule this booking.',
                 ], 422);
@@ -174,7 +175,7 @@ class BookingController extends Controller
             'payment_mode' => ['nullable', 'string', 'regex:/^(full|partial_([1-9]|[1-9][0-9]))$/'],
         ]);
 
-        if (in_array($booking->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true)) {
+        if (in_array($booking->booking_status, [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED], true)) {
             return response()->json([
                 'message' => 'Booking cannot be updated for payment in its current state.',
             ], 422);
@@ -199,12 +200,12 @@ class BookingController extends Controller
         $chargeAmount = $this->plannedPaymentAmountForMode($booking, $paymentMode);
         $this->upsertConfirmedPaymentRecord($booking, $invoiceId, $chargeAmount);
 
-        $nextStatus = $this->extractPartialPercentage($paymentMode) !== null
-            ? Booking::STATUS_PARTIAL
-            : Booking::STATUS_PAID;
+        $nextPayment = $this->extractPartialPercentage($paymentMode) !== null
+            ? Booking::PAYMENT_STATUS_PARTIAL
+            : Booking::PAYMENT_STATUS_PAID;
 
-        if ($booking->status !== $nextStatus) {
-            $booking->update(['status' => $nextStatus]);
+        if ($booking->payment_status !== $nextPayment) {
+            $booking->update(['payment_status' => $nextPayment]);
         }
         Cache::forget($this->pendingOnlinePaymentCacheKey((int) $booking->id));
 
@@ -377,7 +378,8 @@ class BookingController extends Controller
                     'no_of_days' => $validated['days'],
                     'venue_event_type' => $venueEventType,
                     'total_price' => $expectedTotal,
-                    'status' => Booking::STATUS_UNPAID,
+                    'booking_status' => Booking::BOOKING_STATUS_RESERVED,
+                    'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
                     'payment_method' => (string) ($validated['payment_method'] ?? 'cash'),
                     'online_payment_plan' => (string) ($validated['online_payment_plan'] ?? ''),
                 ]);
@@ -633,23 +635,34 @@ class BookingController extends Controller
             }
 
             $validated = $request->validate([
-                'status' => 'sometimes|string|in:'.implode(',', [
-                    Booking::STATUS_UNPAID,
-                    Booking::STATUS_PAID,
-                    Booking::STATUS_COMPLETED,
-                    Booking::STATUS_OCCUPIED,
-                    Booking::STATUS_CANCELLED,
+                'booking_status' => 'sometimes|string|in:'.implode(',', [
+                    Booking::BOOKING_STATUS_RESERVED,
+                    Booking::BOOKING_STATUS_OCCUPIED,
+                    Booking::BOOKING_STATUS_COMPLETED,
+                    Booking::BOOKING_STATUS_CANCELLED,
+                    Booking::BOOKING_STATUS_RESCHEDULED,
+                ]),
+                'payment_status' => 'sometimes|string|in:'.implode(',', [
+                    Booking::PAYMENT_STATUS_UNPAID,
+                    Booking::PAYMENT_STATUS_PARTIAL,
+                    Booking::PAYMENT_STATUS_PAID,
                 ]),
             ]);
 
-            if (! empty($validated['status'])) {
-                if ($validated['status'] === Booking::STATUS_OCCUPIED) {
+            if (! empty($validated['booking_status'])) {
+                if ($validated['booking_status'] === Booking::BOOKING_STATUS_OCCUPIED) {
                     $booking->loadMissing(['rooms.bedSpecifications', 'venues', 'roomLines']);
                     $booking->assertAssignmentsSatisfiedForOccupied();
                 }
-                $booking->update([
-                    'status' => $validated['status'],
-                ]);
+            }
+
+            $updates = array_filter([
+                'booking_status' => $validated['booking_status'] ?? null,
+                'payment_status' => $validated['payment_status'] ?? null,
+            ], fn ($v) => $v !== null);
+
+            if ($updates !== []) {
+                $booking->update($updates);
             }
 
             $booking->refresh()->load(['guest', 'rooms', 'venues']);
@@ -710,16 +723,17 @@ class BookingController extends Controller
         ]);
 
         try {
-            $allowedStatuses = [
-                Booking::STATUS_UNPAID,
-                Booking::STATUS_PAID,
-            ];
+            $canCancel = $booking->booking_status === Booking::BOOKING_STATUS_RESCHEDULED
+                || (
+                    $booking->booking_status === Booking::BOOKING_STATUS_RESERVED
+                    && in_array($booking->payment_status, [
+                        Booking::PAYMENT_STATUS_UNPAID,
+                        Booking::PAYMENT_STATUS_PARTIAL,
+                        Booking::PAYMENT_STATUS_PAID,
+                    ], true)
+                );
 
-            if (defined(Booking::class.'::STATUS_RESCHEDULED')) {
-                $allowedStatuses[] = Booking::STATUS_RESCHEDULED;
-            }
-
-            if (! in_array($booking->status, $allowedStatuses, true)) {
+            if (! $canCancel) {
                 return response()->json([
                     'message' => 'Booking cannot be cancelled in its current state.',
                 ], 422);
@@ -736,7 +750,7 @@ class BookingController extends Controller
             }
 
             $booking->update([
-                'status' => Booking::STATUS_CANCELLED,
+                'booking_status' => Booking::BOOKING_STATUS_CANCELLED,
             ]);
 
             broadcast(new BookingCancelled($booking))->toOthers();
@@ -769,7 +783,7 @@ class BookingController extends Controller
             ], 422);
         }
 
-        if (in_array($booking->status, ['cancelled', 'completed'], true)) {
+        if (in_array($booking->booking_status, [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED], true)) {
             return response()->json([
                 'message' => 'Cannot reschedule this booking',
             ], 422);
@@ -844,7 +858,7 @@ class BookingController extends Controller
             'check_in' => $checkIn,
             'check_out' => $checkOut,
             'total_price' => $newTotal,
-            'status' => 'rescheduled',
+            'booking_status' => Booking::BOOKING_STATUS_RESCHEDULED,
         ]);
 
         broadcast(new BookingRescheduled($booking))->toOthers();
@@ -874,7 +888,8 @@ class BookingController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'status' => (string) $booking->status,
+                'booking_status' => (string) $booking->booking_status,
+                'payment_status' => (string) $booking->payment_status,
                 'payment_method' => (string) ($booking->payment_method ?? 'cash'),
                 'online_payment_plan' => (string) ($booking->online_payment_plan ?? ''),
                 'invoice_id' => (string) ($booking->xendit_invoice_id ?? ''),
@@ -915,7 +930,7 @@ class BookingController extends Controller
         }
 
         $overrideAmount = null;
-        if ((string) $booking->status === Booking::STATUS_PARTIAL) {
+        if ((string) $booking->payment_status === Booking::PAYMENT_STATUS_PARTIAL) {
             $overrideAmount = max(1, (float) $booking->balance);
         }
 
@@ -998,9 +1013,9 @@ class BookingController extends Controller
             return false;
         }
 
-        return in_array((string) $booking->status, [
-            Booking::STATUS_UNPAID,
-            Booking::STATUS_PARTIAL,
+        return in_array((string) $booking->payment_status, [
+            Booking::PAYMENT_STATUS_UNPAID,
+            Booking::PAYMENT_STATUS_PARTIAL,
         ], true);
     }
 
@@ -1086,10 +1101,10 @@ class BookingController extends Controller
         $totalAmount = (float) $booking->total_price;
         $balance = max(0, (float) $booking->balance);
         $plan = (string) ($booking->online_payment_plan ?? '');
-        $status = (string) ($booking->status ?? '');
+        $paymentStatus = (string) ($booking->payment_status ?? '');
         $partialPercent = $this->extractPartialPercentage($plan);
 
-        if ($status === Booking::STATUS_PARTIAL) {
+        if ($paymentStatus === Booking::PAYMENT_STATUS_PARTIAL) {
             return $balance;
         }
 
@@ -1106,7 +1121,7 @@ class BookingController extends Controller
         $balance = max(0, (float) $booking->balance);
         $partialPercent = $this->extractPartialPercentage($paymentMode);
 
-        if ((string) $booking->status === Booking::STATUS_PARTIAL) {
+        if ((string) $booking->payment_status === Booking::PAYMENT_STATUS_PARTIAL) {
             return $balance;
         }
 

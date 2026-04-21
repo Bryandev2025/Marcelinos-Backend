@@ -20,7 +20,8 @@ class BookingCheckInEligibilityTest extends TestCase
     public function check_in_is_blocked_when_check_in_date_is_not_today(): void
     {
         $booking = new Booking([
-            'status' => Booking::STATUS_PAID,
+            'booking_status' => Booking::BOOKING_STATUS_RESERVED,
+            'payment_status' => Booking::PAYMENT_STATUS_PAID,
         ]);
         $booking->check_in = self::manila('2026-04-22 14:00:00');
 
@@ -40,7 +41,8 @@ class BookingCheckInEligibilityTest extends TestCase
     public function check_in_day_predicate_returns_true_when_check_in_date_is_today(): void
     {
         $booking = new Booking([
-            'status' => Booking::STATUS_PAID,
+            'booking_status' => Booking::BOOKING_STATUS_RESERVED,
+            'payment_status' => Booking::PAYMENT_STATUS_PAID,
         ]);
         $booking->check_in = self::manila('2026-04-21 14:00:00');
 
@@ -57,7 +59,8 @@ class BookingCheckInEligibilityTest extends TestCase
     public function complete_is_blocked_when_check_out_date_is_not_today(): void
     {
         $booking = new Booking([
-            'status' => Booking::STATUS_OCCUPIED,
+            'booking_status' => Booking::BOOKING_STATUS_OCCUPIED,
+            'payment_status' => Booking::PAYMENT_STATUS_PAID,
         ]);
         $booking->check_in = self::manila('2026-04-22 14:00:00');
         $booking->check_out = self::manila('2026-04-25 10:00:00');

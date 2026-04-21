@@ -50,11 +50,10 @@ final class BookingFullBalancePayment
             return ['allowed' => false, 'reason' => self::REASON_TRASHED, 'message' => null];
         }
 
-        if (in_array($booking->status, [
-            Booking::STATUS_CANCELLED,
-            Booking::STATUS_COMPLETED,
-            Booking::STATUS_PAID,
-        ], true)) {
+        if (in_array($booking->booking_status, [
+            Booking::BOOKING_STATUS_CANCELLED,
+            Booking::BOOKING_STATUS_COMPLETED,
+        ], true) || $booking->payment_status === Booking::PAYMENT_STATUS_PAID) {
             return ['allowed' => false, 'reason' => self::REASON_INVALID_STATUS, 'message' => null];
         }
 
@@ -100,7 +99,7 @@ final class BookingFullBalancePayment
                 'partial_amount' => $booking->balance,
                 'is_fullypaid' => true,
             ]);
-            $booking->update(['status' => Booking::STATUS_PAID]);
+            $booking->update(['payment_status' => Booking::PAYMENT_STATUS_PAID]);
         });
     }
 }

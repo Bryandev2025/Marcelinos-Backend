@@ -51,7 +51,8 @@ class BookingRescheduled implements ShouldBroadcast
         return [
             'booking' => [
                 'id' => $this->booking->id,
-                'status' => $this->booking->status,
+                'booking_status' => $this->booking->booking_status,
+                'payment_status' => $this->booking->payment_status,
                 'check_in' => $this->booking->check_in,
                 'check_out' => $this->booking->check_out,
                 'reference_number' => $this->booking->reference_number,

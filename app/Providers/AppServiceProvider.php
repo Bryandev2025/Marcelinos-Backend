@@ -254,8 +254,9 @@ class AppServiceProvider extends ServiceProvider
             return;
         }
 
-        if ($model instanceof Booking && $lifecycle === 'updated' && $model->wasChanged('status')) {
-            // Booking status has a dedicated, clearer audit event.
+        if ($model instanceof Booking && $lifecycle === 'updated'
+            && ($model->wasChanged('booking_status') || $model->wasChanged('payment_status'))) {
+            // Booking stay/payment status has a dedicated, clearer audit event.
             return;
         }
 

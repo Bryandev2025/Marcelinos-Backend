@@ -232,7 +232,7 @@ class Room extends Model implements HasMedia
 
         return $query->where('status', '!=', self::STATUS_MAINTENANCE)
             ->whereDoesntHave('bookings', function ($q) use ($checkIn, $checkOut, $excludeBookingId) {
-                $q->where('bookings.status', '!=', Booking::STATUS_CANCELLED)
+                $q->where('bookings.booking_status', '!=', Booking::BOOKING_STATUS_CANCELLED)
                     ->when($excludeBookingId, fn ($q2) => $q2->where('bookings.id', '!=', $excludeBookingId))
                     ->where('bookings.check_in', '<', $checkOut)
                     ->where('bookings.check_out', '>', $checkIn);

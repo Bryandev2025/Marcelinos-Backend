@@ -115,13 +115,24 @@ class RevenueExporter extends Exporter
                     return number_format($num, 2, '.', ',');
                 }),
 
-            ExportColumn::make('status')
-                ->label('Status')
+            ExportColumn::make('booking_status')
+                ->label('Booking status')
                 ->formatStateUsing(function (?string $state): string {
                     if ($state === null || $state === '') {
                         return '—';
                     }
-                    return (string) (Booking::statusOptions()[$state] ?? $state);
+
+                    return (string) (Booking::bookingStatusOptions()[$state] ?? $state);
+                }),
+
+            ExportColumn::make('payment_status')
+                ->label('Payment status')
+                ->formatStateUsing(function (?string $state): string {
+                    if ($state === null || $state === '') {
+                        return '—';
+                    }
+
+                    return (string) (Booking::paymentStatusOptions()[$state] ?? $state);
                 }),
 
             ExportColumn::make('created_at')
@@ -142,7 +153,10 @@ class RevenueExporter extends Exporter
     public static function modifyQuery(Builder $query): Builder
     {
         return $query
-            ->whereIn('status', [Booking::STATUS_PAID, Booking::STATUS_COMPLETED])
+            ->where(function (Builder $q): void {
+                $q->where('payment_status', Booking::PAYMENT_STATUS_PAID)
+                    ->orWhere('booking_status', Booking::BOOKING_STATUS_COMPLETED);
+            })
             ->with([
                 'guest:id,first_name,middle_name,last_name,email',
                 'rooms' => fn ($q) => $q->with(['bedSpecifications']),

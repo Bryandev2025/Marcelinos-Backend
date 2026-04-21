@@ -44,7 +44,7 @@ class BookingLifecycleSlackNotification extends Notification implements ShouldQu
         $total = number_format((float) $booking->total_price, 2).' PHP';
 
         $paymentLine = '';
-        if (in_array($this->event, [Booking::STATUS_PAID, Booking::STATUS_PARTIAL], true)) {
+        if (in_array($this->event, [Booking::PAYMENT_STATUS_PAID, Booking::PAYMENT_STATUS_PARTIAL], true)) {
             /** @var Payment|null $latest */
             $latest = $booking->payments()->latest()->first();
             if ($latest) {
@@ -64,8 +64,10 @@ class BookingLifecycleSlackNotification extends Notification implements ShouldQu
 
         $fallback = "{$header} · {$booking->reference_number} · {$guestName}";
 
-        $statusLabel = Booking::statusOptions()[$booking->status] ?? ucfirst((string) $booking->status);
-        $statusCell = $this->bookingStatusIcon($booking->status).' '.$statusLabel;
+        $stay = Booking::bookingStatusOptions()[(string) $booking->booking_status] ?? (string) $booking->booking_status;
+        $pay = Booking::paymentStatusOptions()[(string) $booking->payment_status] ?? (string) $booking->payment_status;
+        $statusCell = $this->bookingStayIcon((string) $booking->booking_status).' '.$stay
+            .' · '.$this->paymentStatusIcon((string) $booking->payment_status).' '.$pay;
 
         $plan = filled($booking->online_payment_plan) ? $booking->online_payment_plan : '—';
         $xendit = filled($booking->xendit_invoice_id) ? $booking->xendit_invoice_id : '—';
@@ -140,7 +142,7 @@ class BookingLifecycleSlackNotification extends Notification implements ShouldQu
             [$L('👤 Guest'), $V($guestName)],
             [$L('🛬 Check-in (PH Time)'), $V($checkIn)],
             [$L('🛫 Check-out (PH Time)'), $V($checkOut)],
-            [$L('📌 Status'), $V($statusCell)],
+            [$L('📌 Stay / Payment'), $V($statusCell)],
             [$L('💰 Total'), $V($total)],
             [$L('💳 Payment method'), $V($paymentMethod)],
             [$L('🌐 Online payment plan'), $V($plan)],
@@ -367,7 +369,7 @@ class BookingLifecycleSlackNotification extends Notification implements ShouldQu
             $denom = (float) $booking->total_price;
         }
 
-        $isPartial = $booking->status === Booking::STATUS_PARTIAL
+        $isPartial = $booking->payment_status === Booking::PAYMENT_STATUS_PARTIAL
             || ! $payment->is_fullypaid;
 
         return [
@@ -475,11 +477,11 @@ class BookingLifecycleSlackNotification extends Notification implements ShouldQu
         return match ($this->event) {
             'created' => 'New booking',
             'deleted' => 'Booking deleted',
-            Booking::STATUS_CANCELLED => 'Booking cancelled',
-            Booking::STATUS_RESCHEDULED => 'Booking rescheduled',
-            Booking::STATUS_COMPLETED => 'Booking completed',
-            Booking::STATUS_PAID => 'Payment received (paid)',
-            Booking::STATUS_PARTIAL => 'Payment received (partial)',
+            Booking::BOOKING_STATUS_CANCELLED => 'Booking cancelled',
+            Booking::BOOKING_STATUS_RESCHEDULED => 'Booking rescheduled',
+            Booking::BOOKING_STATUS_COMPLETED => 'Booking completed',
+            Booking::PAYMENT_STATUS_PAID => 'Payment received (paid)',
+            Booking::PAYMENT_STATUS_PARTIAL => 'Payment received (partial)',
             default => 'Booking update ('.$this->event.')',
         };
     }
@@ -489,25 +491,33 @@ class BookingLifecycleSlackNotification extends Notification implements ShouldQu
         return match ($this->event) {
             'created' => '✨',
             'deleted' => '🗑️',
-            Booking::STATUS_CANCELLED => '🚫',
-            Booking::STATUS_RESCHEDULED => '🔄',
-            Booking::STATUS_COMPLETED => '🎉',
-            Booking::STATUS_PAID => '✅',
-            Booking::STATUS_PARTIAL => '🔶',
+            Booking::BOOKING_STATUS_CANCELLED => '🚫',
+            Booking::BOOKING_STATUS_RESCHEDULED => '🔄',
+            Booking::BOOKING_STATUS_COMPLETED => '🎉',
+            Booking::PAYMENT_STATUS_PAID => '✅',
+            Booking::PAYMENT_STATUS_PARTIAL => '🔶',
             default => '📣',
         };
     }
 
-    private function bookingStatusIcon(string $status): string
+    private function bookingStayIcon(string $bookingStatus): string
     {
-        return match ($status) {
-            Booking::STATUS_UNPAID => '⏳',
-            Booking::STATUS_PARTIAL => '🔶',
-            Booking::STATUS_OCCUPIED => '🛏️',
-            Booking::STATUS_PAID => '✅',
-            Booking::STATUS_COMPLETED => '🏁',
-            Booking::STATUS_CANCELLED => '❌',
-            Booking::STATUS_RESCHEDULED => '🔄',
+        return match ($bookingStatus) {
+            Booking::BOOKING_STATUS_RESERVED => '📋',
+            Booking::BOOKING_STATUS_OCCUPIED => '🛏️',
+            Booking::BOOKING_STATUS_COMPLETED => '🏁',
+            Booking::BOOKING_STATUS_CANCELLED => '❌',
+            Booking::BOOKING_STATUS_RESCHEDULED => '🔄',
+            default => '❔',
+        };
+    }
+
+    private function paymentStatusIcon(string $paymentStatus): string
+    {
+        return match ($paymentStatus) {
+            Booking::PAYMENT_STATUS_UNPAID => '⏳',
+            Booking::PAYMENT_STATUS_PARTIAL => '🔶',
+            Booking::PAYMENT_STATUS_PAID => '✅',
             default => '❔',
         };
     }

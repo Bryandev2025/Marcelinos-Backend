@@ -316,7 +316,7 @@ class RoomCalendar extends Page
         $monthEnd = $monthStart->copy()->endOfMonth()->endOfDay();
 
         $bookings = Booking::query()
-            ->whereNotIn('status', [Booking::STATUS_CANCELLED])
+            ->whereNotIn('booking_status', [Booking::BOOKING_STATUS_CANCELLED])
             ->where('check_in', '<=', $monthEnd)
             ->where('check_out', '>=', $monthStart)
             ->with(['rooms:id,type', 'roomLines:id,booking_id,room_type,quantity', 'venues:id,name'])
@@ -419,7 +419,7 @@ class RoomCalendar extends Page
     }
 
     /**
-     * @return list<array{id: int, reference_number: string, guest_name: string, check_in: string, check_out: string, rooms: string, venues: string, status: string, has_assigned_rooms: bool, can_pay_balance: bool, can_check_in: bool, booking_badge_kind: 'room'|'venue'|'both'}>
+     * @return list<array{id: int, reference_number: string, guest_name: string, check_in: string, check_out: string, rooms: string, venues: string, booking_status: string, payment_status: string, status_display: string, has_assigned_rooms: bool, can_pay_balance: bool, can_check_in: bool, booking_badge_kind: 'room'|'venue'|'both'}>
      */
     #[Computed]
     public function modalBookingRows(): array
@@ -458,7 +458,11 @@ class RoomCalendar extends Page
                     'check_out' => $b->check_out?->format('M j, Y g:i A') ?? '—',
                     'rooms' => $b->rooms->pluck('name')->filter()->implode(', ') ?: '—',
                     'venues' => $b->venues->pluck('name')->filter()->implode(', ') ?: '—',
-                    'status' => $b->status,
+                    'booking_status' => (string) $b->booking_status,
+                    'payment_status' => (string) $b->payment_status,
+                    'status_display' => (Booking::bookingStatusOptions()[(string) $b->booking_status] ?? (string) $b->booking_status)
+                        .' · '
+                        .(Booking::paymentStatusOptions()[(string) $b->payment_status] ?? (string) $b->payment_status),
                     'has_assigned_rooms' => $hasAssignedRooms,
                     'can_pay_balance' => $this->canPayBalanceForBooking($b),
                     'can_check_in' => $canCheckIn,
@@ -470,7 +474,7 @@ class RoomCalendar extends Page
     }
 
     /**
-     * @return list<array{id: int, reference_number: string, guest_name: string, check_in: string, check_out: string, rooms: string, venues: string, status: string, has_assigned_rooms: bool, can_pay_balance: bool, can_check_in: bool, booking_badge_kind: 'room'|'venue'|'both'}>
+     * @return list<array{id: int, reference_number: string, guest_name: string, check_in: string, check_out: string, rooms: string, venues: string, booking_status: string, payment_status: string, status_display: string, has_assigned_rooms: bool, can_pay_balance: bool, can_check_in: bool, booking_badge_kind: 'room'|'venue'|'both'}>
      */
     #[Computed]
     public function activeBookingRows(): array
@@ -479,7 +483,7 @@ class RoomCalendar extends Page
 
         return Booking::query()
             ->overlappingCalendarInclusiveDisplay($today)
-            ->whereNotIn('status', [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED])
+            ->whereNotIn('booking_status', [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED])
             ->where(fn ($q) => $this->applyReservationFilterQuery($q, $this->reservationFilter))
             ->with(['guest', 'rooms', 'roomLines', 'venues'])
             ->orderBy('check_in')
@@ -496,7 +500,11 @@ class RoomCalendar extends Page
                     'check_out' => $b->check_out?->format('M j, Y g:i A') ?? '—',
                     'rooms' => $b->rooms->pluck('name')->filter()->implode(', ') ?: '—',
                     'venues' => $b->venues->pluck('name')->filter()->implode(', ') ?: '—',
-                    'status' => $b->status,
+                    'booking_status' => (string) $b->booking_status,
+                    'payment_status' => (string) $b->payment_status,
+                    'status_display' => (Booking::bookingStatusOptions()[(string) $b->booking_status] ?? (string) $b->booking_status)
+                        .' · '
+                        .(Booking::paymentStatusOptions()[(string) $b->payment_status] ?? (string) $b->payment_status),
                     'has_assigned_rooms' => $hasAssignedRooms,
                     'can_pay_balance' => $this->canPayBalanceForBooking($b),
                     'can_check_in' => $canCheckIn,

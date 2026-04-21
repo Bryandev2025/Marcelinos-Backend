@@ -19,7 +19,7 @@ final class BookingDoubleBookDetector
             return new Collection;
         }
 
-        if ($booking->status === Booking::STATUS_CANCELLED) {
+        if ($booking->booking_status === Booking::BOOKING_STATUS_CANCELLED) {
             return new Collection;
         }
 
@@ -35,7 +35,7 @@ final class BookingDoubleBookDetector
 
         $query = Booking::query()
             ->whereKeyNot($booking->getKey())
-            ->where('status', '!=', Booking::STATUS_CANCELLED)
+            ->where('booking_status', '!=', Booking::BOOKING_STATUS_CANCELLED)
             ->where('check_in', '<', $checkOut)
             ->where('check_out', '>', $checkIn);
 

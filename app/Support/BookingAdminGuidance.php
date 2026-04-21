@@ -16,46 +16,49 @@ final class BookingAdminGuidance
             return __('Restore this booking from the recycle bin to manage it.');
         }
 
-        $status = (string) $booking->status;
+        $bookingStatus = (string) $booking->booking_status;
+        $paymentStatus = (string) $booking->payment_status;
 
-        if ($status === Booking::STATUS_CANCELLED) {
+        if ($bookingStatus === Booking::BOOKING_STATUS_CANCELLED) {
             return __('No further actions — booking is cancelled.');
         }
 
-        if ($status === Booking::STATUS_COMPLETED) {
+        if ($bookingStatus === Booking::BOOKING_STATUS_COMPLETED) {
             return __('No further actions — stay is completed.');
         }
 
-        if ($status === Booking::STATUS_OCCUPIED) {
+        if ($bookingStatus === Booking::BOOKING_STATUS_OCCUPIED) {
             return __('Mark as completed when the guest has checked out.');
         }
 
-        if ($status === Booking::STATUS_RESCHEDULED) {
+        if ($bookingStatus === Booking::BOOKING_STATUS_RESCHEDULED) {
             return __('Review dates and payment; then continue with payment or check-in as usual.');
         }
 
         $balance = (float) $booking->balance;
         $payAssessment = BookingFullBalancePayment::assess($booking);
 
-        if (in_array($status, [Booking::STATUS_UNPAID, Booking::STATUS_PARTIAL], true)) {
-            if ($balance <= 0.009) {
-                return __('Balance is settled; status should move to Paid when payments are recorded correctly.');
+        if ($bookingStatus === Booking::BOOKING_STATUS_RESERVED) {
+            if (in_array($paymentStatus, [Booking::PAYMENT_STATUS_UNPAID, Booking::PAYMENT_STATUS_PARTIAL], true)) {
+                if ($balance <= 0.009) {
+                    return __('Balance is settled; payment status should be Paid when payments are recorded correctly.');
+                }
+
+                if (! $payAssessment['allowed'] && $payAssessment['message']) {
+                    return $payAssessment['message'];
+                }
+
+                return __('Collect payment: add one or more cash amounts under Payments, or use “Settle remaining balance” to record the remainder and mark Paid in one step.');
             }
 
-            if (! $payAssessment['allowed'] && $payAssessment['message']) {
-                return $payAssessment['message'];
+            if ($paymentStatus === Booking::PAYMENT_STATUS_PAID) {
+                $checkIn = BookingCheckInEligibility::assess($booking);
+                if ($checkIn['allowed']) {
+                    return __('Guest is fully paid and rooms/venues are ready — check in when they arrive.');
+                }
+
+                return $checkIn['message'] ?? __('Complete room and venue assignments before check-in.');
             }
-
-            return __('Collect payment: add one or more cash amounts under Payments, or use “Settle remaining balance” to record the remainder and mark Paid in one step.');
-        }
-
-        if ($status === Booking::STATUS_PAID) {
-            $checkIn = BookingCheckInEligibility::assess($booking);
-            if ($checkIn['allowed']) {
-                return __('Guest is fully paid and rooms/venues are ready — check in when they arrive.');
-            }
-
-            return $checkIn['message'] ?? __('Complete room and venue assignments before check-in.');
         }
 
         return __('Review booking details and payments.');
@@ -70,46 +73,49 @@ final class BookingAdminGuidance
             return __('Restore');
         }
 
-        $status = (string) $booking->status;
+        $bookingStatus = (string) $booking->booking_status;
+        $paymentStatus = (string) $booking->payment_status;
 
-        if ($status === Booking::STATUS_CANCELLED) {
+        if ($bookingStatus === Booking::BOOKING_STATUS_CANCELLED) {
             return '—';
         }
 
-        if ($status === Booking::STATUS_COMPLETED) {
+        if ($bookingStatus === Booking::BOOKING_STATUS_COMPLETED) {
             return '—';
         }
 
-        if ($status === Booking::STATUS_OCCUPIED) {
+        if ($bookingStatus === Booking::BOOKING_STATUS_OCCUPIED) {
             return __('Mark complete');
         }
 
-        if ($status === Booking::STATUS_RESCHEDULED) {
+        if ($bookingStatus === Booking::BOOKING_STATUS_RESCHEDULED) {
             return __('Review');
         }
 
         $balance = (float) $booking->balance;
 
-        if (in_array($status, [Booking::STATUS_UNPAID, Booking::STATUS_PARTIAL], true)) {
-            if ($balance > 0.009) {
-                $pay = BookingFullBalancePayment::assess($booking);
-                if (! $pay['allowed']) {
-                    return __('Assign rooms / fix payment');
+        if ($bookingStatus === Booking::BOOKING_STATUS_RESERVED) {
+            if (in_array($paymentStatus, [Booking::PAYMENT_STATUS_UNPAID, Booking::PAYMENT_STATUS_PARTIAL], true)) {
+                if ($balance > 0.009) {
+                    $pay = BookingFullBalancePayment::assess($booking);
+                    if (! $pay['allowed']) {
+                        return __('Assign rooms / fix payment');
+                    }
+
+                    return __('Collect balance');
                 }
 
-                return __('Collect balance');
+                return __('Verify payment');
             }
 
-            return __('Verify payment');
-        }
+            if ($paymentStatus === Booking::PAYMENT_STATUS_PAID) {
+                $checkIn = BookingCheckInEligibility::assess($booking);
+                if ($checkIn['allowed']) {
+                    return __('Check in guest');
+                }
 
-        if ($status === Booking::STATUS_PAID) {
-            $checkIn = BookingCheckInEligibility::assess($booking);
-            if ($checkIn['allowed']) {
-                return __('Check in guest');
+                return __('Finish assignment');
             }
-
-            return __('Finish assignment');
         }
 
         return __('Review');
@@ -122,9 +128,12 @@ final class BookingAdminGuidance
     {
         $booking->loadMissing(['guest']);
 
-        $status = (string) $booking->status;
-        $statusLabel = e(Booking::statusOptions()[$status] ?? $status);
-        $color = collect(Booking::statusColors())->flip()->get($status, 'gray');
+        $bs = (string) $booking->booking_status;
+        $ps = (string) $booking->payment_status;
+        $bookingLabel = e(Booking::bookingStatusOptions()[$bs] ?? $bs);
+        $paymentLabel = e(Booking::paymentStatusOptions()[$ps] ?? $ps);
+        $bookingColor = collect(Booking::bookingStatusColors())->flip()->get($bs, 'gray');
+        $paymentColor = collect(Booking::paymentStatusColors())->flip()->get($ps, 'gray');
 
         $total = number_format((float) $booking->total_price, 2);
         $paid = number_format((float) $booking->total_paid, 2);
@@ -133,15 +142,19 @@ final class BookingAdminGuidance
         $next = e(self::nextStepPlainText($booking));
 
         $paymentHint = e(__(
-            'Payments tab: record one or more partial cash amounts. Settle remaining balance: records the full remainder in one step and sets status to Paid.',
+            'Payments tab: record one or more partial cash amounts. Settle remaining balance: records the full remainder in one step and sets payment to Paid.',
         ));
 
         $html = <<<HTML
 <div class="space-y-3 text-sm">
     <div class="flex flex-wrap items-center gap-2">
-        <span class="text-gray-600 dark:text-gray-400">Status:</span>
-        <span class="fi-badge flex items-center gap-x-1 rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset fi-color-{$color}">
-            {$statusLabel}
+        <span class="text-gray-600 dark:text-gray-400">Stay:</span>
+        <span class="fi-badge flex items-center gap-x-1 rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset fi-color-{$bookingColor}">
+            {$bookingLabel}
+        </span>
+        <span class="text-gray-600 dark:text-gray-400">Payment:</span>
+        <span class="fi-badge flex items-center gap-x-1 rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset fi-color-{$paymentColor}">
+            {$paymentLabel}
         </span>
     </div>
     <dl class="grid gap-1 sm:grid-cols-3">

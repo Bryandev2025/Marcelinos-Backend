@@ -53,7 +53,7 @@ class ImportLegacyBookingsCsv extends Command
         $dryRun = (bool) $this->option('dry-run');
         $delimiter = (string) $this->option('delimiter');
         $timezone = (string) $this->option('timezone');
-        $defaultStatus = $this->normalizeStatus((string) $this->option('default-status'));
+        $defaultPair = $this->normalizeLegacyCsvToStatuses(trim((string) $this->option('default-status')));
         $allowDuplicates = (bool) $this->option('allow-duplicates');
 
         if (! is_file($path) || ! is_readable($path)) {
@@ -113,7 +113,7 @@ class ImportLegacyBookingsCsv extends Command
             }
 
             try {
-                $payload = $this->normalizeRow($line, $headerMap, $timezone, $defaultStatus);
+                $payload = $this->normalizeRow($line, $headerMap, $timezone, $defaultPair);
                 if (! $allowDuplicates && $this->bookingAlreadyImported($payload)) {
                     $skipped++;
                     $duplicatesSkipped++;
@@ -137,7 +137,8 @@ class ImportLegacyBookingsCsv extends Command
                             'check_out' => $payload['check_out'],
                             'no_of_days' => $payload['no_of_days'],
                             'total_price' => $payload['total_price'],
-                            'status' => $payload['status'],
+                            'booking_status' => $payload['booking_status'],
+                            'payment_status' => $payload['payment_status'],
                             'payment_method' => $payload['payment_method'],
                             'venue_event_type' => $payload['venue_event_type'],
                         ]);
@@ -241,7 +242,10 @@ class ImportLegacyBookingsCsv extends Command
      * @param  array<string, int>  $headerMap
      * @return array<string, mixed>
      */
-    private function normalizeRow(array $line, array $headerMap, string $timezone, ?string $defaultStatus): array
+    /**
+     * @param  array{booking_status: string, payment_status: string}|null  $defaultPair
+     */
+    private function normalizeRow(array $line, array $headerMap, string $timezone, ?array $defaultPair): array
     {
         $firstName = $this->requiredCell($line, $headerMap['first_name'], 'first_name');
         $middleName = $this->optionalCell($line, $headerMap['middle_name'] ?? null);
@@ -259,8 +263,10 @@ class ImportLegacyBookingsCsv extends Command
             throw new \RuntimeException('check_out must be after check_in.');
         }
 
-        $status = $this->normalizeStatus($statusRaw) ?? $defaultStatus ?? $this->autoStatus($checkIn, $checkOut, $timezone);
-        if ($status === null) {
+        $pair = $this->normalizeLegacyCsvToStatuses($statusRaw)
+            ?? $defaultPair
+            ?? $this->autoStatuses($checkIn, $checkOut, $timezone);
+        if ($pair === null) {
             throw new \RuntimeException('Status is invalid.');
         }
 
@@ -274,7 +280,8 @@ class ImportLegacyBookingsCsv extends Command
             'check_out' => $checkOut,
             'no_of_days' => max(1, $checkIn->diffInDays($checkOut)),
             'total_price' => $totalPrice,
-            'status' => $status,
+            'booking_status' => $pair['booking_status'],
+            'payment_status' => $pair['payment_status'],
             'payment_method' => $paymentMethod,
             'venue_event_type' => $this->optionalCell($line, $headerMap['venue_event_type'] ?? null),
             'rooms' => $this->parseNameList($this->optionalCell($line, $headerMap['rooms'] ?? null)),
@@ -379,7 +386,12 @@ class ImportLegacyBookingsCsv extends Command
             ->all();
     }
 
-    private function normalizeStatus(?string $value): ?string
+    /**
+     * Map a legacy single-column status (or empty for auto) to booking + payment columns (same rules as DB migration backfill).
+     *
+     * @return array{booking_status: string, payment_status: string}|null
+     */
+    private function normalizeLegacyCsvToStatuses(?string $value): ?array
     {
         if ($value === null || trim($value) === '') {
             return null;
@@ -389,29 +401,62 @@ class ImportLegacyBookingsCsv extends Command
         $normalized = str_replace(['-', ' '], '_', $normalized);
 
         return match ($normalized) {
-            'unpaid' => Booking::STATUS_UNPAID,
-            'partial' => Booking::STATUS_PARTIAL,
-            'paid', 'confirmed' => Booking::STATUS_PAID,
-            'occupied', 'checked_in' => Booking::STATUS_OCCUPIED,
-            'completed', 'checked_out' => Booking::STATUS_COMPLETED,
-            'cancelled', 'canceled' => Booking::STATUS_CANCELLED,
-            'rescheduled' => Booking::STATUS_RESCHEDULED,
+            'unpaid' => [
+                'booking_status' => Booking::BOOKING_STATUS_RESERVED,
+                'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
+            ],
+            'partial' => [
+                'booking_status' => Booking::BOOKING_STATUS_RESERVED,
+                'payment_status' => Booking::PAYMENT_STATUS_PARTIAL,
+            ],
+            'paid', 'confirmed' => [
+                'booking_status' => Booking::BOOKING_STATUS_RESERVED,
+                'payment_status' => Booking::PAYMENT_STATUS_PAID,
+            ],
+            'occupied', 'checked_in' => [
+                'booking_status' => Booking::BOOKING_STATUS_OCCUPIED,
+                'payment_status' => Booking::PAYMENT_STATUS_PAID,
+            ],
+            'completed', 'checked_out' => [
+                'booking_status' => Booking::BOOKING_STATUS_COMPLETED,
+                'payment_status' => Booking::PAYMENT_STATUS_PAID,
+            ],
+            'cancelled', 'canceled' => [
+                'booking_status' => Booking::BOOKING_STATUS_CANCELLED,
+                'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
+            ],
+            'rescheduled' => [
+                'booking_status' => Booking::BOOKING_STATUS_RESCHEDULED,
+                'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
+            ],
             default => null,
         };
     }
 
-    private function autoStatus(Carbon $checkIn, Carbon $checkOut, string $timezone): string
+    /**
+     * @return array{booking_status: string, payment_status: string}
+     */
+    private function autoStatuses(Carbon $checkIn, Carbon $checkOut, string $timezone): array
     {
         $now = now($timezone);
         if ($checkOut->lessThanOrEqualTo($now)) {
-            return Booking::STATUS_COMPLETED;
+            return [
+                'booking_status' => Booking::BOOKING_STATUS_COMPLETED,
+                'payment_status' => Booking::PAYMENT_STATUS_PAID,
+            ];
         }
 
         if ($checkIn->lessThanOrEqualTo($now) && $checkOut->greaterThan($now)) {
-            return Booking::STATUS_OCCUPIED;
+            return [
+                'booking_status' => Booking::BOOKING_STATUS_OCCUPIED,
+                'payment_status' => Booking::PAYMENT_STATUS_PAID,
+            ];
         }
 
-        return Booking::STATUS_PAID;
+        return [
+            'booking_status' => Booking::BOOKING_STATUS_RESERVED,
+            'payment_status' => Booking::PAYMENT_STATUS_PAID,
+        ];
     }
 
     /**

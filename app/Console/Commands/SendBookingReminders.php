@@ -24,7 +24,10 @@ class SendBookingReminders extends Command
         $bookings = Booking::query()
             ->whereDate('check_in', $tomorrow)
             ->where('reminder_sent', false)
-            ->whereIn('status', [Booking::STATUS_UNPAID, Booking::STATUS_PARTIAL, Booking::STATUS_PAID])
+            ->whereIn('booking_status', [
+                Booking::BOOKING_STATUS_RESERVED,
+                Booking::BOOKING_STATUS_RESCHEDULED,
+            ])
             ->whereHas('guest', function ($query) {
                 $query->whereNotNull('email');
             })
