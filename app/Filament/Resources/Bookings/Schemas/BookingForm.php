@@ -135,6 +135,56 @@ class BookingForm
                         ->preload()
                         ->required()
                         ->columnSpanFull(),
+                    Section::make('Guest information')
+                        ->description('Read-only details for the selected guest.')
+                        ->columns(2)
+                        ->schema([
+                            TextInput::make('guest_info_full_name')
+                                ->label('Full name')
+                                ->formatStateUsing(fn (?Booking $record): string => $record?->guest?->full_name ?? '—')
+                                ->disabled()
+                                ->dehydrated(false),
+                            TextInput::make('guest_info_email')
+                                ->label('Email')
+                                ->formatStateUsing(fn (?Booking $record): string => $record?->guest?->email ?? '—')
+                                ->disabled()
+                                ->dehydrated(false),
+                            TextInput::make('guest_info_contact_num')
+                                ->label('Contact number')
+                                ->formatStateUsing(fn (?Booking $record): string => $record?->guest?->contact_num ?? '—')
+                                ->disabled()
+                                ->dehydrated(false),
+                            TextInput::make('guest_info_gender')
+                                ->label('Gender')
+                                ->formatStateUsing(fn (?Booking $record): string => $record?->guest?->gender ? ucfirst((string) $record->guest->gender) : '—')
+                                ->disabled()
+                                ->dehydrated(false),
+                            TextInput::make('guest_info_country')
+                                ->label('Country')
+                                ->formatStateUsing(fn (?Booking $record): string => $record?->guest?->country ?? '—')
+                                ->disabled()
+                                ->dehydrated(false),
+                            TextInput::make('guest_info_address')
+                                ->label('Address')
+                                ->formatStateUsing(function (?Booking $record): string {
+                                    $guest = $record?->guest;
+                                    if (! $guest) {
+                                        return '—';
+                                    }
+
+                                    $parts = array_filter([
+                                        $guest->barangay,
+                                        $guest->municipality,
+                                        $guest->province,
+                                        $guest->region,
+                                    ]);
+
+                                    return $parts !== [] ? implode(', ', $parts) : '—';
+                                })
+                                ->disabled()
+                                ->dehydrated(false),
+                        ])
+                        ->columnSpanFull(),
 
                     Section::make('Guest booking (billing summary)')
                         ->description(function (?Booking $record): ?HtmlString {

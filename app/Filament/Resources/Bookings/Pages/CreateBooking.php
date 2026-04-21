@@ -7,6 +7,8 @@ use App\Filament\Resources\Bookings\Schemas\BookingCreateWizard;
 use App\Filament\Resources\Bookings\Schemas\BookingForm;
 use App\Models\Booking;
 use App\Models\Guest;
+use App\Models\Room;
+use App\Support\RoomInventoryGroupKey;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Resources\Pages\CreateRecord\Concerns\HasWizard;
 use Filament\Schemas\Components\Component;
@@ -101,6 +103,7 @@ class CreateBooking extends CreateRecord
         $this->pendingPaymentAmount = (int) round($payAmount);
 
         unset($data['admin_payment_mode'], $data['admin_payment_amount']);
+        unset($data['bed_specification_id']);
 
         $data['venue_event_type'] = null;
 
@@ -116,6 +119,46 @@ class CreateBooking extends CreateRecord
         }
 
         return $data;
+    }
+
+    protected function afterCreate(): void
+    {
+        $record = $this->getRecord();
+        if (! $record instanceof Booking) {
+            return;
+        }
+
+        $record->loadMissing(['rooms.bedSpecifications']);
+        if ($record->rooms->isEmpty()) {
+            return;
+        }
+
+        // Build guest-style room lines from the assigned rooms (type + bed spec group).
+        $groups = [];
+        foreach ($record->rooms as $room) {
+            $key = $room->type."\0".RoomInventoryGroupKey::forRoom($room);
+            if (! isset($groups[$key])) {
+                $groups[$key] = [
+                    'room_type' => $room->type,
+                    'inventory_group_key' => RoomInventoryGroupKey::forRoom($room),
+                    'quantity' => 0,
+                    'sum_price' => 0.0,
+                ];
+            }
+            $groups[$key]['quantity']++;
+            $groups[$key]['sum_price'] += (float) ($room->price ?? 0);
+        }
+
+        foreach ($groups as $g) {
+            $qty = max(1, (int) $g['quantity']);
+            $unit = (float) $g['sum_price'] / $qty; // keep totals consistent with selected rooms sum
+            $record->roomLines()->create([
+                'room_type' => $g['room_type'],
+                'inventory_group_key' => $g['inventory_group_key'],
+                'quantity' => $qty,
+                'unit_price_per_night' => $unit,
+            ]);
+        }
     }
 
     /**

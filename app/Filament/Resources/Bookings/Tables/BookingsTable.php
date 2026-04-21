@@ -75,6 +75,20 @@ class BookingsTable
                     ->label('Guest')
                     ->formatStateUsing(fn ($record) => $record->guest?->full_name ?? '—')
                     ->description(fn ($record) => $record->guest?->email ?: 'No email')
+                    ->extraAttributes(['class' => 'cursor-pointer'])
+                    ->action(
+                        Action::make('viewGuest')
+                            ->modalHeading('Guest information')
+                            ->modalCancelActionLabel('Close')
+                            ->modalSubmitAction(false)
+                            ->modalContent(function ($record): View {
+                                $guest = $record->guest;
+
+                                return view('filament.bookings.guest-modal', [
+                                    'guest' => $guest,
+                                ]);
+                            })
+                    )
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         return $query->whereHas('guest', function (Builder $guestQuery) use ($search): void {
                             $guestQuery

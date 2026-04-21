@@ -4,9 +4,9 @@ namespace App\Filament\Resources\Bookings\Schemas;
 
 use App\Filament\Forms\Components\PhAddressFields;
 use App\Models\Booking;
+use App\Models\BedSpecification;
 use App\Models\Guest;
 use App\Models\Room;
-use Carbon\Carbon;
 use Closure;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Radio;
@@ -20,6 +20,7 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\TextSize;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 class BookingCreateWizard
@@ -31,7 +32,7 @@ class BookingCreateWizard
     {
         return [
             Step::make('Accommodation')
-                ->description('Choose check-in and check-out dates, then select rooms only (no venues).')
+                ->description('Pick dates, choose bed specification, then select available room(s) for those dates.')
                 ->schema([
                     DateTimePicker::make('check_in')
                         ->label('Check-in')
@@ -41,7 +42,7 @@ class BookingCreateWizard
                         ->live(onBlur: true)
                         ->seconds(false)
                         ->minDate(now()->startOfDay())
-                        ->disabledDates(fn (Get $get): array => BookingForm::disabledCalendarDateStringsForWizard(array_filter((array) ($get('rooms') ?? []))))
+                        ->disabledDates(fn (Get $get): array => BookingForm::disabledCalendarDateStringsForWizard([]))
                         ->helperText('Blocked days (maintenance / closed) show in red on the calendar and cannot be picked.')
                         ->rules([
                             fn (Get $get) => self::roomAvailabilityRuleForCheckIn($get),
@@ -56,7 +57,7 @@ class BookingCreateWizard
                         ->live(onBlur: true)
                         ->seconds(false)
                         ->disabledDates(function (Get $get): array {
-                            $disabled = BookingForm::disabledCalendarDateStringsForWizard(array_filter((array) ($get('rooms') ?? [])));
+                            $disabled = BookingForm::disabledCalendarDateStringsForWizard([]);
 
                             $checkIn = $get('check_in');
                             if (filled($checkIn)) {
@@ -93,15 +94,60 @@ class BookingCreateWizard
                         ])
                         ->afterStateUpdated(fn (Get $get, Set $set) => BookingForm::updatePricing($get, $set)),
 
+                    Select::make('bed_specification_id')
+                        ->label('Bed specification')
+                        ->options(fn (): array => BedSpecification::query()->orderBy('specification')->pluck('specification', 'id')->all())
+                        ->searchable()
+                        ->preload()
+                        ->required()
+                        ->live()
+                        ->helperText('Choose the bed specification first. The Rooms list will show only rooms with this spec that are available for the selected dates.')
+                        ->afterStateUpdated(function (Get $get, Set $set): void {
+                            $set('rooms', []);
+                            BookingForm::updatePricing($get, $set);
+                        })
+                        ->columnSpanFull(),
+
                     Select::make('rooms')
                         ->label('Rooms')
-                        ->relationship('rooms', 'name')
+                        ->relationship(
+                            'rooms',
+                            'name',
+                            modifyQueryUsing: function ($query, ?string $search, ?Booking $record, Get $get): void {
+                                $checkIn = $get('check_in');
+                                $checkOut = $get('check_out');
+                                $bedSpecId = $get('bed_specification_id');
+                                if (! $checkIn || ! $checkOut || ! $bedSpecId) {
+                                    $query->whereRaw('0 = 1');
+                                    return;
+                                }
+                                try {
+                                    $start = Carbon::parse((string) $checkIn);
+                                    $end = Carbon::parse((string) $checkOut);
+                                } catch (\Exception $e) {
+                                    $query->whereRaw('0 = 1');
+                                    return;
+                                }
+                                if ($end->lessThanOrEqualTo($start)) {
+                                    $query->whereRaw('0 = 1');
+                                    return;
+                                }
+
+                                $typeCol = $query->getModel()->qualifyColumn('type');
+                                $nameCol = $query->getModel()->qualifyColumn('name');
+                                $query->availableBetween($start, $end, null)
+                                    ->whereHas('bedSpecifications', fn ($q) => $q->where('bed_specifications.id', (int) $bedSpecId))
+                                    ->with(['bedSpecifications'])
+                                    ->orderBy($typeCol)
+                                    ->orderBy($nameCol);
+                            },
+                        )
                         ->multiple()
                         ->searchable()
                         ->preload()
                         ->required()
                         ->live()
-                        ->helperText('Totals update automatically. Date changes re-check availability below and on each date field.')
+                        ->helperText('Rooms are filtered by the selected bed specification and availability for the selected dates.')
                         ->rules([
                             fn (Get $get, ?Booking $record) => function (string $attribute, $value, $fail) use ($get, $record): void {
                                 if (BookingForm::hasRoomConflicts($value, $get('check_in'), $get('check_out'), $record)) {
@@ -109,7 +155,8 @@ class BookingCreateWizard
                                 }
                             },
                         ])
-                        ->afterStateUpdated(fn (Get $get, Set $set) => BookingForm::updatePricing($get, $set)),
+                        ->afterStateUpdated(fn (Get $get, Set $set) => BookingForm::updatePricing($get, $set))
+                        ->columnSpanFull(),
 
                     TextInput::make('no_of_days')
                         ->label('Nights')
@@ -126,12 +173,6 @@ class BookingCreateWizard
                         ->numeric()
                         ->prefix('₱')
                         ->helperText('Rooms × nights. Additional payment step records what the guest pays now.'),
-
-                    Text::make(fn (Get $get): string => BookingForm::hasRoomConflicts($get('rooms'), $get('check_in'), $get('check_out'), null)
-                        ? 'These rooms are not available for the selected dates (another booking or blocked date overlaps). Change dates or rooms before continuing.'
-                        : '')
-                        ->color('danger')
-                        ->visible(fn (Get $get): bool => BookingForm::hasRoomConflicts($get('rooms'), $get('check_in'), $get('check_out'), null)),
                 ]),
             Step::make('Guest details')
                 ->description('Create the guest profile for this booking.')
