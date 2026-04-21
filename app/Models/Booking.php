@@ -347,16 +347,24 @@ class Booking extends Model
     }
 
     /**
-     * 9:00 PM Asia/Manila on the check-in calendar day (unpaid settlement, receipt, and auto-cancel).
+     * 9:00 PM Asia/Manila unpaid settlement deadline:
+     * - check-in is on/earlier than booking day: 9:00 PM on check-in day
+     * - check-in is after booking day: 9:00 PM on the day after booking day
      */
-    public function checkInDayUnpaidSettlementDeadlineManila(): ?Carbon
+    public function unpaidSettlementDeadlineManila(?Carbon $at = null): ?Carbon
     {
         if (! $this->check_in) {
             return null;
         }
         $tz = self::timezoneManila();
+        $anchor = ($this->created_at ?? $at ?? now())->copy()->timezone($tz);
+        $checkInDay = $this->check_in->copy()->timezone($tz)->startOfDay();
+        $bookingDay = $anchor->copy()->startOfDay();
+        $targetDay = $checkInDay->gt($bookingDay)
+            ? $bookingDay->copy()->addDay()
+            : $checkInDay;
 
-        return $this->check_in->copy()->timezone($tz)->setTime(
+        return $targetDay->setTime(
             self::CHECK_IN_UNPAID_SETTLEMENT_HOUR,
             0,
             0,
@@ -384,7 +392,7 @@ class Booking extends Model
      */
     public function unpaidExpiresAt(?int $days = null): ?Carbon
     {
-        return $this->checkInDayUnpaidSettlementDeadlineManila();
+        return $this->unpaidSettlementDeadlineManila();
     }
 
     /**
@@ -426,7 +434,7 @@ class Booking extends Model
         }
 
         $at = $at ?? now();
-        $deadline = $this->checkInDayUnpaidSettlementDeadlineManila();
+        $deadline = $this->unpaidSettlementDeadlineManila($at);
 
         return $deadline !== null && $at->gte($deadline);
     }
