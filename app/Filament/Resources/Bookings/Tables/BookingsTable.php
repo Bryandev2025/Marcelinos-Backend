@@ -467,7 +467,7 @@ class BookingsTable
                         Select::make('month')
                             ->label(fn (Get $get): string => 'Month ('.($get('year') ?? now()->year).')')
                             ->options(self::monthButtonLabels())
-                            ->default(now()->format('m'))
+                            ->placeholder('Select a month')
                             ->native(false)
                             ->searchable()
                             ->visible(fn (Get $get) => ! (bool) $get('use_custom')),
