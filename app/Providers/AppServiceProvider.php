@@ -17,6 +17,7 @@ use App\Models\BlockedDate;
 use App\Models\Booking;
 use App\Models\Gallery;
 use App\Models\Guest;
+use App\Models\Payment;
 use App\Models\Review;
 use App\Models\Room;
 use App\Models\RoomBlockedDate;
@@ -415,6 +416,32 @@ class AppServiceProvider extends ServiceProvider
 
     protected function resolveSubjectLabel(Model $model): string
     {
+        if ($model instanceof Payment) {
+            $bookingReference = trim((string) data_get($model, 'booking.reference_number', ''));
+            $recordedAmount = (float) ($model->partial_amount ?? 0);
+            $targetAmount = (float) ($model->total_amount ?? 0);
+
+            if ($bookingReference !== '' && $recordedAmount > 0) {
+                return sprintf(
+                    'Booking %s payment of PHP %s',
+                    $bookingReference,
+                    number_format($recordedAmount, 2)
+                );
+            }
+
+            if ($bookingReference !== '' && $targetAmount > 0) {
+                return sprintf(
+                    'Booking %s payment target PHP %s',
+                    $bookingReference,
+                    number_format($targetAmount, 2)
+                );
+            }
+
+            if ($bookingReference !== '') {
+                return sprintf('Booking %s payment', $bookingReference);
+            }
+        }
+
         $candidates = ['name', 'title', 'specification', 'reference_number', 'email', 'full_name', 'date'];
 
         foreach ($candidates as $attribute) {
