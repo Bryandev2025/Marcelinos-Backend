@@ -6,12 +6,15 @@
         'venue' => __('Venue only'),
         'both' => __('Room + Venue'),
     ];
-    $statusPill = [
-        Booking::BOOKING_STATUS_RESERVED => 'bg-violet-100 text-violet-800 ring-1 ring-inset ring-violet-600/15 dark:bg-violet-500/15 dark:text-violet-200 dark:ring-violet-400/25',
-        Booking::BOOKING_STATUS_OCCUPIED => 'bg-amber-100 text-amber-900 ring-1 ring-inset ring-amber-600/15 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-400/25',
-        Booking::BOOKING_STATUS_COMPLETED => 'bg-gray-100 text-gray-800 ring-1 ring-inset ring-gray-600/15 dark:bg-white/10 dark:text-gray-200 dark:ring-white/15',
-        Booking::BOOKING_STATUS_CANCELLED => 'bg-rose-100 text-rose-800 ring-1 ring-inset ring-rose-600/15 dark:bg-rose-500/15 dark:text-rose-200 dark:ring-rose-400/25',
-        Booking::BOOKING_STATUS_RESCHEDULED => 'bg-blue-100 text-blue-800 ring-1 ring-inset ring-blue-600/15 dark:bg-blue-500/15 dark:text-blue-200 dark:ring-blue-400/25',
+    $referenceLinkClassByPayment = [
+        Booking::PAYMENT_STATUS_PAID => 'text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300',
+        Booking::PAYMENT_STATUS_PARTIAL => 'text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300',
+        Booking::PAYMENT_STATUS_UNPAID => 'text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300',
+    ];
+    $statusDisplayPillByPayment = [
+        Booking::PAYMENT_STATUS_PARTIAL => 'bg-amber-100 text-amber-500 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-500/15 dark:text-amber-100 dark:ring-amber-400/25',
+        Booking::PAYMENT_STATUS_PAID => 'bg-emerald-100 text-emerald-900 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/15 dark:text-emerald-100 dark:ring-emerald-400/25',
+        Booking::PAYMENT_STATUS_UNPAID => 'bg-gray-100 text-gray-700 ring-1 ring-inset ring-gray-600/15 dark:bg-white/10 dark:text-gray-200 dark:ring-white/15',
     ];
 @endphp
 
@@ -95,7 +98,7 @@
                             wire:loading.attr="disabled"
                             wire:target="previousMonth"
                             :label="__('Previous month')"
-                            class="!rounded-lg"
+                            class="rounded-lg!"
                         />
                         <x-filament::icon-button
                             color="gray"
@@ -330,10 +333,20 @@
                             <li class="rounded-xl border border-gray-200/90 bg-white px-4 py-3 text-sm shadow-sm dark:border-white/10 dark:bg-gray-950/50">
                                 <div class="flex items-start justify-between gap-3">
                                     <div class="min-w-0">
-                                        <p class="font-mono font-semibold text-primary-600 dark:text-primary-400">{{ $row['reference_number'] }}</p>
+                                        <a
+                                            href="{{ \App\Filament\Resources\Bookings\BookingResource::getUrl('view', ['record' => $row['id']]) }}"
+                                            class="inline-block break-words font-mono text-sm font-semibold hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-gray-900 {{ $referenceLinkClassByPayment[$row['payment_status']] ?? $referenceLinkClassByPayment[Booking::PAYMENT_STATUS_UNPAID] }}"
+                                        >
+                                            {{ $row['reference_number'] }}
+                                        </a>
                                         <p class="truncate text-gray-700 dark:text-gray-200">{{ $row['guest_name'] }}</p>
                                     </div>
-                                    <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-700 dark:bg-white/10 dark:text-gray-200">
+                                    <span
+                                        @class([
+                                            'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                                            $statusDisplayPillByPayment[$row['payment_status'] ?? ''] ?? $statusDisplayPillByPayment[Booking::PAYMENT_STATUS_UNPAID],
+                                        ])
+                                    >
                                         {{ $row['status_display'] ?? '—' }}
                                     </span>
                                 </div>
@@ -495,13 +508,10 @@
                                             </p>
                                         </div>
                                         <div class="flex shrink-0 items-start justify-between gap-2 sm:justify-start">
-                                            @php
-                                                $pill = $statusPill[$row['booking_status'] ?? ''] ?? 'bg-gray-100 text-gray-800 ring-1 ring-inset ring-gray-600/15 dark:bg-white/10 dark:text-gray-200';
-                                            @endphp
                                             <span
                                                 @class([
                                                     'rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                                                    $pill,
+                                                    $statusDisplayPillByPayment[$row['payment_status'] ?? ''] ?? $statusDisplayPillByPayment[Booking::PAYMENT_STATUS_UNPAID],
                                                 ])
                                             >
                                                 {{ $row['status_display'] ?? '—' }}
