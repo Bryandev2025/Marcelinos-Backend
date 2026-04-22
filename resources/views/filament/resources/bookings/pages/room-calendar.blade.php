@@ -78,7 +78,7 @@
                         rel="noopener noreferrer"
                         class="inline-flex w-full items-center justify-center rounded-md border border-primary-600 px-2 py-1 text-xs font-semibold text-primary-700 transition hover:bg-primary-50 dark:border-primary-400 dark:text-primary-300 dark:hover:bg-primary-500/10"
                     >
-                        {{ __('View Read-Only DB Mirror') }}
+                        {{ __('View Data Backup') }}
                     </a>
                 </div>
             </div>
