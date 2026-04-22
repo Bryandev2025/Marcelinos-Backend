@@ -134,6 +134,7 @@ class BookingForm
                         ->searchable()
                         ->preload()
                         ->required()
+                        ->visibleOn('create')
                         ->columnSpanFull(),
                     Section::make('Guest information')
                         ->description('Read-only details for the selected guest.')
@@ -187,22 +188,8 @@ class BookingForm
                         ->columnSpanFull(),
 
                     Section::make('Guest booking (billing summary)')
-                        ->description(function (?Booking $record): ?HtmlString {
-                            if (! $record || $record->roomLines->isEmpty()) {
-                                return null;
-                            }
-                            $record->loadMissing('roomLines');
-                            $html = '<ul class="list-disc ms-5 space-y-1 text-sm">';
-                            foreach ($record->roomLines as $line) {
-                                $html .= '<li>'.e($line->displayLabel()).' × '.(int) $line->quantity.'</li>';
-                            }
-                            $total = (int) $record->roomLines->sum('quantity');
-                            $html .= '</ul>';
-                            $html .= '<p class="mt-3 text-sm text-gray-500 dark:text-gray-400">Assign exactly <strong>'.$total.'</strong> physical room(s) in “Assigned rooms” so each line matches.</p>';
-
-                            return new HtmlString($html);
-                        })
-                        ->visible(fn (?Booking $record) => $record?->roomLines?->isNotEmpty())
+                        ->description(fn (?Booking $record): ?HtmlString => self::guestBookingBillingSummaryHtml($record))
+                        ->visible(fn (?Booking $record) => self::shouldShowGuestBookingBillingSummary($record))
                         ->schema([
                             Hidden::make('guest_booking_section_placeholder')->dehydrated(false),
                         ])
@@ -882,6 +869,15 @@ class BookingForm
 
     private static function shouldShowAssignedRoomsField(Get $get, ?Booking $record): bool
     {
+        if ($record instanceof Booking) {
+            $record->loadMissing('roomLines');
+
+            // Persisted room-line requirements take precedence over transient UI state.
+            if ($record->expectsRoomAssignments()) {
+                return true;
+            }
+        }
+
         if (self::isVenueOnlyBookingState($get)) {
             return false;
         }
@@ -900,18 +896,78 @@ class BookingForm
             return $bookingType === 'venue';
         }
 
+        $routeRecord = request()->route('record');
+        if ($routeRecord instanceof Booking) {
+            if ($routeRecord->expectsRoomAssignments()) {
+                return false;
+            }
+
+            if ($routeRecord->expectsVenueAssignments()) {
+                return true;
+            }
+        }
+
         $roomIds = array_filter((array) ($get('rooms') ?? []));
         $venueIds = array_filter((array) ($get('venues') ?? []));
         if ($roomIds === [] && $venueIds !== []) {
             return true;
         }
 
-        $routeRecord = request()->route('record');
-        if ($routeRecord instanceof Booking) {
-            return $routeRecord->expectsVenueAssignments() && ! $routeRecord->expectsRoomAssignments();
+        return false;
+    }
+
+    private static function shouldShowGuestBookingBillingSummary(?Booking $record): bool
+    {
+        if (! $record instanceof Booking) {
+            return false;
         }
 
-        return false;
+        $record->loadMissing(['roomLines', 'rooms.bedSpecifications', 'venues']);
+
+        return $record->roomLines->isNotEmpty()
+            || $record->rooms->isNotEmpty()
+            || $record->venues->isNotEmpty();
+    }
+
+    private static function guestBookingBillingSummaryHtml(?Booking $record): ?HtmlString
+    {
+        if (! $record instanceof Booking) {
+            return null;
+        }
+
+        $record->loadMissing(['roomLines', 'rooms.bedSpecifications', 'venues']);
+
+        $items = [];
+        foreach ($record->roomLines as $line) {
+            $items[] = e($line->displayLabel()).' × '.(int) $line->quantity;
+        }
+
+        if ($record->roomLines->isEmpty()) {
+            foreach ($record->rooms as $room) {
+                $items[] = e($room->typeDashBedSummary()).' × 1';
+            }
+        }
+
+        foreach ($record->venues as $venue) {
+            $items[] = e((string) ($venue->name ?? 'Venue')).' × 1';
+        }
+
+        if ($items === []) {
+            return null;
+        }
+
+        $html = '<ul class="list-disc ms-5 space-y-1 text-sm">';
+        foreach ($items as $item) {
+            $html .= '<li>'.$item.'</li>';
+        }
+        $html .= '</ul>';
+
+        if ($record->roomLines->isNotEmpty()) {
+            $total = (int) $record->roomLines->sum('quantity');
+            $html .= '<p class="mt-3 text-sm text-gray-500 dark:text-gray-400">Assign exactly <strong>'.$total.'</strong> physical room(s) in “Assigned rooms” so each line matches.</p>';
+        }
+
+        return new HtmlString($html);
     }
 
     private static function hasBlockedCalendarDatesInInclusiveRange(Carbon $startDay, Carbon $endDay): bool
