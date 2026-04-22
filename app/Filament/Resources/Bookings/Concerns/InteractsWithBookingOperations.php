@@ -8,7 +8,12 @@ use App\Support\BookingAdminGuidance;
 use App\Support\BookingCheckInEligibility;
 use App\Support\BookingFullBalancePayment;
 use App\Support\BookingLifecycleActions;
+use App\Support\BookingSpecialDiscount;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
@@ -21,13 +26,169 @@ trait InteractsWithBookingOperations
     protected function makeBookingOperationsSectionForEdit(): Section
     {
         return Section::make(__('Front desk & payments'))
-            ->description(__('Use the Payments tab to record partial cash payments. Use Settle remaining balance when the guest pays the full remainder in one step.'))
+            ->description(__('Quick payment and booking actions.'))
             ->visible(fn (): bool => $this->getRecord() instanceof Booking && ! $this->getRecord()->trashed())
             ->schema([
                 Text::make('')
                     ->content(fn (): HtmlString => BookingAdminGuidance::operationsSummaryHtml($this->getRecord()))
                     ->columnSpanFull(),
                 Actions::make([
+                    Action::make('bookingOpSpecialDiscount')
+                        ->label(function (): string {
+                            $record = $this->getRecord();
+                            return $record instanceof Booking && BookingSpecialDiscount::hasDiscount($record)
+                                ? __('Update special discount')
+                                : __('Apply special discount');
+                        })
+                        ->icon('heroicon-o-tag')
+                        ->color('gray')
+                        ->visible(function (): bool {
+                            $record = $this->getRecord();
+                            if (! $record instanceof Booking) {
+                                return false;
+                            }
+                            return BookingSpecialDiscount::assessCanMutate($record, auth()->user())['allowed'];
+                        })
+                        ->modalHeading(__('Special discount'))
+                        ->modalDescription(__('Apply a manual discount with a reason so it appears in audit logs and revenue reporting.'))
+                        ->form(function (): array {
+                            /** @var Booking|null $record */
+                            $record = $this->getRecord() instanceof Booking ? $this->getRecord() : null;
+                            $type = $record?->special_discount_type ?: BookingSpecialDiscount::TYPE_FIXED;
+                            $value = $record?->special_discount_value ?: null;
+
+                            return [
+                                Select::make('type')
+                                    ->label(__('Discount type'))
+                                    ->options([
+                                        BookingSpecialDiscount::TYPE_PERCENT => __('Percent (%)'),
+                                        BookingSpecialDiscount::TYPE_FIXED => __('Fixed amount (PHP)'),
+                                    ])
+                                    ->default($type)
+                                    ->live(),
+                                TextInput::make('value')
+                                    ->label(__('Discount value'))
+                                    ->numeric()
+                                    ->minValue(0.01)
+                                    ->required()
+                                    ->default($value)
+                                    ->live()
+                                    ->helperText(__('Percent: 1–99. Fixed: peso amount to deduct.')),
+                                Select::make('reason_code')
+                                    ->label(__('Reason'))
+                                    ->options([
+                                        'relative' => __('Relative / Friends'),
+                                        'service_recovery' => __('Service recovery'),
+                                        'vip' => __('VIP'),
+                                        'promo_match' => __('Promo match'),
+                                        'other' => __('Other'),
+                                    ])
+                                    ->native(false)
+                                    ->required()
+                                    ->default($record?->special_discount_reason_code)
+                                    ->live(),
+                                Textarea::make('note')
+                                    ->label(__('Note'))
+                                    ->rows(3)
+                                    ->default($record?->special_discount_note)
+                                    ->required(fn ($get): bool => (string) $get('reason_code') === 'other')
+                                    ->helperText(__('Required when Reason is "Other". Keep it short and specific.')),
+                                Placeholder::make('preview')
+                                    ->label(__('Revenue impact'))
+                                    ->content(function ($get) use ($record): string {
+                                        if (! $record instanceof Booking) {
+                                            return '—';
+                                        }
+
+                                        $type = (string) ($get('type') ?? '');
+                                        $value = (float) ($get('value') ?? 0);
+                                        if ($type === '' || $value <= 0) {
+                                            $gross = BookingSpecialDiscount::grossTotal($record);
+                                            return 'Gross ₱'.number_format($gross, 2).' → Net ₱'.number_format((float) $record->total_price, 2);
+                                        }
+
+                                        $p = BookingSpecialDiscount::preview($record, $type, $value);
+
+                                        return 'Gross ₱'.number_format($p['gross'], 2)
+                                            .' → Net ₱'.number_format($p['net'], 2)
+                                            .' (Discount ₱'.number_format($p['discount'], 2).')';
+                                    }),
+                            ];
+                        })
+                        ->action(function (array $data): void {
+                            $record = $this->getRecord();
+                            if (! $record instanceof Booking) {
+                                return;
+                            }
+
+                            try {
+                                BookingSpecialDiscount::apply(
+                                    booking: $record,
+                                    type: (string) ($data['type'] ?? ''),
+                                    value: (float) ($data['value'] ?? 0),
+                                    reasonCode: isset($data['reason_code']) ? (string) $data['reason_code'] : null,
+                                    note: isset($data['note']) ? (string) $data['note'] : null,
+                                    actor: auth()->user(),
+                                );
+                            } catch (\InvalidArgumentException $e) {
+                                Notification::make()
+                                    ->title(__('Cannot apply discount'))
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+
+                                throw new Halt;
+                            }
+
+                            Notification::make()
+                                ->title(__('Special discount saved.'))
+                                ->success()
+                                ->send();
+
+                            $this->afterBookingLifecycleMutation();
+                        }),
+                    Action::make('bookingOpRemoveSpecialDiscount')
+                        ->label(__('Remove discount'))
+                        ->icon('heroicon-o-x-mark')
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->modalHeading(__('Remove special discount?'))
+                        ->modalDescription(__('Restores the booking total to its original gross amount. This will be logged.'))
+                        ->visible(function (): bool {
+                            $record = $this->getRecord();
+                            if (! $record instanceof Booking) {
+                                return false;
+                            }
+                            if (! BookingSpecialDiscount::hasDiscount($record)) {
+                                return false;
+                            }
+                            return BookingSpecialDiscount::assessCanMutate($record, auth()->user())['allowed'];
+                        })
+                        ->action(function (): void {
+                            $record = $this->getRecord();
+                            if (! $record instanceof Booking) {
+                                return;
+                            }
+
+                            try {
+                                BookingSpecialDiscount::remove($record, auth()->user());
+                            } catch (\InvalidArgumentException $e) {
+                                Notification::make()
+                                    ->title(__('Cannot remove discount'))
+                                    ->body($e->getMessage())
+                                    ->danger()
+                                    ->send();
+
+                                throw new Halt;
+                            }
+
+                            Notification::make()
+                                ->title(__('Special discount removed.'))
+                                ->success()
+                                ->send();
+
+                            $this->afterBookingLifecycleMutation();
+                        }),
                     Action::make('bookingOpPayBalance')
                         ->label(__('Settle remaining balance'))
                         ->icon('heroicon-o-banknotes')
@@ -82,6 +243,7 @@ trait InteractsWithBookingOperations
             ])
             ->columns(1)
             ->collapsible()
+            ->collapsed()
             ->persistCollapsed()
             ->id('booking-operations-panel-edit')
             ->columnSpanFull();
@@ -90,7 +252,7 @@ trait InteractsWithBookingOperations
     protected function makeBookingOperationsSectionForView(): Section
     {
         return Section::make(__('Front desk & payments'))
-            ->description(__('Actions are in the buttons above. Payments tab records partial cash; Settle remaining balance is in the header.'))
+            ->description(__('Quick payment and booking status summary.'))
             ->visible(fn (): bool => $this->getRecord() instanceof Booking && ! $this->getRecord()->trashed())
             ->schema([
                 Text::make('')
@@ -113,6 +275,120 @@ trait InteractsWithBookingOperations
     {
         return [
             $this->makePayBalanceHeaderAction(),
+            Action::make('viewBookingSpecialDiscount')
+                ->label(function (): string {
+                    $record = $this->getRecord();
+                    return $record instanceof Booking && BookingSpecialDiscount::hasDiscount($record)
+                        ? __('Update discount')
+                        : __('Apply discount');
+                })
+                ->icon('heroicon-o-tag')
+                ->color('gray')
+                ->visible(function (): bool {
+                    $record = $this->getRecord();
+                    if (! $record instanceof Booking) {
+                        return false;
+                    }
+                    return BookingSpecialDiscount::assessCanMutate($record, auth()->user())['allowed'];
+                })
+                ->modalHeading(__('Special discount'))
+                ->modalDescription(__('Apply a manual discount with a reason so it appears in audit logs and revenue reporting.'))
+                ->form(function (): array {
+                    /** @var Booking|null $record */
+                    $record = $this->getRecord() instanceof Booking ? $this->getRecord() : null;
+                    $type = $record?->special_discount_type ?: BookingSpecialDiscount::TYPE_FIXED;
+                    $value = $record?->special_discount_value ?: null;
+
+                    return [
+                        Select::make('type')
+                            ->label(__('Discount type'))
+                            ->options([
+                                BookingSpecialDiscount::TYPE_PERCENT => __('Percent (%)'),
+                                BookingSpecialDiscount::TYPE_FIXED => __('Fixed amount (PHP)'),
+                            ])
+                            ->default($type)
+                            ->live(),
+                        TextInput::make('value')
+                            ->label(__('Discount value'))
+                            ->numeric()
+                            ->minValue(0.01)
+                            ->required()
+                            ->default($value)
+                            ->live()
+                            ->helperText(__('Percent: 1–99. Fixed: peso amount to deduct.')),
+                        Select::make('reason_code')
+                            ->label(__('Reason'))
+                            ->options([
+                                'relative' => __('Relative / Friends'),
+                                'service_recovery' => __('Service recovery'),
+                                'vip' => __('VIP'),
+                                'promo_match' => __('Promo match'),
+                                'other' => __('Other'),
+                            ])
+                            ->native(false)
+                            ->required()
+                            ->default($record?->special_discount_reason_code)
+                            ->live(),
+                        Textarea::make('note')
+                            ->label(__('Note'))
+                            ->rows(3)
+                            ->default($record?->special_discount_note)
+                            ->required(fn ($get): bool => (string) $get('reason_code') === 'other')
+                            ->helperText(__('Required when Reason is "Other". Keep it short and specific.')),
+                        Placeholder::make('preview')
+                            ->label(__('Revenue impact'))
+                            ->content(function ($get) use ($record): string {
+                                if (! $record instanceof Booking) {
+                                    return '—';
+                                }
+
+                                $type = (string) ($get('type') ?? '');
+                                $value = (float) ($get('value') ?? 0);
+                                if ($type === '' || $value <= 0) {
+                                    $gross = BookingSpecialDiscount::grossTotal($record);
+                                    return 'Gross ₱'.number_format($gross, 2).' → Net ₱'.number_format((float) $record->total_price, 2);
+                                }
+
+                                $p = BookingSpecialDiscount::preview($record, $type, $value);
+
+                                return 'Gross ₱'.number_format($p['gross'], 2)
+                                    .' → Net ₱'.number_format($p['net'], 2)
+                                    .' (Discount ₱'.number_format($p['discount'], 2).')';
+                            }),
+                    ];
+                })
+                ->action(function (array $data): void {
+                    $record = $this->getRecord();
+                    if (! $record instanceof Booking) {
+                        return;
+                    }
+
+                    try {
+                        BookingSpecialDiscount::apply(
+                            booking: $record,
+                            type: (string) ($data['type'] ?? ''),
+                            value: (float) ($data['value'] ?? 0),
+                            reasonCode: isset($data['reason_code']) ? (string) $data['reason_code'] : null,
+                            note: isset($data['note']) ? (string) $data['note'] : null,
+                            actor: auth()->user(),
+                        );
+                    } catch (\InvalidArgumentException $e) {
+                        Notification::make()
+                            ->title(__('Cannot apply discount'))
+                            ->body($e->getMessage())
+                            ->danger()
+                            ->send();
+
+                        throw new Halt;
+                    }
+
+                    Notification::make()
+                        ->title(__('Special discount saved.'))
+                        ->success()
+                        ->send();
+
+                    $this->afterBookingLifecycleMutation();
+                }),
             Action::make('viewBookingCheckIn')
                 ->label(__('Check in guest'))
                 ->icon('heroicon-o-arrow-right-circle')

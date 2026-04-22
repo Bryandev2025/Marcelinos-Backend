@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Booking;
 use Illuminate\Support\HtmlString;
+use App\Support\BookingSpecialDiscount;
 
 /**
  * Staff-facing copy for “what’s next” on a booking (list column, operations panel).
@@ -135,18 +136,25 @@ final class BookingAdminGuidance
         $bookingColor = collect(Booking::bookingStatusColors())->flip()->get($bs, 'gray');
         $paymentColor = collect(Booking::paymentStatusColors())->flip()->get($ps, 'gray');
 
-        $total = number_format((float) $booking->total_price, 2);
+        $gross = BookingSpecialDiscount::grossTotal($booking);
+        $discount = BookingSpecialDiscount::discountAmount($booking);
+        $net = (float) $booking->total_price;
+
+        $total = number_format($net, 2);
+        $grossText = number_format($gross, 2);
+        $discountText = number_format($discount, 2);
         $paid = number_format((float) $booking->total_paid, 2);
         $balance = number_format((float) $booking->balance, 2);
 
         $next = e(self::nextStepPlainText($booking));
 
-        $paymentHint = e(__(
-            'Payments tab: record one or more partial cash amounts. Settle remaining balance: records the full remainder in one step and sets payment to Paid.',
-        ));
+        $discountRow = $discount > 0.009
+            ? '<div><dt class="text-gray-500 dark:text-gray-400">Gross</dt><dd class="font-medium tabular-nums">₱'.$grossText.'</dd></div>
+               <div><dt class="text-gray-500 dark:text-gray-400">Discount</dt><dd class="font-medium tabular-nums text-rose-700 dark:text-rose-300">- ₱'.$discountText.'</dd></div>'
+            : '';
 
         $html = <<<HTML
-<div class="space-y-3 text-sm">
+<div class="space-y-2 text-sm">
     <div class="flex flex-wrap items-center gap-2">
         <span class="text-gray-600 dark:text-gray-400">Stay:</span>
         <span class="fi-badge flex items-center gap-x-1 rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset fi-color-{$bookingColor}">
@@ -159,11 +167,11 @@ final class BookingAdminGuidance
     </div>
     <dl class="grid gap-1 sm:grid-cols-3">
         <div><dt class="text-gray-500 dark:text-gray-400">Total</dt><dd class="font-medium tabular-nums">₱{$total}</dd></div>
+        {$discountRow}
         <div><dt class="text-gray-500 dark:text-gray-400">Paid</dt><dd class="font-medium tabular-nums">₱{$paid}</dd></div>
         <div><dt class="text-gray-500 dark:text-gray-400">Balance</dt><dd class="font-medium tabular-nums">₱{$balance}</dd></div>
     </dl>
     <p class="rounded-lg bg-gray-50 p-3 text-gray-800 ring-1 ring-gray-950/5 dark:bg-white/5 dark:text-gray-200 dark:ring-white/10"><span class="font-medium text-gray-950 dark:text-white">Next:</span> {$next}</p>
-    <p class="text-xs text-gray-500 dark:text-gray-400">{$paymentHint}</p>
 </div>
 HTML;
 

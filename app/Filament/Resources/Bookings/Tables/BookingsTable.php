@@ -15,6 +15,7 @@ use App\Support\BookingCheckInEligibility;
 use App\Support\BookingFullBalancePayment;
 use App\Support\BookingLifecycleActions;
 use App\Support\BookingPricing;
+use App\Support\BookingSpecialDiscount;
 use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -353,7 +354,19 @@ class BookingsTable
                 TextColumn::make('total_price')
                     ->label('Total')
                     ->money('PHP', true)
-                    ->description(fn ($record) => 'Paid: '.number_format((float) ($record->total_paid ?? 0), 2).' · Balance: '.number_format((float) ($record->balance ?? 0), 2))
+                    ->description(function (Booking $record): string {
+                        $paid = number_format((float) ($record->total_paid ?? 0), 2);
+                        $balance = number_format((float) ($record->balance ?? 0), 2);
+                        $desc = "Paid: {$paid} · Balance: {$balance}";
+
+                        if (BookingSpecialDiscount::hasDiscount($record)) {
+                            $gross = number_format(BookingSpecialDiscount::grossTotal($record), 2);
+                            $discount = number_format(BookingSpecialDiscount::discountAmount($record), 2);
+                            $desc .= " · Discount: -{$discount} (Gross {$gross})";
+                        }
+
+                        return $desc;
+                    })
                     ->sortable(),
 
                 TextColumn::make('total_paid')
