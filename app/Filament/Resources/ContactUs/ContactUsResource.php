@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\ContactUs;
 
 use App\Filament\Resources\Concerns\ResolvesTrashedRecordRoutes;
+use App\Filament\Resources\ContactUs\Pages\ContactConversation;
 use App\Filament\Resources\ContactUs\Pages\EditContactUs;
 use App\Filament\Resources\ContactUs\Pages\ListContactUs;
 use App\Filament\Resources\ContactUs\Schemas\ContactUsForm;
@@ -64,6 +65,7 @@ class ContactUsResource extends Resource
     {
         return [
             'index' => ListContactUs::route('/'),
+            'conversation' => ContactConversation::route('/{record}/conversation'),
             'edit' => EditContactUs::route('/{record}/edit'),
         ];
     }

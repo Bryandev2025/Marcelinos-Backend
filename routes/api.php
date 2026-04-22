@@ -91,6 +91,8 @@ Route::middleware([EnsureApiKeyIsValid::class])->group(function () {
 
         // Contact form (stricter limit)
         Route::post('/contact', [ContactController::class, 'store'])->middleware('throttle:contact');
+        Route::get('/contact/{id}/messages', [ContactController::class, 'messages'])->middleware('throttle:api');
+        Route::post('/contact/{id}/messages', [ContactController::class, 'appendMessage'])->middleware('throttle:contact');
 
         // Gallery
         Route::get('/galleries', [GalleryController::class, 'index']);
