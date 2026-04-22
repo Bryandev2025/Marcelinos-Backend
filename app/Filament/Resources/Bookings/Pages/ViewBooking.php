@@ -17,6 +17,15 @@ class ViewBooking extends ViewRecord
 
     protected static string $resource = BookingResource::class;
 
+    public function mount(int|string $record): void
+    {
+        parent::mount($record);
+
+        if ($this->record instanceof Booking) {
+            BookingResource::markBookingAsViewed((int) $this->record->getKey());
+        }
+    }
+
     public function form(Schema $schema): Schema
     {
         $configured = parent::form($schema);
