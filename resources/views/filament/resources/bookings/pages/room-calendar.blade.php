@@ -329,7 +329,7 @@
             icon="heroicon-o-clock"
             icon-color="success"
             :heading="__('Current active bookings')"
-            :description="__('Bookings overlapping today, excluding cancelled and completed. Filter: :filter', ['filter' => $reservationFilterLabels[$this->reservationFilter] ?? ucfirst($this->reservationFilter)])"
+            :description="__('Bookings overlapping today, excluding cancelled and completed. Includes Room, Venue, and Room + Venue bookings.')"
         >
             @php
                 $activeRows = $this->activeBookingRows;
@@ -342,7 +342,7 @@
                 </div>
                 @if ($activeCount === 0)
                     <p class="rounded-xl border border-dashed border-gray-200 bg-gray-50/70 px-4 py-6 text-sm text-gray-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-300">
-                        {{ __('No active bookings for today under the selected reservation type.') }}
+                        {{ __('No active bookings for today.') }}
                     </p>
                 @else
                     <ul class="space-y-3">

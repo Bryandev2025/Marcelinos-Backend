@@ -7,6 +7,7 @@ use App\Models\Booking;
 use App\Models\Guest;
 use App\Models\Room;
 use App\Models\Venue;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -17,66 +18,76 @@ class RoomCalendarReservationFilterTest extends TestCase
 
     public function test_reservation_filter_switch_updates_calendar_without_refresh(): void
     {
-        $guest = Guest::query()->create([
-            'first_name' => 'Test',
-            'middle_name' => null,
-            'last_name' => 'Guest',
-            'contact_num' => '09170000000',
-            'email' => 'calendar-filter@example.com',
-            'gender' => 'male',
-            'is_international' => false,
-            'country' => 'Philippines',
-        ]);
+        Carbon::setTestNow('2026-04-22 09:00:00');
 
-        $room = Room::query()->create([
-            'name' => 'Test Standard 101',
-            'capacity' => 2,
-            'type' => Room::TYPE_STANDARD,
-            'price' => 1200,
-            'status' => Room::STATUS_AVAILABLE,
-        ]);
+        try {
+            $guest = Guest::query()->create([
+                'first_name' => 'Test',
+                'middle_name' => null,
+                'last_name' => 'Guest',
+                'contact_num' => '09170000000',
+                'email' => 'calendar-filter@example.com',
+                'gender' => 'male',
+                'is_international' => false,
+                'country' => 'Philippines',
+            ]);
 
-        $venue = Venue::query()->create([
-            'name' => 'Sky Garden Test Venue',
-            'description' => 'Test venue',
-            'capacity' => 80,
-            'price' => 8000,
-            'wedding_price' => 8000,
-            'birthday_price' => 8000,
-            'meeting_staff_price' => 8000,
-            'status' => Venue::STATUS_AVAILABLE,
-        ]);
+            $room = Room::query()->create([
+                'name' => 'Test Standard 101',
+                'capacity' => 2,
+                'type' => Room::TYPE_STANDARD,
+                'price' => 1200,
+                'status' => Room::STATUS_AVAILABLE,
+            ]);
 
-        $roomOnly = $this->createBookingQuietly($guest, '2026-04-22 14:00:00', '2026-04-23 12:00:00');
-        $roomOnly->rooms()->attach($room->id);
+            $venue = Venue::query()->create([
+                'name' => 'Sky Garden Test Venue',
+                'description' => 'Test venue',
+                'capacity' => 80,
+                'price' => 8000,
+                'wedding_price' => 8000,
+                'birthday_price' => 8000,
+                'meeting_staff_price' => 8000,
+                'status' => Venue::STATUS_AVAILABLE,
+            ]);
 
-        $venueOnly = $this->createBookingQuietly($guest, '2026-04-22 14:00:00', '2026-04-23 12:00:00');
-        $venueOnly->venues()->attach($venue->id);
+            $roomOnly = $this->createBookingQuietly($guest, '2026-04-22 14:00:00', '2026-04-23 12:00:00');
+            $roomOnly->rooms()->attach($room->id);
 
-        $roomAndVenue = $this->createBookingQuietly($guest, '2026-04-22 14:00:00', '2026-04-23 12:00:00');
-        $roomAndVenue->rooms()->attach($room->id);
-        $roomAndVenue->venues()->attach($venue->id);
+            $venueOnly = $this->createBookingQuietly($guest, '2026-04-22 14:00:00', '2026-04-23 12:00:00');
+            $venueOnly->venues()->attach($venue->id);
 
-        $component = Livewire::test(RoomCalendar::class)
-            ->set('month', 4)
-            ->set('year', 2026);
+            $roomAndVenue = $this->createBookingQuietly($guest, '2026-04-22 14:00:00', '2026-04-23 12:00:00');
+            $roomAndVenue->rooms()->attach($room->id);
+            $roomAndVenue->venues()->attach($venue->id);
 
-        $component->assertSee('Standard');
-        $component->assertDontSee($venue->name);
-        $this->assertSame(1, $this->cellTypeCount($component->instance()->calendarWeeks, '2026-04-22', Room::TYPE_STANDARD));
+            $component = Livewire::test(RoomCalendar::class)
+                ->set('month', 4)
+                ->set('year', 2026);
 
-        $component->set('reservationFilter', RoomCalendar::RESERVATION_VENUE);
-        $component->assertSee($venue->name);
-        $component->assertDontSee('Standard');
-        $this->assertSame(
-            1,
-            $this->cellTypeCount($component->instance()->calendarWeeks, '2026-04-22', (string) $venue->id)
-        );
+            $this->assertCount(3, $component->instance()->activeBookingRows);
 
-        $component->set('reservationFilter', RoomCalendar::RESERVATION_BOTH);
-        $component->assertDontSee($venue->name);
-        $component->assertSee('Standard');
-        $this->assertSame(1, $this->cellTypeCount($component->instance()->calendarWeeks, '2026-04-22', Room::TYPE_STANDARD));
+            $component->assertSee('Standard');
+            $component->assertDontSee($venue->name);
+            $this->assertSame(1, $this->cellTypeCount($component->instance()->calendarWeeks, '2026-04-22', Room::TYPE_STANDARD));
+
+            $component->set('reservationFilter', RoomCalendar::RESERVATION_VENUE);
+            $this->assertCount(3, $component->instance()->activeBookingRows);
+            $component->assertSee($venue->name);
+            $component->assertDontSee('Standard');
+            $this->assertSame(
+                1,
+                $this->cellTypeCount($component->instance()->calendarWeeks, '2026-04-22', (string) $venue->id)
+            );
+
+            $component->set('reservationFilter', RoomCalendar::RESERVATION_BOTH);
+            $this->assertCount(3, $component->instance()->activeBookingRows);
+            $component->assertDontSee($venue->name);
+            $component->assertSee('Standard');
+            $this->assertSame(1, $this->cellTypeCount($component->instance()->calendarWeeks, '2026-04-22', Room::TYPE_STANDARD));
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     private function createBookingQuietly(Guest $guest, string $checkIn, string $checkOut): Booking
