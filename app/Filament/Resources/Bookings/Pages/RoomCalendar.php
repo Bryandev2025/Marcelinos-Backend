@@ -234,6 +234,27 @@ class RoomCalendar extends Page
         }
 
         $this->closeModal();
+        $this->resetCalendarComputedCaches();
+    }
+
+    public function updatedMonth(): void
+    {
+        $this->resetCalendarComputedCaches();
+    }
+
+    public function updatedYear(): void
+    {
+        $this->resetCalendarComputedCaches();
+    }
+
+    protected function resetCalendarComputedCaches(): void
+    {
+        unset(
+            $this->calendarLegendItems,
+            $this->calendarWeeks,
+            $this->activeBookingRows,
+            $this->modalBookingRows
+        );
     }
 
     /**

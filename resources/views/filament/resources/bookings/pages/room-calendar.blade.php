@@ -191,6 +191,7 @@
                 {{-- Legend: wrap on narrow screens --}}
                 <div
                     class="legend-strip rounded-xl border border-dashed border-gray-200/90 bg-gray-50/50 px-3 py-3 dark:border-white/10 dark:bg-white/[0.03] sm:px-4"
+                    wire:key="calendar-legend-{{ $this->reservationFilter }}-{{ $this->month }}-{{ $this->year }}"
                 >
                     <div
                         class="flex w-full flex-wrap items-center gap-2 sm:min-w-0 sm:gap-x-4 sm:gap-y-2"
@@ -237,7 +238,10 @@
                         </div>
 
                         {{-- Days --}}
-                        <div class="grid grid-cols-1 gap-2 sm:grid-cols-7">
+                        <div
+                            class="grid grid-cols-1 gap-2 sm:grid-cols-7"
+                            wire:key="calendar-grid-{{ $this->reservationFilter }}-{{ $this->month }}-{{ $this->year }}"
+                        >
                     @foreach ($this->calendarWeeks as $week)
                         @foreach ($week as $cell)
                             @php
