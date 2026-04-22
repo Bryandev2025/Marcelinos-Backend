@@ -210,6 +210,7 @@ class BookingForm
 
                     Select::make('rooms')
                         ->label('Assigned rooms')
+                        ->visible(fn (Get $get, ?Booking $record): bool => self::shouldShowAssignedRoomsField($get, $record))
                         ->relationship(
                             'rooms',
                             'name',
@@ -307,7 +308,13 @@ class BookingForm
 
                     Select::make('venues')
                         ->label('Venues')
-                        ->relationship('venues', 'name')
+                        ->relationship(
+                            'venues',
+                            'name',
+                            modifyQueryUsing: function ($query, ?string $search, ?Booking $record = null, Get $get): void {
+                                self::constrainAvailableVenuesQuery($query, $get, $record);
+                            },
+                        )
                         ->multiple()
                         ->searchable()
                         ->preload()
@@ -333,7 +340,9 @@ class BookingForm
                         ->label('Venue event type')
                         ->options(BookingPricing::venueEventTypeOptions())
                         ->default(BookingPricing::VENUE_EVENT_WEDDING)
-                        ->visible(fn (Get $get) => ! empty(array_filter((array) ($get('venues') ?? []))))
+                        ->formatStateUsing(fn ($state): string => BookingPricing::normalizeVenueEventType(is_string($state) ? $state : null))
+                        ->dehydrateStateUsing(fn ($state): string => BookingPricing::normalizeVenueEventType(is_string($state) ? $state : null))
+                        ->visible(fn (Get $get, ?Booking $record): bool => self::shouldShowVenueEventTypeField($get, $record))
                         ->live()
                         ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePricing($get, $set)),
                 ]),
@@ -358,13 +367,15 @@ class BookingForm
                         ->live(onBlur: true)
                         ->seconds(false)
                         ->minDate(fn (Get $get) => filled($get('check_in'))
-                            ? Carbon::parse($get('check_in'))->startOfDay()->addDay()
+                            ? (self::isVenueOnlyBookingState($get)
+                                ? Carbon::parse($get('check_in'))->startOfDay()
+                                : Carbon::parse($get('check_in'))->startOfDay()->addDay())
                             : now())
                         ->disabledDates(function (Get $get): array {
                             $disabled = self::disabledCalendarDateStringsForWizard(array_filter((array) ($get('rooms') ?? [])));
 
                             $checkIn = $get('check_in');
-                            if (filled($checkIn)) {
+                            if (filled($checkIn) && ! self::isVenueOnlyBookingState($get)) {
                                 try {
                                     $disabled[] = Carbon::parse($checkIn)->format('Y-m-d');
                                 } catch (\Exception $e) {
@@ -386,6 +397,14 @@ class BookingForm
                                     $start = Carbon::parse($checkIn);
                                     $end = Carbon::parse($value);
                                 } catch (\Exception $e) {
+                                    return;
+                                }
+
+                                if (self::isVenueOnlyBookingState($get)) {
+                                    if ($end->copy()->startOfDay()->lt($start->copy()->startOfDay())) {
+                                        $fail('Check-out date cannot be before check-in date.');
+                                    }
+
                                     return;
                                 }
 
@@ -480,15 +499,29 @@ class BookingForm
         try {
             $startDate = Carbon::parse($checkIn);
             $endDate = Carbon::parse($checkOut);
+
+            if (self::isVenueOnlyBookingState($get)) {
+                if ($endDate->copy()->startOfDay()->lt($startDate->copy()->startOfDay())) {
+                    $set('no_of_days', 0);
+
+                    return;
+                }
+
+                // Venue-only bookings are billed as inclusive calendar days.
+                $days = (int) $startDate->copy()->startOfDay()->diffInDays($endDate->copy()->startOfDay()) + 1;
+                $set('no_of_days', max(1, $days));
+
+                return;
+            }
+
             if ($endDate->lessThanOrEqualTo($startDate)) {
                 $set('no_of_days', 0);
 
                 return;
             }
 
-            // Nights should follow calendar lodging nights, not elapsed 24-hour blocks.
+            // Room bookings follow calendar lodging nights, not elapsed 24-hour blocks.
             $days = (int) $startDate->copy()->startOfDay()->diffInDays($endDate->copy()->startOfDay());
-
             $set('no_of_days', max(1, $days));
         } catch (\Exception $e) {
             $set('no_of_days', 0);
@@ -571,7 +604,7 @@ class BookingForm
             ->exists();
     }
 
-    private static function hasVenueConflicts($venueIds, $checkIn, $checkOut, ?Booking $record): bool
+    public static function hasVenueConflicts($venueIds, $checkIn, $checkOut, ?Booking $record): bool
     {
         $venueIds = is_array($venueIds) ? $venueIds : [$venueIds];
         $venueIds = array_filter($venueIds);
@@ -587,21 +620,125 @@ class BookingForm
             return false;
         }
 
-        if ($end->lessThanOrEqualTo($start)) {
+        $startDay = $start->copy()->startOfDay();
+        $endDay = $end->copy()->startOfDay();
+
+        if ($endDay->lt($startDay)) {
             return false;
         }
 
-        if (BlockedDate::overlapsRange($start, $end)) {
+        if (self::hasBlockedCalendarDatesInInclusiveRange($startDay, $endDay)) {
+            return true;
+        }
+
+        if (Venue::query()
+            ->whereIn('id', $venueIds)
+            ->where(function ($query) use ($startDay, $endDay): void {
+                $query->where('status', Venue::STATUS_MAINTENANCE)
+                    ->orWhereHas('venueBlockedDates', function ($blocked) use ($startDay, $endDay): void {
+                        $blocked->whereDate('venue_blocked_dates.blocked_on', '>=', $startDay->toDateString())
+                            ->whereDate('venue_blocked_dates.blocked_on', '<=', $endDay->toDateString());
+                    });
+            })
+            ->exists()) {
             return true;
         }
 
         return Booking::query()
             ->when($record, fn ($query) => $query->where('id', '!=', $record->id))
             ->whereNotIn('booking_status', [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED])
-            ->where('check_in', '<', $end)
-            ->where('check_out', '>', $start)
+            ->whereDate('check_in', '<=', $endDay->toDateString())
+            ->whereDate('check_out', '>=', $startDay->toDateString())
             ->whereHas('venues', fn ($query) => $query->whereIn('venues.id', $venueIds))
             ->exists();
+    }
+
+    public static function constrainAvailableVenuesQuery($query, Get $get, ?Booking $record = null): void
+    {
+        $checkIn = $get('check_in');
+        $checkOut = $get('check_out');
+        $venueTableKey = $query->getModel()->getQualifiedKeyName();
+
+        $currentVenueIds = [];
+        if ($record instanceof Booking) {
+            $record->loadMissing('venues:id');
+            $currentVenueIds = $record->venues->pluck('id')->map(fn ($id) => (int) $id)->filter()->values()->all();
+        }
+
+        if (! $checkIn || ! $checkOut) {
+            if ($currentVenueIds !== []) {
+                $query->whereIn($venueTableKey, $currentVenueIds);
+            } else {
+                $query->whereRaw('0 = 1');
+            }
+
+            return;
+        }
+
+        try {
+            $start = Carbon::parse((string) $checkIn);
+            $end = Carbon::parse((string) $checkOut);
+        } catch (\Exception $e) {
+            if ($currentVenueIds !== []) {
+                $query->whereIn($venueTableKey, $currentVenueIds);
+            } else {
+                $query->whereRaw('0 = 1');
+            }
+
+            return;
+        }
+
+        $startDay = $start->copy()->startOfDay();
+        $endDay = $end->copy()->startOfDay();
+        if ($endDay->lt($startDay)) {
+            if ($currentVenueIds !== []) {
+                $query->whereIn($venueTableKey, $currentVenueIds);
+            } else {
+                $query->whereRaw('0 = 1');
+            }
+
+            return;
+        }
+
+        if (self::hasBlockedCalendarDatesInInclusiveRange($startDay, $endDay)) {
+            if ($currentVenueIds !== []) {
+                $query->whereIn($venueTableKey, $currentVenueIds);
+            } else {
+                $query->whereRaw('0 = 1');
+            }
+
+            return;
+        }
+
+        $nameCol = $query->getModel()->qualifyColumn('name');
+
+        $query->where(function ($outerQuery) use ($query, $startDay, $endDay, $record, $currentVenueIds, $venueTableKey): void {
+            $outerQuery
+                ->where(function ($availableQuery) use ($query, $startDay, $endDay, $record): void {
+                    $availableQuery
+                        ->where($query->getModel()->qualifyColumn('status'), '!=', Venue::STATUS_MAINTENANCE)
+                        ->whereDoesntHave('bookings', function ($bookingQuery) use ($startDay, $endDay, $record): void {
+                            $bookingQuery
+                                ->whereNotIn('bookings.booking_status', [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED])
+                                ->whereDate('bookings.check_in', '<=', $endDay->toDateString())
+                                ->whereDate('bookings.check_out', '>=', $startDay->toDateString());
+
+                            if ($record instanceof Booking) {
+                                $bookingQuery->where('bookings.id', '!=', $record->id);
+                            }
+                        })
+                        ->whereDoesntHave('venueBlockedDates', function ($blockedQuery) use ($startDay, $endDay): void {
+                            $blockedQuery
+                                ->whereDate('venue_blocked_dates.blocked_on', '>=', $startDay->toDateString())
+                                ->whereDate('venue_blocked_dates.blocked_on', '<=', $endDay->toDateString());
+                        });
+                });
+
+            if ($currentVenueIds !== []) {
+                $outerQuery->orWhereIn($venueTableKey, $currentVenueIds);
+            }
+        })
+            ->orderBy($nameCol);
     }
 
     /**
@@ -685,5 +822,60 @@ class BookingForm
         }
 
         return $result;
+    }
+
+    private static function shouldShowAssignedRoomsField(Get $get, ?Booking $record): bool
+    {
+        if (self::isVenueOnlyBookingState($get)) {
+            return false;
+        }
+
+        if (! $record instanceof Booking) {
+            return true;
+        }
+
+        return ! ($record->expectsVenueAssignments() && ! $record->expectsRoomAssignments());
+    }
+
+    private static function isVenueOnlyBookingState(Get $get): bool
+    {
+        $bookingType = (string) ($get('booking_type') ?? '');
+        if ($bookingType !== '') {
+            return $bookingType === 'venue';
+        }
+
+        $roomIds = array_filter((array) ($get('rooms') ?? []));
+        $venueIds = array_filter((array) ($get('venues') ?? []));
+        if ($roomIds === [] && $venueIds !== []) {
+            return true;
+        }
+
+        $routeRecord = request()->route('record');
+        if ($routeRecord instanceof Booking) {
+            return $routeRecord->expectsVenueAssignments() && ! $routeRecord->expectsRoomAssignments();
+        }
+
+        return false;
+    }
+
+    private static function hasBlockedCalendarDatesInInclusiveRange(Carbon $startDay, Carbon $endDay): bool
+    {
+        return BlockedDate::query()
+            ->whereDate('blocked_dates.date', '>=', $startDay->toDateString())
+            ->whereDate('blocked_dates.date', '<=', $endDay->toDateString())
+            ->exists();
+    }
+
+    private static function shouldShowVenueEventTypeField(Get $get, ?Booking $record): bool
+    {
+        if (! empty(array_filter((array) ($get('venues') ?? [])))) {
+            return true;
+        }
+
+        if (filled($get('venue_event_type'))) {
+            return true;
+        }
+
+        return $record instanceof Booking && $record->expectsVenueAssignments();
     }
 }

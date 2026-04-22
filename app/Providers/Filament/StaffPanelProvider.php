@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Livewire\DatabaseNotifications as AppDatabaseNotifications;
+use App\Filament\Pages\ActivityHistory;
 use App\Filament\Pages\AdminDashboard;
 use App\Filament\Pages\Settings;
 use App\Filament\Widgets\SessionsByCountryChart;
@@ -62,6 +63,11 @@ class StaffPanelProvider extends PanelProvider
                     ->icon('heroicon-o-cog-6-tooth')
                     ->url(fn (): string => Settings::getUrl(panel: 'staff'))
                     ->visible(fn (): bool => Settings::canAccess()),
+                MenuItem::make()
+                    ->label('Activity History')
+                    ->icon('heroicon-o-clock')
+                    ->url(fn (): string => ActivityHistory::getUrl(panel: 'staff'))
+                    ->visible(fn (): bool => ActivityHistory::canAccess()),
             ])
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->middleware([

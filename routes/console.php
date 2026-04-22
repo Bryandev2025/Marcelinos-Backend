@@ -70,6 +70,18 @@ Schedule::command('bookings:cancel-unpaid')
 
 /*
 |--------------------------------------------------------------------------
+| Hourly full Google Sheets mirror refresh
+|--------------------------------------------------------------------------
+| Rebuilds spreadsheet tabs from the DB to remove manual edits and guarantee
+| all booking rows are present in Sheets.
+*/
+Schedule::command('bookings:sync-google-sheet')
+    ->hourly()
+    ->timezone($manila)
+    ->withoutOverlapping();
+
+/*
+|--------------------------------------------------------------------------
 | Weekly activity-log retention cleanup
 |--------------------------------------------------------------------------
 | Runs every 7 days and keeps only the latest 7 days of audit records.
