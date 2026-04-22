@@ -478,7 +478,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('bookings', function (Request $request) use ($jsonTooManyRequests) {
-            return Limit::perMinute(10)
+            return Limit::perMinute(5)
                 ->by($request->ip())
                 ->response($jsonTooManyRequests);
         });

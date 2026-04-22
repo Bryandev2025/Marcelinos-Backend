@@ -28,7 +28,7 @@ class BookingReschedulePaymentStatusTest extends TestCase
 
         [$booking, $venue] = $this->createFullyPaidVenueBooking(days: 2, venueDayPrice: 1000);
 
-        $response = $this->patchJson("/api/bookings/{$booking->reference_number}/reschedule", [
+        $response = $this->withHeaders($this->apiHeaders())->patchJson("/api/bookings/{$booking->reference_number}/reschedule", [
             'check_in' => '2026-05-10',
             'check_out' => '2026-05-13', // 3 days
             'otp' => '123456',
@@ -57,7 +57,7 @@ class BookingReschedulePaymentStatusTest extends TestCase
 
         [$booking, $venue] = $this->createFullyPaidVenueBooking(days: 2, venueDayPrice: 1000);
 
-        $response = $this->patchJson("/api/bookings/{$booking->reference_number}/reschedule", [
+        $response = $this->withHeaders($this->apiHeaders())->patchJson("/api/bookings/{$booking->reference_number}/reschedule", [
             'check_in' => '2026-05-10',
             'check_out' => '2026-05-11', // 1 day
             'otp' => '123456',
@@ -91,7 +91,7 @@ class BookingReschedulePaymentStatusTest extends TestCase
 
         [$booking] = $this->createFullyPaidVenueBooking(days: 2, venueDayPrice: 1000);
 
-        $this->patchJson("/api/bookings/{$booking->reference_number}/reschedule", [
+        $this->withHeaders($this->apiHeaders())->patchJson("/api/bookings/{$booking->reference_number}/reschedule", [
             'check_in' => '2026-05-10',
             'check_out' => '2026-05-11',
             'otp' => '123456',
@@ -119,7 +119,7 @@ class BookingReschedulePaymentStatusTest extends TestCase
 
         [$booking] = $this->createFullyPaidVenueBooking(days: 2, venueDayPrice: 1000);
 
-        $this->patchJson("/api/bookings/{$booking->reference_number}/reschedule", [
+        $this->withHeaders($this->apiHeaders())->patchJson("/api/bookings/{$booking->reference_number}/reschedule", [
             'check_in' => '2026-05-10',
             'check_out' => '2026-05-11',
             'otp' => '123456',
@@ -155,7 +155,7 @@ class BookingReschedulePaymentStatusTest extends TestCase
 
         Log::spy();
 
-        $response = $this->patchJson("/api/bookings/{$booking->reference_number}/reschedule", [
+        $response = $this->withHeaders($this->apiHeaders())->patchJson("/api/bookings/{$booking->reference_number}/reschedule", [
             'check_in' => '2026-05-10',
             'check_out' => '2026-05-11',
             'otp' => '123456',
@@ -193,6 +193,19 @@ class BookingReschedulePaymentStatusTest extends TestCase
         $this->assertNotNull($booking->refund_guest_confirmation_sent_at);
         Mail::assertSent(RefundCompletedGuestMail::class, 1);
         Mail::assertNotSent(RefundEligibleGuestMail::class);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function apiHeaders(): array
+    {
+        config()->set('services.api.key', 'test-api-key');
+
+        return [
+            'x-api-key' => 'test-api-key',
+            'Accept' => 'application/json',
+        ];
     }
 
     private function mockRescheduleOtpVerification(): void

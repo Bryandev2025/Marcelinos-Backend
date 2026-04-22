@@ -138,7 +138,7 @@ class Venue extends Model implements HasMedia
 
         return $query->where('status', '!=', self::STATUS_MAINTENANCE)
             ->whereDoesntHave('bookings', function ($q) use ($checkIn, $checkOut, $excludeBookingId) {
-                $q->where('bookings.booking_status', '!=', Booking::BOOKING_STATUS_CANCELLED)
+                $q->whereIn('bookings.booking_status', Booking::availabilityBlockingStatuses())
                     ->where('bookings.check_in', '<', $checkOut)
                     ->where('bookings.check_out', '>', $checkIn);
 

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Mail\BookingCreated;
+use App\Mail\VerifyBookingEmail;
 use App\Mail\TestimonialFeedbackEmail;
 use App\Support\RoomInventoryGroupKey;
 use Illuminate\Database\Eloquent\Builder;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
@@ -58,6 +60,7 @@ class Booking extends Model
         'refund_alert_sent_at',
         'refund_guest_notice_sent_at',
         'refund_guest_confirmation_sent_at',
+        'email_verified_at',
     ];
 
     protected $casts = [
@@ -78,6 +81,7 @@ class Booking extends Model
         'refund_alert_sent_at' => 'datetime',
         'refund_guest_notice_sent_at' => 'datetime',
         'refund_guest_confirmation_sent_at' => 'datetime',
+        'email_verified_at' => 'datetime',
     ];
 
     protected static function booted()
@@ -103,6 +107,22 @@ class Booking extends Model
          * Handle actions AFTER booking is created
          */
         static::created(function (Booking $booking) {
+            if ($booking->booking_status === self::BOOKING_STATUS_PENDING_VERIFICATION) {
+                $booking->loadMissing('guest');
+                $email = $booking->guest?->email;
+                if ($email) {
+                    $hours = max(1, (int) config('booking.pending_verification_url_ttl_hours', 72));
+                    $verifyUrl = URL::temporarySignedRoute(
+                        'bookings.verify-email',
+                        now()->addHours($hours),
+                        ['booking' => $booking->id],
+                    );
+                    Mail::to($email)->send(new VerifyBookingEmail($booking, $verifyUrl));
+                }
+
+                return;
+            }
+
             $booking->generateQrCode();
 
             $booking->loadMissing('guest');
@@ -322,6 +342,9 @@ class Booking extends Model
 
     /* ================= BOOKING (STAY) STATUS ================= */
 
+    /** Awaiting guest email confirmation; does not block public availability (see {@see availabilityBlockingStatuses()}). */
+    const BOOKING_STATUS_PENDING_VERIFICATION = 'pending_verification';
+
     const BOOKING_STATUS_RESERVED = 'reserved';
 
     const BOOKING_STATUS_OCCUPIED = 'occupied';
@@ -439,9 +462,25 @@ class Booking extends Model
         );
     }
 
+    /**
+     * Stay statuses that consume inventory in public availability (rooms/venues/capacity).
+     *
+     * @return list<string>
+     */
+    public static function availabilityBlockingStatuses(): array
+    {
+        return [
+            self::BOOKING_STATUS_RESERVED,
+            self::BOOKING_STATUS_OCCUPIED,
+            self::BOOKING_STATUS_COMPLETED,
+            self::BOOKING_STATUS_RESCHEDULED,
+        ];
+    }
+
     public static function bookingStatusOptions(): array
     {
         return [
+            self::BOOKING_STATUS_PENDING_VERIFICATION => 'Pending email verification',
             self::BOOKING_STATUS_RESERVED => 'Reserved',
             self::BOOKING_STATUS_OCCUPIED => 'Occupied',
             self::BOOKING_STATUS_COMPLETED => 'Completed',
@@ -546,6 +585,7 @@ class Booking extends Model
     public static function bookingStatusColors(): array
     {
         return [
+            'info' => self::BOOKING_STATUS_PENDING_VERIFICATION,
             'primary' => self::BOOKING_STATUS_RESERVED,
             'warning' => self::BOOKING_STATUS_OCCUPIED,
             'secondary' => self::BOOKING_STATUS_COMPLETED,

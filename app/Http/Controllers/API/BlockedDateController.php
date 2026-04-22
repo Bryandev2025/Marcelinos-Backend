@@ -68,7 +68,7 @@ class BlockedDateController extends Controller
                     $otherVenueBookings = Booking::query()
                         ->with('venues:id')
                         ->where('id', '!=', $booking->id)
-                        ->where('booking_status', '!=', Booking::BOOKING_STATUS_CANCELLED)
+                        ->whereIn('booking_status', Booking::availabilityBlockingStatuses())
                         ->where('check_in', '<', $horizonEnd)
                         ->where('check_out', '>', $todayCarbon)
                         ->whereHas('venues', fn($q) => $q->whereIn('venues.id', $venueIds))

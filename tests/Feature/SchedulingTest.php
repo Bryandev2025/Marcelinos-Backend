@@ -13,6 +13,7 @@ class SchedulingTest extends TestCase
             ->expectsOutputToContain('bookings:complete-checkouts')
             ->expectsOutputToContain('bookings:activate-checkins')
             ->expectsOutputToContain('bookings:send-reminders')
-            ->expectsOutputToContain('bookings:cancel-unpaid');
+            ->expectsOutputToContain('bookings:cancel-unpaid')
+            ->expectsOutputToContain('bookings:prune-pending-verification');
     }
 }
