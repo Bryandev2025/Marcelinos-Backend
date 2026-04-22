@@ -528,14 +528,26 @@
                                             </p>
                                         </div>
                                         <div class="flex shrink-0 items-start justify-between gap-2 sm:justify-start">
-                                            <span
-                                                @class([
-                                                    'rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                                                    $statusDisplayPillByPayment[$row['payment_status'] ?? ''] ?? $statusDisplayPillByPayment[Booking::PAYMENT_STATUS_UNPAID],
-                                                ])
-                                            >
-                                                {{ $row['status_display'] ?? '—' }}
-                                            </span>
+                                            <div class="flex items-center gap-1.5">
+                                                <span
+                                                    @class([
+                                                        'rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                                                        $statusDisplayPillByPayment[$row['payment_status'] ?? ''] ?? $statusDisplayPillByPayment[Booking::PAYMENT_STATUS_UNPAID],
+                                                    ])
+                                                >
+                                                    {{ $row['status_display'] ?? '—' }}
+                                                </span>
+                                                @if (($row['has_special_discount'] ?? false) === true)
+                                                    <span
+                                                        class="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-950 px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-amber-200 shadow-sm dark:border-amber-300/35 dark:bg-amber-900 dark:text-amber-100"
+                                                        title="{{ $row['discount_tooltip'] ?? __('Special discount applied') }}"
+                                                        aria-label="{{ $row['discount_tooltip'] ?? __('Special discount applied') }}"
+                                                    >
+                                                        <span class="h-1 w-1 rounded-full bg-amber-300/90 dark:bg-amber-200/90"></span>
+                                                        <span>{{ $row['discount_badge_text'] ?? __('Discount') }}</span>
+                                                    </span>
+                                                @endif
+                                            </div>
 
                                             <div
                                                 class="relative"

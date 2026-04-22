@@ -9,6 +9,7 @@ use App\Models\Venue;
 use App\Support\BookingCheckInEligibility;
 use App\Support\BookingFullBalancePayment;
 use App\Support\BookingLifecycleActions;
+use App\Support\BookingSpecialDiscount;
 use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
@@ -471,6 +472,7 @@ class RoomCalendar extends Page
                 $hasAssignedRooms = $b->rooms->isNotEmpty();
                 $canCheckIn = BookingCheckInEligibility::assess($b)['allowed'];
                 $activeDateRange = $this->formatActiveDateRange($b);
+                $discountMeta = $this->specialDiscountMetaForBooking($b);
 
                 return [
                     'id' => $b->id,
@@ -490,6 +492,9 @@ class RoomCalendar extends Page
                     'can_pay_balance' => $this->canPayBalanceForBooking($b),
                     'can_check_in' => $canCheckIn,
                     'booking_badge_kind' => $this->bookingBadgeKindForCalendar($b),
+                    'has_special_discount' => $discountMeta['has_special_discount'],
+                    'discount_badge_text' => $discountMeta['discount_badge_text'],
+                    'discount_tooltip' => $discountMeta['discount_tooltip'],
                 ];
             })
             ->values()
@@ -514,6 +519,7 @@ class RoomCalendar extends Page
                 $hasAssignedRooms = $b->rooms->isNotEmpty();
                 $canCheckIn = BookingCheckInEligibility::assess($b)['allowed'];
                 $activeDateRange = $this->formatActiveDateRange($b);
+                $discountMeta = $this->specialDiscountMetaForBooking($b);
 
                 return [
                     'id' => $b->id,
@@ -533,10 +539,46 @@ class RoomCalendar extends Page
                     'can_pay_balance' => $this->canPayBalanceForBooking($b),
                     'can_check_in' => $canCheckIn,
                     'booking_badge_kind' => $this->bookingBadgeKindForCalendar($b),
+                    'has_special_discount' => $discountMeta['has_special_discount'],
+                    'discount_badge_text' => $discountMeta['discount_badge_text'],
+                    'discount_tooltip' => $discountMeta['discount_tooltip'],
                 ];
             })
             ->values()
             ->all();
+    }
+
+    /**
+     * @return array{has_special_discount: bool, discount_badge_text: string, discount_tooltip: string}
+     */
+    protected function specialDiscountMetaForBooking(Booking $booking): array
+    {
+        if (! BookingSpecialDiscount::hasDiscount($booking)) {
+            return [
+                'has_special_discount' => false,
+                'discount_badge_text' => '',
+                'discount_tooltip' => '',
+            ];
+        }
+
+        $amount = BookingSpecialDiscount::discountAmount($booking);
+        $gross = BookingSpecialDiscount::grossTotal($booking);
+        $type = (string) ($booking->special_discount_type ?? '');
+        $value = (float) ($booking->special_discount_value ?? 0);
+
+        $valueLabel = $type === BookingSpecialDiscount::TYPE_PERCENT
+            ? rtrim(rtrim(number_format($value, 2), '0'), '.').'%'
+            : 'PHP '.number_format($value, 2);
+
+        return [
+            'has_special_discount' => true,
+            'discount_badge_text' => 'Discounted',
+            'discount_tooltip' => sprintf(
+                'Special discount applied: %s off (PHP %s).',
+                $valueLabel,
+                number_format($amount, 2),
+            ),
+        ];
     }
 
     protected function canPayBalanceForBooking(Booking $booking): bool
