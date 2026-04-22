@@ -39,10 +39,7 @@ class LatestBookings extends TableWidget
 
             Tables\Columns\BadgeColumn::make('booking_status')
                 ->label('Status')
-<<<<<<< Updated upstream
                 ->formatStateUsing(fn (?string $state) => Booking::bookingStatusOptions()[$state] ?? ucfirst((string) $state))
-=======
->>>>>>> Stashed changes
                 ->colors(Booking::bookingStatusColors()),
         ];
     }

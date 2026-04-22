@@ -1,6 +1,8 @@
 @php
     use App\Models\Booking;
     $legendItems = $this->calendarLegendItems;
+    $spreadsheetId = trim((string) config('services.google_sheets.spreadsheet_id', ''));
+    $spreadsheetUrl = $spreadsheetId !== '' ? "https://docs.google.com/spreadsheets/d/{$spreadsheetId}/preview" : null;
     $reservationFilterLabels = [
         'room' => __('Rooms only'),
         'venue' => __('Venue only'),
@@ -72,14 +74,16 @@
                         <time datetime="{{ now()->toDateString() }}">{{ now()->format('M j, Y') }}</time>
                     </span>
 
-                    <a
-                        href="https://docs.google.com/spreadsheets/d/1eElLtPbGdkXvw6oGXxFwNUBonkpxyo3FdR-GTYeytCw/preview"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="inline-flex w-full items-center justify-center rounded-md border border-primary-600 px-2 py-1 text-xs font-semibold text-primary-700 transition hover:bg-primary-50 dark:border-primary-400 dark:text-primary-300 dark:hover:bg-primary-500/10"
-                    >
-                        {{ __('View Data Backup') }}
-                    </a>
+                    @if ($spreadsheetUrl)
+                        <a
+                            href="{{ $spreadsheetUrl }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="inline-flex w-full items-center justify-center rounded-md border border-primary-600 px-2 py-1 text-xs font-semibold text-primary-700 transition hover:bg-primary-50 dark:border-primary-400 dark:text-primary-300 dark:hover:bg-primary-500/10"
+                        >
+                            {{ __('View Data Backup') }}
+                        </a>
+                    @endif
                 </div>
             </div>
         </div>
