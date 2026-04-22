@@ -37,9 +37,10 @@ class LatestBookings extends TableWidget
                 ->label('Date')
                 ->dateTime('M d, Y H:i'),
 
-            Tables\Columns\BadgeColumn::make('status')
+            Tables\Columns\BadgeColumn::make('booking_status')
                 ->label('Status')
-                ->colors(Booking::statusColors()),
+                ->formatStateUsing(fn (?string $state) => Booking::bookingStatusOptions()[$state] ?? ucfirst((string) $state))
+                ->colors(Booking::bookingStatusColors()),
         ];
     }
 }
