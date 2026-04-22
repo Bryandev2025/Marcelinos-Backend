@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\API;
 
+use App\Rules\ValidTurnstileToken;
+use App\Services\TurnstileVerificationService;
 use Illuminate\Foundation\Http\FormRequest;
 
 class ContactRequest extends FormRequest
@@ -13,7 +15,16 @@ class ContactRequest extends FormRequest
 
     public function rules(): array
     {
+        $turnstile = app(TurnstileVerificationService::class);
+        $captchaRules = array_values(array_filter([
+            $turnstile->isConfigured() ? 'required' : 'nullable',
+            'string',
+            new ValidTurnstileToken,
+        ]));
+
         return [
+            'website' => ['nullable', 'string', 'max:0'],
+            'captcha_token' => $captchaRules,
             'full_name' => 'required|string|max:255',
             'email'     => 'required|email',
             'phone'     => 'nullable|string|max:20',

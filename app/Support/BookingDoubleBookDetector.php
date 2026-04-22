@@ -35,7 +35,7 @@ final class BookingDoubleBookDetector
 
         $query = Booking::query()
             ->whereKeyNot($booking->getKey())
-            ->where('booking_status', '!=', Booking::BOOKING_STATUS_CANCELLED)
+            ->whereIn('booking_status', Booking::availabilityBlockingStatuses())
             ->where('check_in', '<', $checkOut)
             ->where('check_out', '>', $checkIn);
 

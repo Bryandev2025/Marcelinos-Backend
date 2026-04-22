@@ -46,7 +46,7 @@ final class RoomInventoryGroupAvailability
         $out = [];
 
         $query = Booking::query()
-            ->where('booking_status', '!=', Booking::BOOKING_STATUS_CANCELLED)
+            ->whereIn('booking_status', Booking::availabilityBlockingStatuses())
             ->where('check_in', '<', $rangeEnd)
             ->where('check_out', '>', $rangeStart)
             ->where(function ($q) {

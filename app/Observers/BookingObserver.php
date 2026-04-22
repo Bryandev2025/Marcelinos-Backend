@@ -28,6 +28,27 @@ class BookingObserver
             'reference_number' => $booking->reference_number,
         ]);
 
+        if ($booking->booking_status === Booking::BOOKING_STATUS_PENDING_VERIFICATION) {
+            Log::info('Booking pending email verification — staff alerts deferred', [
+                'booking_id' => $booking->id,
+            ]);
+
+            return;
+        }
+
+        $this->dispatchNewBookingStaffAlerts($booking);
+
+        SyncBookingToGoogleSheet::dispatch(
+            bookingId: (int) $booking->id,
+            referenceNumber: (string) $booking->reference_number,
+        );
+    }
+
+    /**
+     * Filament DB notifications, Slack, double-book check, and realtime events for a newly active public booking.
+     */
+    private function dispatchNewBookingStaffAlerts(Booking $booking): void
+    {
         $users = User::whereIn('role', ['admin', 'staff'])
             ->where('is_active', true)
             ->get();
@@ -40,13 +61,12 @@ class BookingObserver
         if ($users->isNotEmpty()) {
             $booking->loadMissing('guest');
             $bookedByName = trim((string) ($booking->guest?->full_name ?? '')) ?: 'a guest';
-            $bookingViewUrl = BookingResource::getUrl('view', ['record' => $booking]);
 
             $isSuspicious = $booking->no_of_days > 10;
 
             if ($isSuspicious) {
                 $notification = Notification::make()
-                    ->warning() // Sets the official warning theme styling
+                    ->warning()
                     ->title('Suspicious Booking Alert')
                     ->body("{$bookedByName} created a suspicious booking for {$booking->no_of_days} days.")
                     ->icon('heroicon-o-exclamation-triangle')
@@ -61,7 +81,7 @@ class BookingObserver
                     ->persistent();
             } else {
                 $notification = Notification::make()
-                    ->success() // Sets the official success theme styling
+                    ->success()
                     ->title('New Booking Created')
                     ->body("{$bookedByName} created a booking.")
                     ->icon('heroicon-o-calendar-days')
@@ -101,15 +121,16 @@ class BookingObserver
         SlackBookingAlerts::notify(new BookingLifecycleSlackNotification($booking, 'created'));
 
         BookingDoubleBookAlert::scheduleCheckAfterSave($booking);
-
-        SyncBookingToGoogleSheet::dispatch(
-            bookingId: (int) $booking->id,
-            referenceNumber: (string) $booking->reference_number,
-        );
     }
 
     public function updated(Booking $booking): void
     {
+        if ($booking->wasChanged('booking_status')
+            && (string) $booking->getOriginal('booking_status') === Booking::BOOKING_STATUS_PENDING_VERIFICATION
+            && (string) $booking->booking_status === Booking::BOOKING_STATUS_RESERVED) {
+            $this->dispatchNewBookingStaffAlerts($booking);
+        }
+
         $user = auth()->user();
         $isStaffOrAdmin = $user && in_array($user->role, ['admin', 'staff'], true);
 

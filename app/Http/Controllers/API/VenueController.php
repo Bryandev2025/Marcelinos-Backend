@@ -103,7 +103,7 @@ class VenueController extends Controller
                 $bookedVenueIds = Booking::query()
                     ->join('booking_venue', 'bookings.id', '=', 'booking_venue.booking_id')
                     ->whereIn('booking_venue.venue_id', $venueIds)
-                    ->where('bookings.booking_status', '!=', Booking::BOOKING_STATUS_CANCELLED)
+                    ->whereIn('bookings.booking_status', Booking::availabilityBlockingStatuses())
                     ->where('bookings.check_in', '<', $checkOut)
                     ->where('bookings.check_out', '>', $checkIn)
                     ->distinct()

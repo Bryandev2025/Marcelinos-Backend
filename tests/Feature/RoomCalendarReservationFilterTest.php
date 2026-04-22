@@ -9,6 +9,7 @@ use App\Models\Room;
 use App\Models\Venue;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -94,6 +95,8 @@ class RoomCalendarReservationFilterTest extends TestCase
     {
         return Booking::withoutEvents(fn () => Booking::query()->create([
             'guest_id' => $guest->id,
+            'reference_number' => 'TEST-CAL-'.Str::upper(Str::random(8)),
+            'receipt_token' => (string) Str::uuid(),
             'check_in' => $checkIn,
             'check_out' => $checkOut,
             'no_of_days' => 1,

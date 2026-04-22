@@ -45,6 +45,10 @@ return [
         'key' => env('API_KEY'),
     ],
 
+    'turnstile' => [
+        'secret_key' => env('TURNSTILE_SECRET_KEY'),
+    ],
+
     /*
      * Booking cancel/reschedule OTP is sent by email (see BookingActionOtpService).
      */
@@ -71,6 +75,7 @@ return [
         'spreadsheet_id' => env('GOOGLE_SHEETS_SPREADSHEET_ID'),
         'credentials_path' => storage_path('app/google-credentials.json'),
             'status_to_sheet' => [
+            'pending_verification' => 'Pending email',
             'reserved' => 'Reserved',
             'occupied' => 'Checked in',
             'completed' => 'Completed',

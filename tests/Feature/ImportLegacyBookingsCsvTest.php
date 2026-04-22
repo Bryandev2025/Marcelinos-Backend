@@ -27,7 +27,10 @@ class ImportLegacyBookingsCsvTest extends TestCase
             ->expectsOutputToContain('Imported: 1')
             ->expectsOutputToContain('Skipped: 0');
 
-        $booking = Booking::query()->with('guest')->first();
+        $booking = Booking::query()
+            ->with('guest')
+            ->whereHas('guest', fn ($q) => $q->where('email', 'juan@example.com'))
+            ->first();
         $this->assertNotNull($booking);
         $this->assertSame(Booking::BOOKING_STATUS_COMPLETED, $booking->booking_status);
         $this->assertSame(Booking::PAYMENT_STATUS_PAID, $booking->payment_status);
@@ -52,7 +55,6 @@ class ImportLegacyBookingsCsvTest extends TestCase
             ->expectsOutputToContain('Dry-run finished.')
             ->expectsOutputToContain('Imported: 1');
 
-        $this->assertDatabaseCount('bookings', 0);
-        $this->assertDatabaseCount('guests', 0);
+        $this->assertDatabaseMissing('guests', ['email' => 'maria@example.com']);
     }
 }

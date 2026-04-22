@@ -43,6 +43,10 @@ Route::get('/maintenance-mode', [MaintenanceModeController::class, 'show']);
 Route::get('/payment-settings', [PaymentSettingsController::class, 'show']);
 Route::post('/xendit/webhook', [XenditWebhookController::class, 'handle']);
 
+Route::get('bookings/verify-email/{booking}', [BookingController::class, 'verifyEmail'])
+    ->middleware(['signed', 'throttle:receipt_lookup'])
+    ->name('bookings.verify-email');
+
 Route::middleware([EnsureApiKeyIsValid::class])->group(function () {
     Route::middleware('throttle:api')->group(function () {
         // Password management (client app)

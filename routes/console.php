@@ -68,6 +68,11 @@ Schedule::command('bookings:cancel-unpaid')
     ->timezone($manila)
     ->withoutOverlapping();
 
+Schedule::command('bookings:prune-pending-verification')
+    ->hourly()
+    ->timezone($manila)
+    ->withoutOverlapping();
+
 /*
 |--------------------------------------------------------------------------
 | Hourly full Google Sheets mirror refresh
