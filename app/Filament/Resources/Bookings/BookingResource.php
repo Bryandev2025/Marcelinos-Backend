@@ -17,6 +17,7 @@ use App\Filament\Widgets\BookingStatsOverview;
 use App\Models\Booking;
 use BackedEnum;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
@@ -66,6 +67,31 @@ class BookingResource extends Resource
         $ids = array_values(array_unique(array_map('intval', $ids)));
 
         session()->put($key, $ids);
+    }
+
+    /**
+     * Mark every booking created today as seen (e.g. staff opened calendar or list).
+     */
+    public static function markTodaysBookingsAsViewed(): void
+    {
+        $key = static::viewedBookingsSessionKey();
+        $ids = session()->get($key, []);
+
+        if (! is_array($ids)) {
+            $ids = [];
+        }
+
+        $ids = array_map('intval', $ids);
+
+        $todaysIds = Booking::query()
+            ->whereDate('created_at', today())
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+
+        $merged = array_values(array_unique(array_merge($ids, $todaysIds)));
+
+        session()->put($key, $merged);
     }
 
     /**
@@ -142,7 +168,7 @@ class BookingResource extends Resource
     {
         $booking->loadMissing(['rooms:id,type', 'roomLines', 'venues:id']);
 
-        $checkIn = $booking->check_in instanceof \Carbon\CarbonInterface
+        $checkIn = $booking->check_in instanceof CarbonInterface
             ? $booking->check_in->copy()
             : Carbon::parse($booking->check_in);
 

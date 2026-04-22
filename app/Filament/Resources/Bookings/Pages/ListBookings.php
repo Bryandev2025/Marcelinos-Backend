@@ -9,12 +9,19 @@ use Filament\Actions\CreateAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Tabs\Tab;
-use JeffersonGoncalves\Filament\QrCodeField\Forms\Components\QrCodeInput;
 use Illuminate\Database\Eloquent\Builder;
+use JeffersonGoncalves\Filament\QrCodeField\Forms\Components\QrCodeInput;
 
 class ListBookings extends ListRecords
 {
     protected static string $resource = BookingResource::class;
+
+    public function mount(): void
+    {
+        parent::mount();
+
+        BookingResource::markTodaysBookingsAsViewed();
+    }
 
     public function getHeading(): string
     {
@@ -85,7 +92,7 @@ class ListBookings extends ListRecords
                             $livewire->redirect(BookingResource::getUrl('view', ['record' => $booking]));
                         }),
                 ])
-                ->action(fn() => null),
+                ->action(fn () => null),
         ];
     }
 
@@ -192,6 +199,7 @@ class ListBookings extends ListRecords
 
         if (! str_starts_with($payload, '{') && ! str_starts_with($payload, '[')) {
             $trimmed = trim($payload);
+
             return $trimmed !== '' ? $trimmed : null;
         }
 

@@ -18,11 +18,11 @@ use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
-use JeffersonGoncalves\Filament\QrCodeField\Forms\Components\QrCodeInput;
 use Illuminate\Support\Facades\Artisan;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use JeffersonGoncalves\Filament\QrCodeField\Forms\Components\QrCodeInput;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class RoomCalendar extends Page
 {
@@ -226,6 +226,8 @@ class RoomCalendar extends Page
         if (! in_array($this->reservationFilter, $this->reservationFilterOptions(), true)) {
             $this->reservationFilter = self::RESERVATION_ROOM;
         }
+
+        BookingResource::markTodaysBookingsAsViewed();
     }
 
     public function updatedReservationFilter(): void
