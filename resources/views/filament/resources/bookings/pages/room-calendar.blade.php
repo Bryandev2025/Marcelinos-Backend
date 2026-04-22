@@ -559,6 +559,7 @@
                                                     cancelId: {{ (int) $row['id'] }},
                                                     delOpen: false,
                                                     delVal: '',
+                                                    delConfirm: false,
                                                     delRef: @js($row['reference_number']),
                                                     delId: {{ (int) $row['id'] }},
                                                     submitPayBalance() {
@@ -573,6 +574,7 @@
                                                         $wire.deleteBooking(this.delId, this.delVal);
                                                         this.delOpen = false;
                                                         this.delVal = '';
+                                                        this.delConfirm = false;
                                                     },
                                                 }"
                                                 @click.outside="open = false"
@@ -651,7 +653,7 @@
 
                                                     <button
                                                         type="button"
-                                                        @click="open = false; delOpen = true; delVal = ''"
+                                                        @click="open = false; delOpen = true; delVal = ''; delConfirm = false"
                                                         class="block w-full whitespace-nowrap px-3 py-1.5 text-left text-[13px] font-medium leading-5 text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10"
                                                     >
                                                         Delete
@@ -743,35 +745,41 @@
                                                     >
                                                         <div class="absolute inset-0 bg-black/50" @click="delOpen = false"></div>
                                                         <div
-                                                            class="relative z-10 w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-xl dark:border-white/10 dark:bg-gray-900"
+                                                            class="relative z-10 w-full max-w-md rounded-xl border border-gray-200 bg-white p-4 shadow-xl dark:border-white/10 dark:bg-gray-900"
                                                             @click.stop
                                                         >
                                                             <h3 class="text-base font-semibold text-gray-900 dark:text-white">
                                                                 {{ __('Delete booking') }}
                                                             </h3>
-                                                            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                                                                {{ __('To confirm, type the booking reference below. This cannot be undone.') }}
-                                                            </p>
-                                                            <p class="mt-2 font-mono text-sm font-semibold text-gray-900 dark:text-white" x-text="delRef"></p>
+                                                            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ __('Type the reference and confirm to move this booking to Recycle Bin.') }}</p>
+                                                            <p class="mt-2 rounded-md bg-gray-100 px-2 py-1 font-mono text-sm font-semibold text-gray-900 dark:bg-white/10 dark:text-white" x-text="delRef"></p>
                                                             <input
                                                                 type="text"
                                                                 x-model="delVal"
-                                                                class="mt-3 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-danger-500 focus:outline-none focus:ring-1 focus:ring-danger-500 dark:border-white/10 dark:bg-gray-950 dark:text-white"
+                                                                class="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-danger-500 focus:outline-none focus:ring-1 focus:ring-danger-500 dark:border-white/10 dark:bg-gray-950 dark:text-white"
                                                                 autocomplete="off"
                                                                 :placeholder="delRef"
                                                             />
+                                                            <label class="mt-2 flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    x-model="delConfirm"
+                                                                    class="mt-0.5 h-4 w-4 rounded border-gray-300 text-danger-600 focus:ring-danger-500 dark:border-white/20 dark:bg-gray-950"
+                                                                />
+                                                                <span>{{ __('I understand this will move the booking to Recycle Bin.') }}</span>
+                                                            </label>
                                                             <div class="mt-4 flex justify-end gap-2">
                                                                 <button
                                                                     type="button"
                                                                     class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5"
-                                                                    @click="delOpen = false"
+                                                                    @click="delOpen = false; delConfirm = false; delVal = ''"
                                                                 >
                                                                     {{ __('Cancel') }}
                                                                 </button>
                                                                 <button
                                                                     type="button"
                                                                     class="rounded-lg bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-40"
-                                                                    :disabled="delVal.trim() !== delRef"
+                                                                    :disabled="delVal.trim() !== delRef || !delConfirm"
                                                                     @click="submitDelete()"
                                                                 >
                                                                     {{ __('Delete booking') }}

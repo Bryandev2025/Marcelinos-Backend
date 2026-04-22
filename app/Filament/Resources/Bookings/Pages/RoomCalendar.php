@@ -826,7 +826,7 @@ class RoomCalendar extends Page
         $booking->delete();
 
         Notification::make()
-            ->title('Booking deleted.')
+            ->title('Booking moved to Recycle Bin.')
             ->success()
             ->send();
     }
