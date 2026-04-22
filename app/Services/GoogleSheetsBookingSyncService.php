@@ -76,6 +76,47 @@ class GoogleSheetsBookingSyncService
         }
     }
 
+    public function syncAllBookings(): void
+    {
+        if (! $this->isEnabled()) {
+            return;
+        }
+
+        $spreadsheetId = $this->spreadsheetId();
+        if ($spreadsheetId === '') {
+            Log::warning('Google Sheets booking full sync skipped: spreadsheet id is missing.');
+
+            return;
+        }
+
+        try {
+            $service = $this->makeSheetsService();
+            $allTabs = $this->allSheetTabs();
+            $this->ensureSheetsExist($service, $spreadsheetId, $allTabs);
+
+            $rowsByTab = collect($allTabs)->mapWithKeys(fn (string $tab): array => [$tab => []])->all();
+
+            Booking::query()
+                ->with(['guest', 'rooms', 'venues', 'roomLines'])
+                ->orderBy('id')
+                ->chunkById(200, function (Collection $bookings) use (&$rowsByTab): void {
+                    foreach ($bookings as $booking) {
+                        $tab = $this->statusTabName((string) $booking->booking_status);
+                        $rowsByTab[$tab][] = $this->buildBookingRow($booking);
+                    }
+                });
+
+            foreach ($allTabs as $tabName) {
+                $this->writeDataRows($service, $spreadsheetId, $tabName, $rowsByTab[$tabName] ?? []);
+            }
+        } catch (\Throwable $exception) {
+            Log::error('Google Sheets booking full sync failed', [
+                'error' => $exception->getMessage(),
+                'exception' => get_class($exception),
+            ]);
+        }
+    }
+
     public function removeBookingByReference(string $referenceNumber): void
     {
         if (! $this->isEnabled() || trim($referenceNumber) === '') {
