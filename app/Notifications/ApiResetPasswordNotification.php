@@ -23,7 +23,13 @@ class ApiResetPasswordNotification extends Notification implements ShouldQueue
 
     private function resetUrl(): string
     {
-        $base = rtrim((string) config('app.frontend_url'), '/');
+        $base = trim((string) config('app.frontend_url', ''));
+
+        if ($base === '') {
+            $base = (string) config('app.url', '');
+        }
+
+        $base = rtrim($base, '/');
         $email = urlencode($this->email);
         $token = urlencode($this->token);
 

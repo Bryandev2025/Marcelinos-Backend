@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\API\ChangePasswordRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class ChangePasswordController extends Controller
 {
@@ -29,7 +30,8 @@ class ChangePasswordController extends Controller
         }
 
         $user->forceFill([
-            'password' => (string) $validated['password'],
+            'password' => Hash::make((string) $validated['password']),
+            'remember_token' => Str::random(60),
         ])->save();
 
         return response()->json([

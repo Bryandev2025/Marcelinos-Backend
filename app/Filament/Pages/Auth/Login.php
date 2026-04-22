@@ -3,18 +3,55 @@
 namespace App\Filament\Pages\Auth;
 
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
+use Filament\Actions\Action;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Auth\MultiFactor\Contracts\HasBeforeChallengeHook;
 use Filament\Auth\Pages\Login as BaseLogin;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\TextInput;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\Component;
+use Filament\Schemas\Schema;
+use Filament\Support\Enums\Alignment;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\RateLimiter;
 
 class Login extends BaseLogin
 {
+    public function form(Schema $schema): Schema
+    {
+        $components = [
+            $this->getEmailFormComponent(),
+            $this->getPasswordFormComponent(),
+        ];
+
+        if (filament()->hasPasswordReset()) {
+            $components[] = Actions::make([
+                Action::make('requestPasswordReset')
+                    ->link()
+                    ->label(__('filament-panels::auth/pages/login.actions.request_password_reset.label'))
+                    ->url(filament()->getRequestPasswordResetUrl()),
+            ])->alignment(Alignment::End);
+        }
+
+        $components[] = $this->getRememberFormComponent();
+
+        return $schema->components($components);
+    }
+
+    protected function getPasswordFormComponent(): Component
+    {
+        return TextInput::make('password')
+            ->label(__('filament-panels::auth/pages/login.form.password.label'))
+            ->password()
+            ->revealable(filament()->arePasswordsRevealable())
+            ->autocomplete('current-password')
+            ->required();
+    }
+
     public function authenticate(): ?LoginResponse
     {
         try {
