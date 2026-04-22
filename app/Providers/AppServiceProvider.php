@@ -39,6 +39,7 @@ use Filament\Resources\Events\RecordCreated;
 use Filament\Support\Facades\FilamentView;
 use Filament\Tables\View\TablesRenderHook;
 use Filament\View\PanelsRenderHook;
+use DateTimeInterface;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -364,13 +365,40 @@ class AppServiceProvider extends ServiceProvider
             return $value ? 'Yes' : 'No';
         }
 
+        if ($value instanceof DateTimeInterface) {
+            return $value->format('F d, Y');
+        }
+
         if (is_scalar($value)) {
             $stringValue = trim((string) $value);
 
-            return $stringValue === '' ? 'empty' : $stringValue;
+            if ($stringValue === '') {
+                return 'empty';
+            }
+
+            $normalizedValue = trim($stringValue, "\"'");
+            $formattedDate = $this->formatHumanDate($normalizedValue);
+
+            return $formattedDate ?? $normalizedValue;
         }
 
         return json_encode($value) ?: 'value';
+    }
+
+    protected function formatHumanDate(string $value): ?string
+    {
+        // Only parse known date-like values to avoid mutating regular text.
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}(?:[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?)?Z?$/', $value)) {
+            return null;
+        }
+
+        $timestamp = strtotime($value);
+
+        if ($timestamp === false) {
+            return null;
+        }
+
+        return date('F d, Y', $timestamp);
     }
 
     protected function humanizeFieldName(string $field): string
@@ -387,13 +415,17 @@ class AppServiceProvider extends ServiceProvider
 
     protected function resolveSubjectLabel(Model $model): string
     {
-        $candidates = ['name', 'title', 'reference_number', 'email', 'full_name', 'date'];
+        $candidates = ['name', 'title', 'specification', 'reference_number', 'email', 'full_name', 'date'];
 
         foreach ($candidates as $attribute) {
             $value = $model->getAttribute($attribute);
 
             if (is_string($value) && trim($value) !== '') {
                 return trim($value);
+            }
+
+            if ($value instanceof DateTimeInterface) {
+                return $value->format('F d, Y');
             }
         }
 

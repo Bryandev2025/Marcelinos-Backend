@@ -11,13 +11,14 @@ use Illuminate\Support\Str;
 
 class ActivityHistory extends Page
 {
+    protected static bool $shouldRegisterNavigation = false;
+
     public int $logsLimit = 5;
 
     public string $search = '';
 
-    public string $dateMode = 'all_time';
-
-    public ?string $selectedDate = null;
+    public ?string $fromDate = null;
+    public ?string $toDate = null;
 
     protected int $logsStep = 10;
 
@@ -40,6 +41,13 @@ class ActivityHistory extends Page
         $user = auth()->user();
 
         return $user?->hasPrivilege('manage_activity_logs') ?? false;
+    }
+
+    public function mount(): void
+    {
+        $today = now()->toDateString();
+        $this->fromDate = $this->fromDate ?: $today;
+        $this->toDate = $this->toDate ?: $today;
     }
 
     public function getTimelineGroupsProperty(): Collection
@@ -79,30 +87,39 @@ class ActivityHistory extends Page
         $this->logsLimit = 5;
     }
 
-    public function updatedSelectedDate(): void
+    public function updatedFromDate(): void
     {
         $this->logsLimit = 5;
+
+        if ($this->fromDate && $this->toDate && $this->fromDate > $this->toDate) {
+            $this->toDate = $this->fromDate;
+        }
     }
 
-    public function updatedDateMode(): void
+    public function updatedToDate(): void
     {
-        if ($this->dateMode !== 'custom_date') {
-            $this->selectedDate = null;
-        }
-
         $this->logsLimit = 5;
+
+        if ($this->fromDate && $this->toDate && $this->toDate < $this->fromDate) {
+            $this->fromDate = $this->toDate;
+        }
     }
 
     protected function getLogsQuery(): Builder
     {
         $search = trim($this->search);
-        $selectedDate = trim((string) $this->selectedDate);
+        $fromDate = trim((string) $this->fromDate);
+        $toDate = trim((string) $this->toDate);
 
         return ActivityLog::query()
             ->with('user:id,name')
             ->when(
-                $this->dateMode === 'custom_date' && $selectedDate !== '',
-                fn (Builder $query): Builder => $query->whereDate('created_at', $selectedDate)
+                $fromDate !== '',
+                fn (Builder $query): Builder => $query->whereDate('created_at', '>=', $fromDate)
+            )
+            ->when(
+                $toDate !== '',
+                fn (Builder $query): Builder => $query->whereDate('created_at', '<=', $toDate)
             )
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $like = '%' . $search . '%';

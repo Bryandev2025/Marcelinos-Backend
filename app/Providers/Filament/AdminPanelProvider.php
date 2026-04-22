@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Livewire\DatabaseNotifications as AppDatabaseNotifications;
+use App\Filament\Pages\ActivityHistory;
 use App\Filament\Pages\AdminDashboard;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\RecycleBin;
@@ -58,6 +59,11 @@ class AdminPanelProvider extends PanelProvider
                     ->label('Settings')
                     ->icon('heroicon-o-cog-6-tooth')
                     ->url(fn (): string => Settings::getUrl(panel: 'admin')),
+                MenuItem::make()
+                    ->label('Activity History')
+                    ->icon('heroicon-o-clock')
+                    ->url(fn (): string => ActivityHistory::getUrl(panel: 'admin'))
+                    ->visible(fn (): bool => ActivityHistory::canAccess()),
             ])
             ->middleware([
                 EncryptCookies::class,
