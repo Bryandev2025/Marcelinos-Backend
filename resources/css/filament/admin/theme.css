@@ -5,7 +5,7 @@
 /* Shared Blade components (e.g. room-type-badge) live outside resources/views/filament — include so Tailwind generates their utilities */
 @source '../../../../resources/views/components/**/*.blade.php';
 
-@tailwind components;
+@tailwind utilities;
 
 
 .fi-sidebar-nav {

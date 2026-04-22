@@ -4,19 +4,17 @@ namespace App\Filament\Resources\ContactUs\Tables;
 
 use App\Filament\Actions\TypedDeleteBulkAction;
 use App\Filament\Actions\TypedForceDeleteBulkAction;
-use App\Mail\ContactReply;
+use App\Filament\Resources\ContactUs\ContactUsResource;
+use App\Models\ContactUs;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\EditAction;
+use Filament\Facades\Filament;
 use Filament\Actions\RestoreBulkAction;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
-use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Mail;
 
 class ContactUsTable
 {
@@ -35,6 +33,11 @@ class ContactUsTable
                 TextColumn::make('subject')
                     ->label('Subject')
                     ->searchable(),
+
+                TextColumn::make('latestMessage.body')
+                    ->label('Latest Message')
+                    ->limit(55)
+                    ->placeholder('No messages yet'),
 
                 TextColumn::make('status')
                     ->label('Status')
@@ -69,52 +72,16 @@ class ContactUsTable
                 TrashedFilter::make(),
             ])
             ->recordActions([
-                Action::make('reply')
-                    ->label('Reply')
-                    ->icon('heroicon-o-arrow-uturn-left')
+                Action::make('conversation')
+                    ->label('Open Conversation')
+                    ->icon('heroicon-o-chat-bubble-left-right')
                     ->color('success')
-                    ->visible(fn ($record) => ! $record->trashed() && in_array($record->status, ['new', 'in_progress']))
-                    ->form([
-                        Select::make('method')
-                            ->label('Reply Method')
-                            ->options([
-                                'email' => 'Email',
-                                'sms' => 'SMS (Coming Soon)',
-                            ])
-                            ->default('email')
-                            ->required(),
-                        Textarea::make('message')
-                            ->label('Reply Message')
-                            ->required()
-                            ->rows(4)
-                            ->placeholder('Compose your reply to the customer...'),
-                    ])
-                    ->action(function (array $data, $record) {
-                        // Handle the reply logic here
-                        if ($data['method'] === 'email') {
-                            // Send email reply using mailable
-                            Mail::to($record->email)->send(new ContactReply($record, $data['message']));
-
-                            // Update status to in_progress if it's new, and set replied_at
-                            $record->update([
-                                'status' => $record->status === 'new' ? 'in_progress' : $record->status,
-                                'replied_at' => now(),
-                            ]);
-
-                            Notification::make()
-                                ->title('Reply sent successfully!')
-                                ->success()
-                                ->send();
-                        } else {
-                            // SMS functionality (placeholder for future)
-                            Notification::make()
-                                ->title('SMS functionality coming soon!')
-                                ->warning()
-                                ->send();
-                        }
-                    })
-                    ->modalHeading('Reply to Customer')
-                    ->modalSubmitActionLabel('Send Reply'),
+                    ->visible(fn (ContactUs $record): bool => $record->exists)
+                    ->url(fn (ContactUs $record): string => ContactUsResource::getUrl(
+                        'conversation',
+                        ['record' => $record],
+                        panel: Filament::getCurrentPanel()?->getId() ?? 'admin',
+                    )),
                 EditAction::make(),
             ])
             ->toolbarActions([
