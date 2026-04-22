@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Filament\Livewire\DatabaseNotifications as AppDatabaseNotifications;
 use App\Filament\Pages\ActivityHistory;
 use App\Filament\Pages\AdminDashboard;
+use App\Filament\Pages\Profile;
 use App\Filament\Pages\Settings;
 use App\Filament\Widgets\SessionsByCountryChart;
 use App\Filament\Widgets\SessionsByDeviceChart;
@@ -33,6 +34,7 @@ class StaffPanelProvider extends PanelProvider
         return $panel
             ->id('staff')
             ->path('staff')
+            ->passwordReset()
             ->databaseNotifications(true, AppDatabaseNotifications::class, false)
             ->databaseNotificationsPolling('1s')
             ->colors([
@@ -58,6 +60,10 @@ class StaffPanelProvider extends PanelProvider
                 // FilamentInfoWidget::class,
             ])
             ->userMenuItems([
+                MenuItem::make()
+                    ->label('Profile')
+                    ->icon('heroicon-o-user')
+                    ->url(fn (): string => Profile::getUrl(panel: 'staff')),
                 MenuItem::make()
                     ->label('Settings')
                     ->icon('heroicon-o-cog-6-tooth')

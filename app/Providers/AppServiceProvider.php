@@ -519,5 +519,20 @@ class AppServiceProvider extends ServiceProvider
                 ->by($request->ip())
                 ->response($jsonTooManyRequests);
         });
+
+        RateLimiter::for('password_reset', function (Request $request) use ($jsonTooManyRequests) {
+            $email = strtolower(trim((string) $request->input('email', '')));
+            $key = $email !== '' ? "{$request->ip()}|{$email}" : $request->ip();
+
+            return Limit::perMinute(5)
+                ->by($key)
+                ->response($jsonTooManyRequests);
+        });
+
+        RateLimiter::for('password_change', function (Request $request) use ($jsonTooManyRequests) {
+            return Limit::perMinute(10)
+                ->by($request->user()?->id ?: $request->ip())
+                ->response($jsonTooManyRequests);
+        });
     }
 }
