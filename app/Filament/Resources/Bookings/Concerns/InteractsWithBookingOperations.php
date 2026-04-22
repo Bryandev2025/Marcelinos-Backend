@@ -204,6 +204,17 @@ trait InteractsWithBookingOperations
                         ->action(function (): void {
                             $this->runBookingPayBalance();
                         }),
+                    Action::make('bookingOpMarkRefundCompleted')
+                        ->label(__('Mark refund completed'))
+                        ->icon('heroicon-o-arrow-path-rounded-square')
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->modalHeading(__('Confirm refund completion?'))
+                        ->modalDescription(__('Use this only after the guest refund has been processed externally. This updates payment status to Refunded.'))
+                        ->visible(fn (): bool => $this->shouldOfferMarkRefundCompletedForRecord())
+                        ->action(function (): void {
+                            $this->runMarkRefundCompleted();
+                        }),
                     Action::make('bookingOpCheckIn')
                         ->label(__('Check in guest'))
                         ->icon('heroicon-o-arrow-right-circle')
@@ -275,6 +286,17 @@ trait InteractsWithBookingOperations
     {
         return [
             $this->makePayBalanceHeaderAction(),
+            Action::make('viewBookingMarkRefundCompleted')
+                ->label(__('Mark refund completed'))
+                ->icon('heroicon-o-arrow-path-rounded-square')
+                ->color('success')
+                ->requiresConfirmation()
+                ->modalHeading(__('Confirm refund completion?'))
+                ->modalDescription(__('Use this only after the guest refund has been processed externally. This updates payment status to Refunded.'))
+                ->visible(fn (): bool => $this->shouldOfferMarkRefundCompletedForRecord())
+                ->action(function (): void {
+                    $this->runMarkRefundCompleted();
+                }),
             Action::make('viewBookingSpecialDiscount')
                 ->label(function (): string {
                     $record = $this->getRecord();
@@ -461,6 +483,36 @@ trait InteractsWithBookingOperations
                 BookingFullBalancePayment::REASON_NO_BALANCE => __('No remaining balance.'),
                 default => __('This booking cannot be marked as paid yet.'),
             };
+    }
+
+    protected function shouldOfferMarkRefundCompletedForRecord(): bool
+    {
+        $record = $this->getRecord();
+        if (! $record instanceof Booking || $record->trashed()) {
+            return false;
+        }
+
+        return $record->booking_status === Booking::BOOKING_STATUS_RESCHEDULED
+            && $record->payment_status === Booking::PAYMENT_STATUS_REFUND_PENDING;
+    }
+
+    public function runMarkRefundCompleted(): void
+    {
+        $record = $this->getRecord();
+        if (! $record instanceof Booking) {
+            return;
+        }
+
+        $record->update([
+            'payment_status' => Booking::PAYMENT_STATUS_REFUNDED,
+        ]);
+
+        Notification::make()
+            ->title(__('Refund marked as completed.'))
+            ->success()
+            ->send();
+
+        $this->afterBookingLifecycleMutation();
     }
 
     public function runBookingPayBalance(): void

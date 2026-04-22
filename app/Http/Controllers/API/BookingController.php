@@ -58,6 +58,7 @@ class BookingController extends Controller
                         Booking::PAYMENT_STATUS_UNPAID,
                         Booking::PAYMENT_STATUS_PARTIAL,
                         Booking::PAYMENT_STATUS_PAID,
+                        Booking::PAYMENT_STATUS_REFUND_PENDING,
                         Booking::PAYMENT_STATUS_REFUNDED,
                     ], true)
                 );
@@ -647,6 +648,7 @@ class BookingController extends Controller
                     Booking::PAYMENT_STATUS_UNPAID,
                     Booking::PAYMENT_STATUS_PARTIAL,
                     Booking::PAYMENT_STATUS_PAID,
+                    Booking::PAYMENT_STATUS_REFUND_PENDING,
                     Booking::PAYMENT_STATUS_REFUNDED,
                 ]),
             ]);
@@ -732,6 +734,7 @@ class BookingController extends Controller
                         Booking::PAYMENT_STATUS_UNPAID,
                         Booking::PAYMENT_STATUS_PARTIAL,
                         Booking::PAYMENT_STATUS_PAID,
+                        Booking::PAYMENT_STATUS_REFUND_PENDING,
                         Booking::PAYMENT_STATUS_REFUNDED,
                     ], true)
                 );

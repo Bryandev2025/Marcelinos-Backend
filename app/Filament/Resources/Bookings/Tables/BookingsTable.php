@@ -680,6 +680,26 @@ class BookingsTable
                                 throw new Halt;
                             }
                         }),
+                    Action::make('markRefundCompleted')
+                        ->label('Mark refund completed')
+                        ->icon('heroicon-o-arrow-path-rounded-square')
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->modalHeading('Confirm refund completion?')
+                        ->modalDescription('Use this only after the guest refund has been processed externally. This updates payment status to Refunded.')
+                        ->visible(fn (Booking $record): bool => ! $record->trashed()
+                            && $record->booking_status === Booking::BOOKING_STATUS_RESCHEDULED
+                            && $record->payment_status === Booking::PAYMENT_STATUS_REFUND_PENDING)
+                        ->action(function (Booking $record): void {
+                            $record->update([
+                                'payment_status' => Booking::PAYMENT_STATUS_REFUNDED,
+                            ]);
+
+                            Notification::make()
+                                ->title('Refund marked as completed.')
+                                ->success()
+                                ->send();
+                        }),
                     Action::make('checkIn')
                         ->label('Check in guest')
                         ->icon('heroicon-o-arrow-right-circle')

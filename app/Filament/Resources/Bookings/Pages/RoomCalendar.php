@@ -441,7 +441,7 @@ class RoomCalendar extends Page
     }
 
     /**
-     * @return list<array{id: int, reference_number: string, guest_name: string, check_in: string, check_out: string, rooms: string, venues: string, booking_status: string, payment_status: string, active_date_range: string, status_display: string, has_assigned_rooms: bool, can_pay_balance: bool, can_check_in: bool, booking_badge_kind: 'room'|'venue'|'both'}>
+     * @return list<array{id: int, reference_number: string, guest_name: string, check_in: string, check_out: string, rooms: string, venues: string, booking_status: string, payment_status: string, active_date_range: string, status_display: string, has_assigned_rooms: bool, can_pay_balance: bool, can_check_in: bool, can_mark_refund_completed: bool, booking_badge_kind: 'room'|'venue'|'both'}>
      */
     #[Computed]
     public function modalBookingRows(): array
@@ -491,6 +491,7 @@ class RoomCalendar extends Page
                     'has_assigned_rooms' => $hasAssignedRooms,
                     'can_pay_balance' => $this->canPayBalanceForBooking($b),
                     'can_check_in' => $canCheckIn,
+                    'can_mark_refund_completed' => $this->canMarkRefundCompletedForBooking($b),
                     'booking_badge_kind' => $this->bookingBadgeKindForCalendar($b),
                     'has_special_discount' => $discountMeta['has_special_discount'],
                     'discount_badge_text' => $discountMeta['discount_badge_text'],
@@ -502,7 +503,7 @@ class RoomCalendar extends Page
     }
 
     /**
-     * @return list<array{id: int, reference_number: string, guest_name: string, check_in: string, check_out: string, rooms: string, venues: string, booking_status: string, payment_status: string, active_date_range: string, status_display: string, has_assigned_rooms: bool, can_pay_balance: bool, can_check_in: bool, booking_badge_kind: 'room'|'venue'|'both'}>
+     * @return list<array{id: int, reference_number: string, guest_name: string, check_in: string, check_out: string, rooms: string, venues: string, booking_status: string, payment_status: string, active_date_range: string, status_display: string, has_assigned_rooms: bool, can_pay_balance: bool, can_check_in: bool, can_mark_refund_completed: bool, booking_badge_kind: 'room'|'venue'|'both'}>
      */
     #[Computed]
     public function activeBookingRows(): array
@@ -538,6 +539,7 @@ class RoomCalendar extends Page
                     'has_assigned_rooms' => $hasAssignedRooms,
                     'can_pay_balance' => $this->canPayBalanceForBooking($b),
                     'can_check_in' => $canCheckIn,
+                    'can_mark_refund_completed' => $this->canMarkRefundCompletedForBooking($b),
                     'booking_badge_kind' => $this->bookingBadgeKindForCalendar($b),
                     'has_special_discount' => $discountMeta['has_special_discount'],
                     'discount_badge_text' => $discountMeta['discount_badge_text'],
@@ -584,6 +586,12 @@ class RoomCalendar extends Page
     protected function canPayBalanceForBooking(Booking $booking): bool
     {
         return BookingFullBalancePayment::assess($booking)['allowed'];
+    }
+
+    protected function canMarkRefundCompletedForBooking(Booking $booking): bool
+    {
+        return $booking->booking_status === Booking::BOOKING_STATUS_RESCHEDULED
+            && $booking->payment_status === Booking::PAYMENT_STATUS_REFUND_PENDING;
     }
 
     protected function formatActiveDateRange(Booking $booking): string
@@ -802,6 +810,24 @@ class RoomCalendar extends Page
 
         Notification::make()
             ->title('Booking cancelled.')
+            ->success()
+            ->send();
+    }
+
+    public function markRefundCompleted(int $bookingId): void
+    {
+        $booking = Booking::query()->find($bookingId);
+
+        if (! $booking || ! $this->canMarkRefundCompletedForBooking($booking)) {
+            return;
+        }
+
+        $booking->update([
+            'payment_status' => Booking::PAYMENT_STATUS_REFUNDED,
+        ]);
+
+        Notification::make()
+            ->title('Refund marked as completed.')
             ->success()
             ->send();
     }

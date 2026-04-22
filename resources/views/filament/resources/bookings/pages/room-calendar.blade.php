@@ -12,12 +12,14 @@
         Booking::PAYMENT_STATUS_PAID => 'text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300',
         Booking::PAYMENT_STATUS_PARTIAL => 'text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300',
         Booking::PAYMENT_STATUS_UNPAID => 'text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300',
+        Booking::PAYMENT_STATUS_REFUND_PENDING => 'text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300',
         Booking::PAYMENT_STATUS_REFUNDED => 'text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300',
     ];
     $statusDisplayPillByPayment = [
         Booking::PAYMENT_STATUS_PARTIAL => 'bg-amber-100 text-amber-500 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-500/15 dark:text-amber-100 dark:ring-amber-400/25',
         Booking::PAYMENT_STATUS_PAID => 'bg-emerald-100 text-emerald-900 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/15 dark:text-emerald-100 dark:ring-emerald-400/25',
         Booking::PAYMENT_STATUS_UNPAID => 'bg-gray-100 text-gray-700 ring-1 ring-inset ring-gray-600/15 dark:bg-white/10 dark:text-gray-200 dark:ring-white/15',
+        Booking::PAYMENT_STATUS_REFUND_PENDING => 'bg-orange-100 text-orange-900 ring-1 ring-inset ring-orange-600/20 dark:bg-orange-500/15 dark:text-orange-100 dark:ring-orange-400/25',
         Booking::PAYMENT_STATUS_REFUNDED => 'bg-rose-100 text-rose-900 ring-1 ring-inset ring-rose-600/20 dark:bg-rose-500/15 dark:text-rose-100 dark:ring-rose-400/25',
     ];
 @endphp
@@ -618,6 +620,17 @@
                                                             class="block w-full whitespace-nowrap px-3 py-1.5 text-left text-[13px] font-medium leading-5 text-sky-700 hover:bg-sky-50 dark:text-sky-300 dark:hover:bg-sky-500/10"
                                                         >
                                                             {{ __('Settle remaining balance') }}
+                                                        </button>
+                                                    @endif
+
+                                                    @if (($row['can_mark_refund_completed'] ?? false) === true)
+                                                        <button
+                                                            type="button"
+                                                            wire:click="markRefundCompleted({{ $row['id'] }})"
+                                                            @click="open = false"
+                                                            class="block w-full whitespace-nowrap px-3 py-1.5 text-left text-[13px] font-medium leading-5 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
+                                                        >
+                                                            {{ __('Mark refund completed') }}
                                                         </button>
                                                     @endif
 

@@ -55,6 +55,9 @@ class Booking extends Model
         'reminder_sms_sent_at',
         'reminder_sms_error',
         'testimonial_feedback_sent_at',
+        'refund_alert_sent_at',
+        'refund_guest_notice_sent_at',
+        'refund_guest_confirmation_sent_at',
     ];
 
     protected $casts = [
@@ -72,6 +75,9 @@ class Booking extends Model
         'reminder_sms_sent' => 'boolean',
         'reminder_sms_sent_at' => 'datetime',
         'testimonial_feedback_sent_at' => 'datetime',
+        'refund_alert_sent_at' => 'datetime',
+        'refund_guest_notice_sent_at' => 'datetime',
+        'refund_guest_confirmation_sent_at' => 'datetime',
     ];
 
     protected static function booted()
@@ -334,6 +340,8 @@ class Booking extends Model
 
     const PAYMENT_STATUS_PAID = 'paid';
 
+    const PAYMENT_STATUS_REFUND_PENDING = 'refund_pending';
+
     const PAYMENT_STATUS_REFUNDED = 'refunded';
 
     /**
@@ -448,6 +456,7 @@ class Booking extends Model
             self::PAYMENT_STATUS_UNPAID => 'Unpaid',
             self::PAYMENT_STATUS_PARTIAL => 'Partial',
             self::PAYMENT_STATUS_PAID => 'Paid',
+            self::PAYMENT_STATUS_REFUND_PENDING => 'Refund Pending',
             self::PAYMENT_STATUS_REFUNDED => 'Refunded',
         ];
     }
@@ -554,7 +563,8 @@ class Booking extends Model
             'primary' => self::PAYMENT_STATUS_UNPAID,
             'info' => self::PAYMENT_STATUS_PARTIAL,
             'success' => self::PAYMENT_STATUS_PAID,
-            'warning' => self::PAYMENT_STATUS_REFUNDED,
+            'warning' => self::PAYMENT_STATUS_REFUND_PENDING,
+            'gray' => self::PAYMENT_STATUS_REFUNDED,
         ];
     }
 
@@ -571,7 +581,7 @@ class Booking extends Model
         }
 
         if ($totalPaid > ($totalPrice + 0.009)) {
-            return self::PAYMENT_STATUS_REFUNDED;
+            return self::PAYMENT_STATUS_REFUND_PENDING;
         }
 
         if ($totalPaid < ($totalPrice - 0.009)) {

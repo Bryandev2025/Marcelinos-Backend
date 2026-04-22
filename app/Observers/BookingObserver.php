@@ -10,6 +10,7 @@ use App\Jobs\SyncBookingToGoogleSheet;
 use App\Models\Booking;
 use App\Models\User;
 use App\Notifications\Slack\BookingLifecycleSlackNotification;
+use App\Services\RefundNotificationService;
 use App\Support\ActivityLogger;
 use App\Support\BookingDoubleBookAlert;
 use App\Support\SlackBookingAlerts;
@@ -224,6 +225,10 @@ class BookingObserver
                     userId: $user->id,
                 );
             }
+        }
+
+        if ($booking->wasChanged('payment_status')) {
+            app(RefundNotificationService::class)->handleRescheduledPaymentStatusTransition($booking);
         }
 
         $this->safeBroadcast(
