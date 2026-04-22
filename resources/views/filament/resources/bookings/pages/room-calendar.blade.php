@@ -12,11 +12,13 @@
         Booking::PAYMENT_STATUS_PAID => 'text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300',
         Booking::PAYMENT_STATUS_PARTIAL => 'text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300',
         Booking::PAYMENT_STATUS_UNPAID => 'text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300',
+        Booking::PAYMENT_STATUS_REFUNDED => 'text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300',
     ];
     $statusDisplayPillByPayment = [
         Booking::PAYMENT_STATUS_PARTIAL => 'bg-amber-100 text-amber-500 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-500/15 dark:text-amber-100 dark:ring-amber-400/25',
         Booking::PAYMENT_STATUS_PAID => 'bg-emerald-100 text-emerald-900 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/15 dark:text-emerald-100 dark:ring-emerald-400/25',
         Booking::PAYMENT_STATUS_UNPAID => 'bg-gray-100 text-gray-700 ring-1 ring-inset ring-gray-600/15 dark:bg-white/10 dark:text-gray-200 dark:ring-white/15',
+        Booking::PAYMENT_STATUS_REFUNDED => 'bg-rose-100 text-rose-900 ring-1 ring-inset ring-rose-600/20 dark:bg-rose-500/15 dark:text-rose-100 dark:ring-rose-400/25',
     ];
 @endphp
 

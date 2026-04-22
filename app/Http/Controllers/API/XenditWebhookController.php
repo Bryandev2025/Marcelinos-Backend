@@ -117,9 +117,7 @@ class XenditWebhookController extends Controller
 
         $bookingTotal = $this->toNumericAmount($booking->total_price);
 
-        $nextPayment = ($paidAmount >= $bookingTotal && $bookingTotal > 0)
-            ? Booking::PAYMENT_STATUS_PAID
-            : Booking::PAYMENT_STATUS_PARTIAL;
+        $nextPayment = Booking::paymentStatusFromAmounts($bookingTotal, $paidAmount);
 
         $invoiceUrl = (string) ($payload['invoice_url'] ?? '');
         $paymentMode = (string) ($payload['metadata']['payment_mode'] ?? '');

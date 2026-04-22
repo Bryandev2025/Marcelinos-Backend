@@ -334,6 +334,8 @@ class Booking extends Model
 
     const PAYMENT_STATUS_PAID = 'paid';
 
+    const PAYMENT_STATUS_REFUNDED = 'refunded';
+
     /**
      * Testimonial email / review eligibility: fully paid stay marked completed.
      */
@@ -446,6 +448,7 @@ class Booking extends Model
             self::PAYMENT_STATUS_UNPAID => 'Unpaid',
             self::PAYMENT_STATUS_PARTIAL => 'Partial',
             self::PAYMENT_STATUS_PAID => 'Paid',
+            self::PAYMENT_STATUS_REFUNDED => 'Refunded',
         ];
     }
 
@@ -551,7 +554,31 @@ class Booking extends Model
             'primary' => self::PAYMENT_STATUS_UNPAID,
             'info' => self::PAYMENT_STATUS_PARTIAL,
             'success' => self::PAYMENT_STATUS_PAID,
+            'warning' => self::PAYMENT_STATUS_REFUNDED,
         ];
+    }
+
+    /**
+     * Resolve payment status from recorded payments versus current booking total.
+     */
+    public static function paymentStatusFromAmounts(float $totalPrice, float $totalPaid): string
+    {
+        $totalPrice = max(0, $totalPrice);
+        $totalPaid = max(0, $totalPaid);
+
+        if ($totalPaid <= 0.009) {
+            return self::PAYMENT_STATUS_UNPAID;
+        }
+
+        if ($totalPaid > ($totalPrice + 0.009)) {
+            return self::PAYMENT_STATUS_REFUNDED;
+        }
+
+        if ($totalPaid < ($totalPrice - 0.009)) {
+            return self::PAYMENT_STATUS_PARTIAL;
+        }
+
+        return self::PAYMENT_STATUS_PAID;
     }
 
     /* ================= BLOCKED DATE CONFLICTS ================= */

@@ -58,6 +58,7 @@ class BookingController extends Controller
                         Booking::PAYMENT_STATUS_UNPAID,
                         Booking::PAYMENT_STATUS_PARTIAL,
                         Booking::PAYMENT_STATUS_PAID,
+                        Booking::PAYMENT_STATUS_REFUNDED,
                     ], true)
                 );
 
@@ -646,6 +647,7 @@ class BookingController extends Controller
                     Booking::PAYMENT_STATUS_UNPAID,
                     Booking::PAYMENT_STATUS_PARTIAL,
                     Booking::PAYMENT_STATUS_PAID,
+                    Booking::PAYMENT_STATUS_REFUNDED,
                 ]),
             ]);
 
@@ -730,6 +732,7 @@ class BookingController extends Controller
                         Booking::PAYMENT_STATUS_UNPAID,
                         Booking::PAYMENT_STATUS_PARTIAL,
                         Booking::PAYMENT_STATUS_PAID,
+                        Booking::PAYMENT_STATUS_REFUNDED,
                     ], true)
                 );
 
@@ -853,11 +856,14 @@ class BookingController extends Controller
         $nights = max(1, (int) $checkInDate->diffInDays($checkOutDate));
 
         $newTotal = $this->expectedTotalForBooking($booking, $nights);
+        $amountPaid = (float) $booking->total_paid;
+        $nextPaymentStatus = Booking::paymentStatusFromAmounts($newTotal, $amountPaid);
 
         $booking->update([
             'check_in' => $checkIn,
             'check_out' => $checkOut,
             'total_price' => $newTotal,
+            'payment_status' => $nextPaymentStatus,
             'booking_status' => Booking::BOOKING_STATUS_RESCHEDULED,
         ]);
 
