@@ -466,15 +466,6 @@ class BookingForm
                         })
                         ->disabled()
                         ->dehydrated(false),
-                    TextInput::make('xendit_invoice_id')
-                        ->label('Xendit invoice ID')
-                        ->disabled()
-                        ->dehydrated(false),
-                    TextInput::make('xendit_invoice_url')
-                        ->label('Xendit invoice URL')
-                        ->disabled()
-                        ->dehydrated(false)
-                        ->columnSpanFull(),
                 ]),
         ]);
     }
@@ -561,6 +552,71 @@ class BookingForm
         } else {
             $set('total_price', 0);
         }
+    }
+
+    /**
+     * Recomputes derived booking form fields when state is updated outside the main form
+     * flow (for example, in a slide-over editor).
+     *
+     * @param  array<string, mixed>  $state
+     * @return array<string, mixed>
+     */
+    public static function syncDerivedState(array $state, ?Booking $record = null): array
+    {
+        $checkIn = $state['check_in'] ?? null;
+        $checkOut = $state['check_out'] ?? null;
+        $roomIds = array_values(array_filter((array) ($state['rooms'] ?? [])));
+        $venueIds = array_values(array_filter((array) ($state['venues'] ?? [])));
+
+        $days = 0;
+
+        if ($checkIn && $checkOut) {
+            try {
+                $startDate = Carbon::parse((string) $checkIn);
+                $endDate = Carbon::parse((string) $checkOut);
+
+                $isVenueOnly = $roomIds === [] && $venueIds !== []
+                    && ! ($record instanceof Booking && $record->expectsRoomAssignments());
+
+                if ($isVenueOnly) {
+                    if (! $endDate->copy()->startOfDay()->lt($startDate->copy()->startOfDay())) {
+                        $days = max(1, (int) $startDate->copy()->startOfDay()->diffInDays($endDate->copy()->startOfDay()) + 1);
+                    }
+                } elseif ($endDate->greaterThan($startDate) && ! $endDate->isSameDay($startDate)) {
+                    $days = max(1, (int) $startDate->copy()->startOfDay()->diffInDays($endDate->copy()->startOfDay()));
+                }
+            } catch (\Exception $e) {
+                $days = 0;
+            }
+        }
+
+        $state['no_of_days'] = $days;
+
+        if (($roomIds !== [] || $venueIds !== []) && $days > 0) {
+            if ($roomIds !== []) {
+                $roomsTotal = (float) Room::query()->whereIn('id', $roomIds)->sum('price');
+            } else {
+                $roomsTotal = 0.0;
+                if ($record instanceof Booking) {
+                    $record->loadMissing('roomLines');
+                    if ($record->roomLines->isNotEmpty()) {
+                        $roomsTotal = (float) $record->roomLines->sum(
+                            fn ($line) => $line->quantity * (float) $line->unit_price_per_night
+                        );
+                    }
+                }
+            }
+
+            $venueEventType = $state['venue_event_type'] ?? null;
+            $venues = Venue::query()->whereIn('id', $venueIds)->get();
+            $venuesTotal = BookingPricing::sumVenueLine($venues, $venueEventType);
+
+            $state['total_price'] = ($roomsTotal + $venuesTotal) * $days;
+        } else {
+            $state['total_price'] = 0;
+        }
+
+        return $state;
     }
 
     public static function hasRoomConflicts($roomIds, $checkIn, $checkOut, ?Booking $record): bool
