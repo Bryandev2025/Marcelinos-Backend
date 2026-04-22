@@ -7,6 +7,8 @@ use App\Models\Booking;
 use App\Models\BedSpecification;
 use App\Models\Guest;
 use App\Models\Room;
+use App\Models\Venue;
+use App\Support\BookingPricing;
 use Closure;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Radio;
@@ -34,6 +36,31 @@ class BookingCreateWizard
             Step::make('Accommodation')
                 ->description('Pick dates, choose bed specification, then select available room(s) for those dates.')
                 ->schema([
+                    Select::make('booking_type')
+                        ->label('Booking type')
+                        ->options([
+                            'rooms' => 'Rooms',
+                            'venue' => 'Venue',
+                            'rooms_and_venues' => 'Rooms + venue',
+                        ])
+                        ->default('rooms')
+                        ->live()
+                        ->afterStateUpdated(function (Get $get, Set $set, ?string $state): void {
+                            if ($state === 'venue') {
+                                $set('bed_specification_id', null);
+                                $set('rooms', []);
+                                self::applyVenueFixedTimes($get, $set);
+                            }
+
+                            if ($state === 'rooms') {
+                                $set('venues', []);
+                                $set('venue_event_type', null);
+                            }
+
+                            BookingForm::updatePricing($get, $set);
+                        })
+                        ->columnSpanFull(),
+
                     DateTimePicker::make('check_in')
                         ->label('Check-in')
                         ->required()
@@ -47,7 +74,10 @@ class BookingCreateWizard
                         ->rules([
                             fn (Get $get) => self::roomAvailabilityRuleForCheckIn($get),
                         ])
-                        ->afterStateUpdated(fn (Get $get, Set $set) => BookingForm::updatePricing($get, $set)),
+                        ->afterStateUpdated(function (Get $get, Set $set): void {
+                            self::applyVenueFixedTimes($get, $set);
+                            BookingForm::updatePricing($get, $set);
+                        }),
 
                     DateTimePicker::make('check_out')
                         ->label('Check-out')
@@ -60,7 +90,7 @@ class BookingCreateWizard
                             $disabled = BookingForm::disabledCalendarDateStringsForWizard([]);
 
                             $checkIn = $get('check_in');
-                            if (filled($checkIn)) {
+                            if (filled($checkIn) && ! self::bookingTypeIsVenueOnly($get)) {
                                 try {
                                     $disabled[] = Carbon::parse($checkIn)->format('Y-m-d');
                                 } catch (\Exception $e) {
@@ -70,9 +100,11 @@ class BookingCreateWizard
 
                             return array_values(array_unique($disabled));
                         })
-                        ->helperText('Same blocked days as check-in; range must avoid all blocked nights.')
+                        ->helperText('Same blocked days as check-in; venue-only bookings may use same-day checkout.')
                         ->minDate(fn (Get $get) => filled($get('check_in'))
-                            ? Carbon::parse($get('check_in'))->startOfDay()->addDay()
+                            ? (self::bookingTypeIsVenueOnly($get)
+                                ? Carbon::parse($get('check_in'))->startOfDay()
+                                : Carbon::parse($get('check_in'))->startOfDay()->addDay())
                             : now())
                         ->rules([
                             fn (Get $get) => function (string $attribute, $value, $fail) use ($get): void {
@@ -86,20 +118,33 @@ class BookingCreateWizard
                                 } catch (\Exception $e) {
                                     return;
                                 }
+
+                                if (self::bookingTypeIsVenueOnly($get)) {
+                                    if ($end->copy()->startOfDay()->lt($start->copy()->startOfDay())) {
+                                        $fail('Check-out date cannot be before check-in date.');
+                                    }
+
+                                    return;
+                                }
+
                                 if ($end->lessThanOrEqualTo($start) || $end->isSameDay($start)) {
                                     $fail('Check-out must be at least the next day after check-in.');
                                 }
                             },
                             fn (Get $get) => self::roomAvailabilityRuleForCheckOut($get),
                         ])
-                        ->afterStateUpdated(fn (Get $get, Set $set) => BookingForm::updatePricing($get, $set)),
+                        ->afterStateUpdated(function (Get $get, Set $set): void {
+                            self::applyVenueFixedTimes($get, $set);
+                            BookingForm::updatePricing($get, $set);
+                        }),
 
                     Select::make('bed_specification_id')
                         ->label('Bed specification')
                         ->options(fn (): array => BedSpecification::query()->orderBy('specification')->pluck('specification', 'id')->all())
                         ->searchable()
                         ->preload()
-                        ->required()
+                        ->required(fn (Get $get): bool => self::bookingTypeUsesRooms($get))
+                        ->visible(fn (Get $get): bool => self::bookingTypeUsesRooms($get))
                         ->live()
                         ->helperText('Choose the bed specification first. The Rooms list will show only rooms with this spec that are available for the selected dates.')
                         ->afterStateUpdated(function (Get $get, Set $set): void {
@@ -145,11 +190,15 @@ class BookingCreateWizard
                         ->multiple()
                         ->searchable()
                         ->preload()
-                        ->required()
+                        ->required(fn (Get $get): bool => self::bookingTypeRequiresRooms($get))
+                        ->visible(fn (Get $get): bool => self::bookingTypeUsesRooms($get))
                         ->live()
                         ->helperText('Rooms are filtered by the selected bed specification and availability for the selected dates.')
                         ->rules([
                             fn (Get $get, ?Booking $record) => function (string $attribute, $value, $fail) use ($get, $record): void {
+                                if (! self::bookingTypeUsesRooms($get)) {
+                                    return;
+                                }
                                 if (BookingForm::hasRoomConflicts($value, $get('check_in'), $get('check_out'), $record)) {
                                     $fail('One or more selected rooms are not available for the chosen dates.');
                                 }
@@ -158,15 +207,53 @@ class BookingCreateWizard
                         ->afterStateUpdated(fn (Get $get, Set $set) => BookingForm::updatePricing($get, $set))
                         ->columnSpanFull(),
 
+                    Select::make('venues')
+                        ->label('Venues')
+                        ->relationship(
+                            'venues',
+                            'name',
+                            modifyQueryUsing: function ($query, ?string $search, ?Booking $record, Get $get): void {
+                                BookingForm::constrainAvailableVenuesQuery($query, $get, $record);
+                            },
+                        )
+                        ->multiple()
+                        ->searchable()
+                        ->preload()
+                        ->live()
+                        ->visible(fn (Get $get): bool => self::bookingTypeUsesVenues($get))
+                        ->required(fn (Get $get): bool => self::bookingTypeRequiresVenues($get))
+                        ->helperText('Optional for rooms-only bookings. Uses the same date-range availability checks.')
+                        ->rules([
+                            fn (Get $get, ?Booking $record) => function (string $attribute, $value, $fail) use ($get, $record): void {
+                                if (! self::bookingTypeUsesVenues($get)) {
+                                    return;
+                                }
+                                if (BookingForm::hasVenueConflicts($value, $get('check_in'), $get('check_out'), $record)) {
+                                    $fail('One or more selected venues are not available for the chosen dates.');
+                                }
+                            },
+                        ])
+                        ->afterStateUpdated(fn (Get $get, Set $set) => BookingForm::updatePricing($get, $set))
+                        ->columnSpanFull(),
+
+                    Radio::make('venue_event_type')
+                        ->label('Venue event type')
+                        ->options(BookingPricing::venueEventTypeOptions())
+                        ->default(BookingPricing::VENUE_EVENT_WEDDING)
+                        ->visible(fn (Get $get): bool => self::bookingTypeUsesVenues($get)
+                            && ! empty(array_filter((array) ($get('venues') ?? []))))
+                        ->live()
+                        ->afterStateUpdated(fn (Get $get, Set $set) => BookingForm::updatePricing($get, $set)),
+
                     TextInput::make('no_of_days')
-                        ->label('Nights')
+                        ->label(fn (Get $get): string => self::stayUnitLabel($get))
                         ->numeric()
-                        ->suffix('nights')
+                        ->suffix(fn (Get $get): string => self::stayUnitSuffix($get))
                         ->readOnly()
                         ->dehydrated(),
 
                     TextInput::make('total_price')
-                        ->label('Room total (estimated)')
+                        ->label(fn (Get $get): string => self::totalEstimateLabel($get))
                         ->default(0)
                         ->readOnly()
                         ->dehydrated()
@@ -255,7 +342,10 @@ class BookingCreateWizard
                                     Text::make(fn (Get $get): string => self::formatCheckInOut($get))
                                         ->weight(FontWeight::SemiBold)
                                         ->size(TextSize::Medium),
-                                    Text::make(fn (Get $get): string => self::formatRoomsLine($get)),
+                                    Text::make(fn (Get $get): string => self::formatRoomsLine($get))
+                                        ->visible(fn (Get $get): bool => self::bookingTypeUsesRooms($get)),
+                                    Text::make(fn (Get $get): string => self::formatVenuesLine($get))
+                                        ->visible(fn (Get $get): bool => self::bookingTypeUsesVenues($get)),
                                     Text::make(fn (Get $get): string => self::formatNightsAndTotal($get))
                                         ->weight(FontWeight::SemiBold),
                                 ]),
@@ -304,7 +394,7 @@ class BookingCreateWizard
             Step::make('Confirmation')
                 ->description('Everything below will be saved when you create the booking.')
                 ->schema([
-                    Text::make(fn (Get $get): string => 'Stay: '.trim(self::formatCheckInOut($get).' · '.self::formatRoomsLine($get).' · '.self::formatNightsAndTotal($get)))
+                    Text::make(fn (Get $get): string => 'Stay: '.trim(self::formatCheckInOut($get).' · '.self::formatAccommodationLine($get).' · '.self::formatNightsAndTotal($get)))
                         ->weight(FontWeight::Bold),
                     Text::make(fn (Get $get): string => 'Guest: '.self::formatGuestSummary($get)),
                     Text::make(fn (Get $get): string => 'Payment to record now: '.self::formatPaymentLine($get))
@@ -341,12 +431,47 @@ class BookingCreateWizard
         return 'Rooms: '.(empty($names) ? '—' : implode(', ', $names));
     }
 
+    private static function formatVenuesLine(Get $get): string
+    {
+        $ids = $get('venues') ?? [];
+        $ids = is_array($ids) ? array_filter($ids) : [];
+        if ($ids === []) {
+            return 'Venues: —';
+        }
+        $names = Venue::query()->whereIn('id', $ids)->pluck('name')->sort()->values()->all();
+
+        return 'Venues: '.(empty($names) ? '—' : implode(', ', $names));
+    }
+
+    private static function formatAccommodationLine(Get $get): string
+    {
+        $parts = [];
+        $roomIds = $get('rooms') ?? [];
+        $venueIds = $get('venues') ?? [];
+        $roomIds = is_array($roomIds) ? array_filter($roomIds) : [];
+        $venueIds = is_array($venueIds) ? array_filter($venueIds) : [];
+
+        if ($roomIds !== []) {
+            $parts[] = self::formatRoomsLine($get);
+        }
+        if ($venueIds !== []) {
+            $parts[] = self::formatVenuesLine($get);
+        }
+
+        if ($parts === []) {
+            return 'Rooms/Venues: —';
+        }
+
+        return implode(' · ', $parts);
+    }
+
     private static function formatNightsAndTotal(Get $get): string
     {
         $nights = (int) ($get('no_of_days') ?? 0);
         $total = number_format((float) ($get('total_price') ?? 0), 2);
+        $label = self::stayUnitLabel($get);
 
-        return "Nights: {$nights} · Total: ₱{$total}";
+        return "{$label}: {$nights} · Total: ₱{$total}";
     }
 
     private static function formatGuestName(Get $get): string
@@ -396,6 +521,89 @@ class BookingCreateWizard
         $totalStr = number_format($total, 2);
 
         return "₱{$amtStr}".($mode === 'full' ? " (full balance of ₱{$totalStr})" : " (custom; booking total ₱{$totalStr})");
+    }
+
+    private static function stayUnitLabel(Get $get): string
+    {
+        return self::bookingTypeIsVenueOnly($get) ? 'Days' : 'Nights';
+    }
+
+    private static function stayUnitSuffix(Get $get): string
+    {
+        return self::bookingTypeIsVenueOnly($get) ? 'days' : 'nights';
+    }
+
+    private static function bookingTypeUsesRooms(Get $get): bool
+    {
+        $type = (string) ($get('booking_type') ?? 'rooms');
+
+        return in_array($type, ['rooms', 'rooms_and_venues'], true);
+    }
+
+    private static function bookingTypeRequiresRooms(Get $get): bool
+    {
+        $type = (string) ($get('booking_type') ?? 'rooms');
+
+        return $type === 'rooms' || $type === 'rooms_and_venues';
+    }
+
+    private static function bookingTypeUsesVenues(Get $get): bool
+    {
+        $type = (string) ($get('booking_type') ?? 'rooms');
+
+        return in_array($type, ['venue', 'rooms_and_venues'], true);
+    }
+
+    private static function bookingTypeRequiresVenues(Get $get): bool
+    {
+        $type = (string) ($get('booking_type') ?? 'rooms');
+
+        return $type === 'venue' || $type === 'rooms_and_venues';
+    }
+
+    private static function bookingTypeIsVenueOnly(Get $get): bool
+    {
+        return (string) ($get('booking_type') ?? 'rooms') === 'venue';
+    }
+
+    private static function totalEstimateLabel(Get $get): string
+    {
+        $type = (string) ($get('booking_type') ?? 'rooms');
+
+        return match ($type) {
+            'venue' => 'Venue total (estimated)',
+            'rooms_and_venues' => 'Accommodation total (estimated)',
+            default => 'Room total (estimated)',
+        };
+    }
+
+    private static function applyVenueFixedTimes(Get $get, Set $set): void
+    {
+        if (! self::bookingTypeIsVenueOnly($get)) {
+            return;
+        }
+
+        self::setTimeIfPresent($get, $set, 'check_in', 8, 0);
+        self::setTimeIfPresent($get, $set, 'check_out', 0, 0);
+    }
+
+    private static function setTimeIfPresent(Get $get, Set $set, string $field, int $hour, int $minute): void
+    {
+        $value = $get($field);
+        if (! filled($value)) {
+            return;
+        }
+
+        try {
+            $parsed = Carbon::parse((string) $value);
+            $target = $parsed->copy()->setTime($hour, $minute, 0);
+
+            if (! $parsed->equalTo($target)) {
+                $set($field, $target->toDateTimeString());
+            }
+        } catch (\Exception $e) {
+            return;
+        }
     }
 
     /**

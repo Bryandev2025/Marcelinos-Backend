@@ -58,6 +58,17 @@ class CreateBooking extends CreateRecord
             ]);
         }
 
+        if (BookingForm::hasVenueConflicts(
+            $data['venues'] ?? [],
+            $data['check_in'] ?? null,
+            $data['check_out'] ?? null,
+            null,
+        )) {
+            throw ValidationException::withMessages([
+                'data.venues' => __('One or more selected venues are not available for the chosen dates.'),
+            ]);
+        }
+
         $guestKeys = [
             'first_name',
             'middle_name',
@@ -104,8 +115,12 @@ class CreateBooking extends CreateRecord
 
         unset($data['admin_payment_mode'], $data['admin_payment_amount']);
         unset($data['bed_specification_id']);
+        unset($data['booking_type']);
 
-        $data['venue_event_type'] = null;
+        $venueIds = array_filter((array) ($data['venues'] ?? []));
+        if ($venueIds === []) {
+            $data['venue_event_type'] = null;
+        }
 
         $totalInt = (int) round($total);
         $data['booking_status'] = Booking::BOOKING_STATUS_RESERVED;
