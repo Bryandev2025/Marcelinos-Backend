@@ -175,7 +175,7 @@
 .fi-icon-btn.fi-color-danger .fi-icon,
 .fi-icon-btn.fi-color-danger svg {
     color: #ffffff;
-    stroke: transparent;
+    stroke: currentColor;
 }
 
 /* Date/time picker: blocked / disabled days (Filament adds .fi-disabled) */
