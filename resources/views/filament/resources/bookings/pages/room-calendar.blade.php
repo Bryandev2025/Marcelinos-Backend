@@ -357,6 +357,9 @@
                                             {{ $row['reference_number'] }}
                                         </a>
                                         <p class="truncate text-gray-700 dark:text-gray-200">{{ $row['guest_name'] }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                                            {{ __('Active for :range', ['range' => $row['active_date_range'] ?? '—']) }}
+                                        </p>
                                     </div>
                                     <span
                                         @class([

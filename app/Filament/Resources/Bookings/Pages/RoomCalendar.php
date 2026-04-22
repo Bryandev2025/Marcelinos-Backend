@@ -440,7 +440,7 @@ class RoomCalendar extends Page
     }
 
     /**
-     * @return list<array{id: int, reference_number: string, guest_name: string, check_in: string, check_out: string, rooms: string, venues: string, booking_status: string, payment_status: string, status_display: string, has_assigned_rooms: bool, can_pay_balance: bool, can_check_in: bool, booking_badge_kind: 'room'|'venue'|'both'}>
+     * @return list<array{id: int, reference_number: string, guest_name: string, check_in: string, check_out: string, rooms: string, venues: string, booking_status: string, payment_status: string, active_date_range: string, status_display: string, has_assigned_rooms: bool, can_pay_balance: bool, can_check_in: bool, booking_badge_kind: 'room'|'venue'|'both'}>
      */
     #[Computed]
     public function modalBookingRows(): array
@@ -470,6 +470,7 @@ class RoomCalendar extends Page
             ->map(function (Booking $b) {
                 $hasAssignedRooms = $b->rooms->isNotEmpty();
                 $canCheckIn = BookingCheckInEligibility::assess($b)['allowed'];
+                $activeDateRange = $this->formatActiveDateRange($b);
 
                 return [
                     'id' => $b->id,
@@ -481,6 +482,7 @@ class RoomCalendar extends Page
                     'venues' => $b->venues->pluck('name')->filter()->implode(', ') ?: '—',
                     'booking_status' => (string) $b->booking_status,
                     'payment_status' => (string) $b->payment_status,
+                    'active_date_range' => $activeDateRange,
                     'status_display' => (Booking::bookingStatusOptions()[(string) $b->booking_status] ?? (string) $b->booking_status)
                         .' · '
                         .(Booking::paymentStatusOptions()[(string) $b->payment_status] ?? (string) $b->payment_status),
@@ -495,7 +497,7 @@ class RoomCalendar extends Page
     }
 
     /**
-     * @return list<array{id: int, reference_number: string, guest_name: string, check_in: string, check_out: string, rooms: string, venues: string, booking_status: string, payment_status: string, status_display: string, has_assigned_rooms: bool, can_pay_balance: bool, can_check_in: bool, booking_badge_kind: 'room'|'venue'|'both'}>
+     * @return list<array{id: int, reference_number: string, guest_name: string, check_in: string, check_out: string, rooms: string, venues: string, booking_status: string, payment_status: string, active_date_range: string, status_display: string, has_assigned_rooms: bool, can_pay_balance: bool, can_check_in: bool, booking_badge_kind: 'room'|'venue'|'both'}>
      */
     #[Computed]
     public function activeBookingRows(): array
@@ -511,6 +513,7 @@ class RoomCalendar extends Page
             ->map(function (Booking $b) {
                 $hasAssignedRooms = $b->rooms->isNotEmpty();
                 $canCheckIn = BookingCheckInEligibility::assess($b)['allowed'];
+                $activeDateRange = $this->formatActiveDateRange($b);
 
                 return [
                     'id' => $b->id,
@@ -522,6 +525,7 @@ class RoomCalendar extends Page
                     'venues' => $b->venues->pluck('name')->filter()->implode(', ') ?: '—',
                     'booking_status' => (string) $b->booking_status,
                     'payment_status' => (string) $b->payment_status,
+                    'active_date_range' => $activeDateRange,
                     'status_display' => (Booking::bookingStatusOptions()[(string) $b->booking_status] ?? (string) $b->booking_status)
                         .' · '
                         .(Booking::paymentStatusOptions()[(string) $b->payment_status] ?? (string) $b->payment_status),
@@ -538,6 +542,20 @@ class RoomCalendar extends Page
     protected function canPayBalanceForBooking(Booking $booking): bool
     {
         return BookingFullBalancePayment::assess($booking)['allowed'];
+    }
+
+    protected function formatActiveDateRange(Booking $booking): string
+    {
+        $checkIn = $booking->check_in;
+        $checkOut = $booking->check_out;
+
+        if (! $checkIn || ! $checkOut) {
+            return '—';
+        }
+
+        return $checkIn->isSameDay($checkOut)
+            ? $checkIn->format('F j')
+            : $checkIn->format('F j').' - '.$checkOut->format('F j');
     }
 
     /**
