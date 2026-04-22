@@ -38,6 +38,57 @@ class BookingResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'reference_number';
 
+    /**
+     * Show a sidebar badge for bookings created today.
+     */
+    public static function getNavigationBadge(): ?string
+    {
+        $viewedBookingIds = static::getViewedBookingIdsForToday();
+
+        $count = Booking::query()
+            ->whereDate('created_at', today())
+            ->when($viewedBookingIds !== [], fn (Builder $query): Builder => $query->whereNotIn('id', $viewedBookingIds))
+            ->count();
+
+        return $count > 0 ? (string) $count : null;
+    }
+
+    public static function markBookingAsViewed(int $bookingId): void
+    {
+        $key = static::viewedBookingsSessionKey();
+        $ids = session()->get($key, []);
+
+        if (! is_array($ids)) {
+            $ids = [];
+        }
+
+        $ids[] = $bookingId;
+        $ids = array_values(array_unique(array_map('intval', $ids)));
+
+        session()->put($key, $ids);
+    }
+
+    /**
+     * @return array<int>
+     */
+    protected static function getViewedBookingIdsForToday(): array
+    {
+        $ids = session()->get(static::viewedBookingsSessionKey(), []);
+
+        if (! is_array($ids)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_map('intval', $ids)));
+    }
+
+    protected static function viewedBookingsSessionKey(): string
+    {
+        $userId = auth()->id() ?? 'guest';
+
+        return 'filament.bookings.viewed.'.today()->toDateString().'.'.$userId;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return BookingForm::configure($schema);
