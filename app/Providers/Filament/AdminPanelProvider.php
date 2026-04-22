@@ -6,6 +6,7 @@ use App\Filament\Livewire\DatabaseNotifications as AppDatabaseNotifications;
 use App\Filament\Pages\ActivityHistory;
 use App\Filament\Pages\AdminDashboard;
 use App\Filament\Pages\Auth\Login;
+use App\Filament\Pages\Profile;
 use App\Filament\Pages\RecycleBin;
 use App\Filament\Pages\Settings;
 use App\Http\Middleware\EnsureAdminUser;
@@ -35,6 +36,7 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login(Login::class)
+            ->passwordReset()
             ->databaseNotifications(true, AppDatabaseNotifications::class, false)
             ->databaseNotificationsPolling('1s')
             ->colors([
@@ -55,6 +57,10 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->userMenuItems([
+                MenuItem::make()
+                    ->label('Profile')
+                    ->icon('heroicon-o-user')
+                    ->url(fn (): string => Profile::getUrl(panel: 'admin')),
                 MenuItem::make()
                     ->label('Settings')
                     ->icon('heroicon-o-cog-6-tooth')
