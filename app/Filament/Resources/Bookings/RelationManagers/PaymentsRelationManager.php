@@ -83,6 +83,7 @@ class PaymentsRelationManager extends RelationManager
                     ->modalHeading('Record cash payment')
                     ->modalSubmitActionLabel('Submit')
                     ->modalDescription('Enter a partial or full cash amount. To settle only the remaining balance in one step and mark Paid, use Settle remaining balance on the booking instead.')
+                    ->createAnother(false)
                     ->mutateFormDataUsing(function (array $data, RelationManager $livewire): array {
                         $booking = $livewire->getOwnerRecord();
                         $totalPaidSoFar = collect($livewire->getRelationship()->get())->sum('partial_amount');
