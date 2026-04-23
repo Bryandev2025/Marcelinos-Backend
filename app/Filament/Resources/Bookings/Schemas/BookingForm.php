@@ -184,6 +184,7 @@ class BookingForm
                                     return $parts !== [] ? implode(', ', $parts) : '—';
                                 })
                                 ->disabled()
+                                ->visible(fn (?Booking $record): bool => ! ($record?->guest?->is_international ?? false))
                                 ->dehydrated(false),
                         ])
                         ->columnSpanFull(),
@@ -230,6 +231,7 @@ class BookingForm
                             },
                         )
                         ->multiple()
+                        ->placeholder('Select an option')
                         ->searchable()
                         ->preload()
                         ->allowHtml()
@@ -304,6 +306,7 @@ class BookingForm
                             },
                         )
                         ->multiple()
+                        ->placeholder('Select an option')
                         ->searchable()
                         ->preload()
                         ->live()
@@ -322,7 +325,8 @@ class BookingForm
                                 }
                             },
                         ])
-                        ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePricing($get, $set)),
+                        ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePricing($get, $set))
+                        ->columnSpanFull(),
 
                     Radio::make('venue_event_type')
                         ->label('Venue event type')
@@ -330,9 +334,10 @@ class BookingForm
                         ->default(BookingPricing::VENUE_EVENT_WEDDING)
                         ->formatStateUsing(fn ($state): string => BookingPricing::normalizeVenueEventType(is_string($state) ? $state : null))
                         ->dehydrateStateUsing(fn ($state): string => BookingPricing::normalizeVenueEventType(is_string($state) ? $state : null))
-                        ->visible(fn (Get $get, ?Booking $record): bool => self::shouldShowVenueEventTypeField($get, $record))
+                        ->visible(fn (Get $get, ?Booking $record): bool => ! $record instanceof Booking && self::shouldShowVenueEventTypeField($get, $record))
                         ->live()
                         ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePricing($get, $set)),
+
                 ]),
 
             Section::make('Schedule and pricing')
