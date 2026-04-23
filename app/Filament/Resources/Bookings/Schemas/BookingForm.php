@@ -125,6 +125,7 @@ class BookingForm
         return $schema->components([
             Section::make('Booking details')
                 ->description('Guest, room allocation, and venue assignment.')
+                ->extraAttributes(['class' => 'h-full'])
                 ->columns(2)
                 ->schema([
                     Select::make('guest_id')
@@ -336,6 +337,7 @@ class BookingForm
 
             Section::make('Schedule and pricing')
                 ->description('Set stay dates and review auto-computed totals.')
+                ->extraAttributes(['class' => 'h-full'])
                 ->columns(2)
                 ->schema([
                     DateTimePicker::make('check_in')
@@ -416,43 +418,44 @@ class BookingForm
                         ->numeric()
                         ->prefix('₱')
                         ->helperText('Auto-calculated from selected rooms/venues and nights.'),
-                ]),
 
-            Section::make('Status and reference')
-                ->columns(2)
-                ->schema([
-                    Select::make('booking_status')
-                        ->label('Stay status')
-                        ->options(Booking::bookingStatusOptions())
-                        ->required(),
-                    Select::make('payment_status')
-                        ->label('Payment status')
-                        ->options(Booking::paymentStatusOptions())
-                        ->required(),
-                    TextInput::make('reference_number')
-                        ->label('Reference number')
-                        ->disabled()
-                        ->dehydrated(false),
-                    TextInput::make('payment_method')
-                        ->label('Payment method')
-                        ->formatStateUsing(fn ($state) => $state ? strtoupper((string) $state) : 'CASH')
-                        ->disabled()
-                        ->dehydrated(false),
-                    TextInput::make('online_payment_plan')
-                        ->label('Online payment plan')
-                        ->formatStateUsing(function ($state): string {
-                            $value = (string) $state;
-                            if (preg_match('/^partial_([1-9]|[1-9][0-9])$/', $value, $matches) === 1) {
-                                return 'PARTIAL '.$matches[1].'%';
-                            }
+                    Section::make('Status and reference')
+                        ->columns(2)
+                        ->columnSpanFull()
+                        ->schema([
+                            Select::make('booking_status')
+                                ->label('Stay status')
+                                ->options(Booking::bookingStatusOptions())
+                                ->required(),
+                            Select::make('payment_status')
+                                ->label('Payment status')
+                                ->options(Booking::paymentStatusOptions())
+                                ->required(),
+                            TextInput::make('reference_number')
+                                ->label('Reference number')
+                                ->disabled()
+                                ->dehydrated(false),
+                            TextInput::make('payment_method')
+                                ->label('Payment method')
+                                ->formatStateUsing(fn ($state) => $state ? strtoupper((string) $state) : 'CASH')
+                                ->disabled()
+                                ->dehydrated(false),
+                            TextInput::make('online_payment_plan')
+                                ->label('Online payment plan')
+                                ->formatStateUsing(function ($state): string {
+                                    $value = (string) $state;
+                                    if (preg_match('/^partial_([1-9]|[1-9][0-9])$/', $value, $matches) === 1) {
+                                        return 'PARTIAL '.$matches[1].'%';
+                                    }
 
-                            return match ($value) {
-                                'full' => 'FULL',
-                                default => '—',
-                            };
-                        })
-                        ->disabled()
-                        ->dehydrated(false),
+                                    return match ($value) {
+                                        'full' => 'FULL',
+                                        default => '—',
+                                    };
+                                })
+                                ->disabled()
+                                ->dehydrated(false),
+                        ]),
                 ]),
         ]);
     }
