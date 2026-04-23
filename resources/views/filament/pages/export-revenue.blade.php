@@ -9,7 +9,8 @@
                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Year</span>
                 <select
                     wire:model.live="revenueYear"
-                    class="fi-input block min-w-[7rem] rounded-lg border border-gray-300 bg-white py-1.5 ps-3 pe-8 text-sm text-gray-950 shadow-sm transition duration-75 focus:border-primary-600 focus:ring-2 focus:ring-primary-600/20 disabled:bg-gray-50 disabled:text-gray-500 disabled:opacity-70 dark:border-white/10 dark:bg-white/5 dark:text-white dark:focus:border-primary-500 dark:focus:ring-primary-500/20"
+                    class="fi-input block min-w-[7rem] rounded-lg border border-gray-300 bg-white text-black py-1.5 ps-3 pe-8 text-sm shadow-sm transition duration-75 focus:border-primary-600 focus:ring-2 focus:ring-primary-600/20 disabled:bg-gray-50 disabled:text-gray-500 disabled:opacity-70
+                        dark:border-white/10 dark:bg-gray-900 dark:text-white dark:focus:border-primary-500 dark:focus:ring-primary-500/20"
                 >
                     @for ($y = 2000; $y <= $this->maxSelectableRevenueYear(); $y++)
                         <option value="{{ $y }}">{{ $y }}</option>
