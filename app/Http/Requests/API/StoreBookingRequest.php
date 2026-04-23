@@ -2,8 +2,6 @@
 
 namespace App\Http\Requests\API;
 
-use App\Rules\ValidTurnstileToken;
-use App\Services\TurnstileVerificationService;
 use App\Support\BookingPricing;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -46,16 +44,9 @@ class StoreBookingRequest extends FormRequest
 
     public function rules(): array
     {
-        $turnstile = app(TurnstileVerificationService::class);
-        $captchaRules = array_values(array_filter([
-            $turnstile->isConfigured() ? 'required' : 'nullable',
-            'string',
-            new ValidTurnstileToken,
-        ]));
-
         return [
             'website' => ['nullable', 'string', 'max:0'],
-            'captcha_token' => $captchaRules,
+            'captcha_token' => ['nullable', 'string'],
             'reference_number' => 'nullable|string',
             'room_lines' => 'nullable|array|max:32',
             'room_lines.*.room_type' => ['required', 'string', Rule::in(['standard', 'family', 'deluxe'])],

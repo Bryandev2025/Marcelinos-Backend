@@ -8,7 +8,6 @@ use App\Models\Guest;
 use App\Models\Venue;
 use App\Support\BookingPricing;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use PHPUnit\Framework\Attributes\Test;
@@ -94,35 +93,13 @@ class BookingPublicSecurityTest extends TestCase
     }
 
     #[Test]
-    public function turnstile_secret_requires_captcha_token(): void
+    public function booking_accepts_request_without_captcha_token_when_turnstile_configured(): void
     {
         Mail::fake();
         config()->set('services.turnstile.secret_key', 'ts-secret-test');
 
         $venue = $this->createVenue();
         $payload = $this->venueOnlyPayload($venue);
-        unset($payload['captcha_token']);
-
-        $this->withHeaders($this->apiHeaders())
-            ->postJson('/api/bookings', $payload)
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['captcha_token']);
-    }
-
-    #[Test]
-    public function turnstile_success_creates_pending_verification_booking(): void
-    {
-        Mail::fake();
-        config()->set('services.turnstile.secret_key', 'ts-secret-test');
-        Http::fake([
-            'https://challenges.cloudflare.com/turnstile/v0/siteverify' => Http::response([
-                'success' => true,
-            ], 200),
-        ]);
-
-        $venue = $this->createVenue();
-        $payload = $this->venueOnlyPayload($venue);
-        $payload['captcha_token'] = 'valid-test-token';
 
         $response = $this->withHeaders($this->apiHeaders())
             ->postJson('/api/bookings', $payload);
