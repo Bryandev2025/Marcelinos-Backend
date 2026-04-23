@@ -1,8 +1,11 @@
 <x-filament-panels::page wire:poll.180s="refreshHealth">
     @php
         $emailUsed = max(0, (int) $this->emailsSentToday);
-        $emailLimit = max(1, (int) $this->mailDailyLimit);
-        $emailPercent = min(100, (int) round(($emailUsed / $emailLimit) * 100));
+        $emailLimit = max(0, (int) $this->mailDailyLimit);
+        $hasEmailLimit = $emailLimit > 0;
+        $emailPercent = $hasEmailLimit
+            ? min(100, (int) round(($emailUsed / $emailLimit) * 100))
+            : 0;
         $emailOnline = str_starts_with(strtolower((string) $this->emailHealth), 'online');
         $smsOnline = str_starts_with(strtolower((string) $this->smsHealth), 'online');
         
@@ -259,15 +262,30 @@
                             <div class="mt-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-100 dark:border-gray-800">
                                 <div class="flex justify-between items-end mb-2">
                                     <span class="text-2xl font-bold text-gray-900 dark:text-white">{{ number_format($emailUsed) }}</span>
-                                    <span class="text-sm font-medium text-gray-500 dark:text-gray-400">out of {{ number_format($emailLimit) }} limit</span>
+                                    <span class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                                        @if ($hasEmailLimit)
+                                            out of {{ number_format($emailLimit) }} limit
+                                        @else
+                                            no fixed daily limit
+                                        @endif
+                                    </span>
                                 </div>
                                 <div class="h-3 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                                     <div class="progress-bar-animated h-full rounded-full {{ $emailPercent > 85 ? 'bg-rose-500' : 'bg-emerald-500' }}"
                                          style="width: {{ $emailPercent }}%"></div>
                                 </div>
-                                <p class="mt-2 text-[11px] font-bold uppercase tracking-widest {{ $emailPercent > 85 ? 'text-rose-600 dark:text-rose-400' : 'text-gray-500 dark:text-gray-400' }}">
-                                    {{ $emailPercent }}% Daily Quota Consumed
-                                </p>
+                                @if ($hasEmailLimit)
+                                    <p class="mt-2 text-[11px] font-bold uppercase tracking-widest {{ $emailPercent > 85 ? 'text-rose-600 dark:text-rose-400' : 'text-gray-500 dark:text-gray-400' }}">
+                                        {{ $emailPercent }}% Daily Quota Consumed
+                                    </p>
+                                    <p class="mt-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                                        Credits left: {{ number_format(max(0, (int) $this->emailsLeftToday)) }}
+                                    </p>
+                                @else
+                                    <p class="mt-2 text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                                        Quota Tracking Disabled
+                                    </p>
+                                @endif
                             </div>
                         </div>
                         
@@ -407,7 +425,7 @@
                                 ['key' => 'mailEncryption', 'label' => 'Encryption Type', 'type' => 'text', 'icon' => 'heroicon-m-shield-check'],
                                 ['key' => 'mailUsername', 'label' => 'Mail Username', 'type' => 'email', 'icon' => 'heroicon-m-user'],
                                 ['key' => 'mailPassword', 'label' => 'Mail Password', 'type' => 'password', 'icon' => 'heroicon-m-key'],
-                                ['key' => 'mailDailyLimit', 'label' => 'Daily Quota Limit', 'type' => 'number', 'icon' => 'heroicon-m-chart-bar'],
+                                ['key' => 'mailDailyLimit', 'label' => 'Daily Quota Limit (0 = unlimited)', 'type' => 'number', 'icon' => 'heroicon-m-chart-bar'],
                                 ['key' => 'mailFromAddress', 'label' => 'Sender Address', 'type' => 'email', 'icon' => 'heroicon-m-at-symbol'],
                                 ['key' => 'mailFromName', 'label' => 'Sender Name', 'type' => 'text', 'icon' => 'heroicon-m-identification'],
                             ] as $field)
@@ -607,7 +625,7 @@
                         <div class="flex flex-col sm:flex-row justify-between sm:items-center pb-6 border-b border-gray-100 dark:border-gray-800 gap-4">
                             <div>
                                 <h3 class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                                    Xendit Integration
+                                    Payment Setting
                                     @if($this->xenditSecretKey !== '' && $this->xenditPublicKey !== '')
                                         <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20">Configured</span>
                                     @else
@@ -619,7 +637,7 @@
                             <div class="flex-shrink-0">
                                 @if (! $this->editingPayment)
                                     <x-filament::button size="md" color="primary" wire:click="enablePaymentEdit" icon="heroicon-m-adjustments-vertical" class="!rounded-xl shadow-sm w-full sm:w-auto">
-                                        Configure Gateway
+                                        Configure Settings
                                     </x-filament::button>
                                 @else
                                     <div class="mobile-safe-actions">

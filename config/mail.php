@@ -117,4 +117,6 @@ return [
 
     'booking_cc_address' => env('MAIL_BOOKING_CC_ADDRESS'),
 
+    'daily_limit' => (int) env('MAIL_DAILY_LIMIT', 100),
+
 ];

@@ -59,6 +59,7 @@ return [
 
     'semaphore' => [
         'api_key' => env('SEMAPHORE_API_KEY'),
+        'account_url' => env('SEMAPHORE_ACCOUNT_URL', 'https://api.semaphore.co/api/v4/account'),
         'otp_url' => env('SEMAPHORE_OTP_URL', 'https://api.semaphore.co/api/v4/otp'),
         'messages_url' => env('SEMAPHORE_MESSAGES_URL', 'https://api.semaphore.co/api/v4/messages'),
         'sender_name' => env('SEMAPHORE_SENDER_NAME'),

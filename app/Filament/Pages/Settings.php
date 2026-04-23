@@ -54,11 +54,15 @@ class Settings extends Page
 
     public string $mailFromName = '';
 
-    public int $mailDailyLimit = 1000;
+    public int $mailDailyLimit = 100;
 
     public string $semaphoreApiKey = '';
 
     public string $semaphoreOtpUrl = 'https://api.semaphore.co/api/v4/otp';
+
+    public string $semaphoreAccountUrl = 'https://api.semaphore.co/api/v4/account';
+
+    public string $semaphoreMessagesUrl = 'https://api.semaphore.co/api/v4/messages';
 
     public string $semaphoreSenderName = '';
 
@@ -181,7 +185,7 @@ class Settings extends Page
             'mailEncryption' => ['nullable', 'string'],
             'mailFromAddress' => ['required', 'email'],
             'mailFromName' => ['required', 'string'],
-            'mailDailyLimit' => ['required', 'integer', 'min:1', 'max:100000'],
+            'mailDailyLimit' => ['required', 'integer', 'min:0', 'max:100000'],
         ]);
 
         EnvEditor::updateMany([
@@ -203,6 +207,7 @@ class Settings extends Page
             'mail.mailers.smtp.encryption' => $this->mailEncryption,
             'mail.from.address' => $this->mailFromAddress,
             'mail.from.name' => $this->mailFromName,
+            'mail.daily_limit' => $this->mailDailyLimit,
         ]);
 
         $this->editingMail = false;
@@ -233,6 +238,12 @@ class Settings extends Page
             'SEMAPHORE_API_KEY' => $this->semaphoreApiKey,
             'SEMAPHORE_OTP_URL' => $this->semaphoreOtpUrl,
             'SEMAPHORE_SENDER_NAME' => $this->semaphoreSenderName,
+        ]);
+
+        config([
+            'services.semaphore.api_key' => $this->semaphoreApiKey,
+            'services.semaphore.otp_url' => $this->semaphoreOtpUrl,
+            'services.semaphore.sender_name' => $this->semaphoreSenderName,
         ]);
 
         $this->editingSms = false;
@@ -419,7 +430,9 @@ class Settings extends Page
         $this->emailHealth = $this->checkEmailHealth();
         $this->smsHealth = $this->checkSmsHealth();
         $this->emailsSentToday = $this->resolveEmailsSentToday();
-        $this->emailsLeftToday = max(0, $this->mailDailyLimit - $this->emailsSentToday);
+        $this->emailsLeftToday = $this->mailDailyLimit > 0
+            ? max(0, $this->mailDailyLimit - $this->emailsSentToday)
+            : 0;
         $this->lastCheckedAt = now()->format('Y-m-d H:i:s');
     }
 
@@ -494,7 +507,7 @@ class Settings extends Page
         }
 
         try {
-            $response = Http::timeout(10)->get('https://api.semaphore.co/api/v4/account', [
+            $response = Http::timeout(10)->get($this->semaphoreAccountUrl, [
                 'apikey' => $this->semaphoreApiKey,
             ]);
 
@@ -566,7 +579,7 @@ class Settings extends Page
             ? (int) round(($this->emailsSentToday / $this->mailDailyLimit) * 100)
             : 0;
 
-        if ($emailUsagePercent >= $this->emailAlertThresholdValue()) {
+        if ($this->mailDailyLimit > 0 && $emailUsagePercent >= $this->emailAlertThresholdValue()) {
             $alerts[] = [
                 'title' => 'Email quota is high',
                 'detail' => "Usage is at {$emailUsagePercent}% today.",
@@ -614,18 +627,20 @@ class Settings extends Page
 
     private function loadFromEnv(): void
     {
-        $this->mailHost = (string) env('MAIL_HOST', 'smtp.hostinger.com');
-        $this->mailPort = (string) env('MAIL_PORT', '465');
-        $this->mailUsername = (string) env('MAIL_USERNAME', '');
-        $this->mailPassword = (string) env('MAIL_PASSWORD', '');
-        $this->mailEncryption = (string) env('MAIL_ENCRYPTION', 'ssl');
-        $this->mailFromAddress = (string) env('MAIL_FROM_ADDRESS', '');
-        $this->mailFromName = (string) env('MAIL_FROM_NAME', '');
-        $this->mailDailyLimit = (int) env('MAIL_DAILY_LIMIT', 1000);
+        $this->mailHost = (string) config('mail.mailers.smtp.host', 'smtp.hostinger.com');
+        $this->mailPort = (string) config('mail.mailers.smtp.port', '465');
+        $this->mailUsername = (string) config('mail.mailers.smtp.username', '');
+        $this->mailPassword = (string) config('mail.mailers.smtp.password', '');
+        $this->mailEncryption = (string) config('mail.mailers.smtp.encryption', 'ssl');
+        $this->mailFromAddress = (string) config('mail.from.address', '');
+        $this->mailFromName = (string) config('mail.from.name', '');
+        $this->mailDailyLimit = max(0, (int) config('mail.daily_limit', 100));
 
-        $this->semaphoreApiKey = (string) env('SEMAPHORE_API_KEY', '');
-        $this->semaphoreOtpUrl = (string) env('SEMAPHORE_OTP_URL', 'https://api.semaphore.co/api/v4/otp');
-        $this->semaphoreSenderName = (string) env('SEMAPHORE_SENDER_NAME', '');
+        $this->semaphoreApiKey = (string) config('services.semaphore.api_key', '');
+        $this->semaphoreAccountUrl = (string) config('services.semaphore.account_url', 'https://api.semaphore.co/api/v4/account');
+        $this->semaphoreOtpUrl = (string) config('services.semaphore.otp_url', 'https://api.semaphore.co/api/v4/otp');
+        $this->semaphoreMessagesUrl = (string) config('services.semaphore.messages_url', 'https://api.semaphore.co/api/v4/messages');
+        $this->semaphoreSenderName = (string) config('services.semaphore.sender_name', '');
 
         $this->maintenanceModeEnabled = filter_var(env('MAINTENANCE_MODE_ENABLED', false), FILTER_VALIDATE_BOOLEAN);
         $this->maintenanceVariant = MaintenancePageVariant::normalize((string) env('MAINTENANCE_MODE_VARIANT', MaintenancePageVariant::DEFAULT));
@@ -699,7 +714,7 @@ class Settings extends Page
                 now()->addMinutes(5),
                 function (): array {
                     $response = Http::timeout(10)
-                        ->get('https://api.semaphore.co/api/v4/account', [
+                        ->get($this->semaphoreAccountUrl, [
                             'apikey' => $this->semaphoreApiKey,
                         ]);
 
@@ -738,7 +753,7 @@ class Settings extends Page
                 now()->addMinutes(2),
                 function () use ($today): array {
                     $response = Http::timeout(10)
-                        ->get('https://api.semaphore.co/api/v4/messages', [
+                        ->get($this->semaphoreMessagesUrl, [
                             'apikey' => $this->semaphoreApiKey,
                             'startDate' => $today,
                             'endDate' => $today,
