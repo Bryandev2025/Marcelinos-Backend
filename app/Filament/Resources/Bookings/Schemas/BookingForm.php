@@ -971,6 +971,18 @@ class BookingForm
         }
         $html .= '</ul>';
 
+        $stayCount = max(0, (int) ($record->no_of_days ?? 0));
+        $totalPrice = max(0, (float) ($record->total_price ?? 0));
+        if ($stayCount > 0) {
+            $unitPrice = $totalPrice / $stayCount;
+            $stayLabel = $stayCount === 1 ? 'night' : 'nights';
+            $html .= '<p class="mt-3 text-sm font-medium text-gray-700 dark:text-gray-200">'
+                .e($stayCount.' '.$stayLabel)
+                .' × ₱'.number_format($unitPrice, 2)
+                .' = ₱'.number_format($totalPrice, 2)
+                .'</p>';
+        }
+
         if ($record->roomLines->isNotEmpty()) {
             $total = (int) $record->roomLines->sum('quantity');
             $html .= '<p class="mt-3 text-sm text-gray-500 dark:text-gray-400">Assign exactly <strong>'.$total.'</strong> physical room(s) in “Assigned rooms” so each line matches.</p>';
