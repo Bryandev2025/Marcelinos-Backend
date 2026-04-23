@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\API;
 
 use App\Events\BookingCancelled;
-use App\Mail\BookingCreated;
 use App\Events\BookingRescheduled;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\API\StoreBookingRequest;
@@ -389,15 +388,6 @@ class BookingController extends Controller
         $booking->generateQrCode();
 
         $fresh = $booking->fresh(['guest', 'rooms', 'venues', 'roomLines']);
-
-        if ($guest->email) {
-            $mail = Mail::to($guest->email);
-            $bookingCcAddress = config('mail.booking_cc_address');
-            if (filled($bookingCcAddress)) {
-                $mail->cc($bookingCcAddress);
-            }
-            $mail->send(new BookingCreated($fresh));
-        }
 
         $paymentUrl = $this->provisionOnlineInvoiceForPublicBooking($booking->fresh(['guest']), $guest);
 
