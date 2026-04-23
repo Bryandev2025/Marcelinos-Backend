@@ -29,6 +29,14 @@ final class BookingCheckInEligibility
             return ['allowed' => false, 'reason' => self::REASON_TRASHED, 'message' => null];
         }
 
+        if ($booking->booking_status !== Booking::BOOKING_STATUS_RESERVED) {
+            return [
+                'allowed' => false,
+                'reason' => self::REASON_INVALID_STATUS,
+                'message' => __('Booking must be Reserved before check-in.'),
+            ];
+        }
+
         if (! $booking->isCheckInTodayManila()) {
             return [
                 'allowed' => false,

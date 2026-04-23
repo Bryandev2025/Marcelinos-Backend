@@ -95,6 +95,18 @@ class EditBooking extends EditRecord
                 $this->shouldRecordFullPaymentAfterSave = true;
                 unset($data['payment_status']);
             }
+
+            // If staff changed dates/rooms/venues, total_price may change. When the payment status
+            // field is left untouched, keep it consistent with the actual paid amount.
+            if (array_key_exists('payment_status', $data)
+                && (string) $incomingPaymentStatus === (string) $record->payment_status) {
+                $newTotal = array_key_exists('total_price', $data) ? (float) $data['total_price'] : (float) $record->total_price;
+                $paid = (float) $record->total_paid;
+                $computed = Booking::paymentStatusFromAmounts($newTotal, $paid);
+                if ($computed !== $incomingPaymentStatus) {
+                    $data['payment_status'] = $computed;
+                }
+            }
         }
 
         return $data;
