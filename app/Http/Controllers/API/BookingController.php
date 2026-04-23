@@ -13,6 +13,7 @@ use App\Models\Payment;
 use App\Models\Room;
 use App\Models\Venue;
 use App\Services\BookingActionOtpService;
+use App\Support\CancellationPolicy;
 use App\Support\BookingDuplicateGuard;
 use App\Support\BookingPricing;
 use App\Support\RoomInventoryGroupAvailability;
@@ -266,6 +267,9 @@ class BookingController extends Controller
                 'amount_paid' => $amountPaid,
                 'balance' => $balance,
                 'amount_due_now' => $amountDueNow,
+            ],
+            'cancellation_policy' => [
+                'fee_percent' => CancellationPolicy::feePercent(),
             ],
             'unpaid_expires_at' => $bookingPayload->unpaidExpiresAt()?->toIso8601String(),
             'unpaid_expiry_days' => Booking::UNPAID_EXPIRY_DAYS,
@@ -929,11 +933,17 @@ class BookingController extends Controller
                 'booking_status' => Booking::BOOKING_STATUS_CANCELLED,
             ]);
 
+            $cancellation = CancellationPolicy::breakdown(
+                (float) $booking->total_price,
+                (float) $booking->total_paid
+            );
+
             broadcast(new BookingCancelled($booking))->toOthers();
 
             return response()->json([
                 'message' => 'Booking cancelled successfully.',
                 'booking' => $booking,
+                'cancellation' => $cancellation,
             ], 200);
         } catch (\Throwable $e) {
             return response()->json([

@@ -112,6 +112,8 @@ class Settings extends Page
 
     public bool $allowCustomPartialPayment = false;
 
+    public int $cancellationFeePercent = 30;
+
     public string $xenditSecretKey = '';
 
     public string $xenditPublicKey = '';
@@ -332,6 +334,7 @@ class Settings extends Page
             'onlinePaymentEnabled' => ['required', 'boolean'],
             'partialPaymentSelection' => $this->partialPaymentRules(),
             'allowCustomPartialPayment' => ['required', 'boolean'],
+            'cancellationFeePercent' => ['required', 'integer', 'min:0', 'max:100'],
             'xenditSecretKey' => ['nullable', 'string', 'max:255'],
             'xenditPublicKey' => ['nullable', 'string', 'max:255'],
             'xenditWebhookToken' => ['nullable', 'string', 'max:255'],
@@ -346,6 +349,7 @@ class Settings extends Page
             'PAYMENT_ONLINE_ENABLED' => $this->onlinePaymentEnabled ? 'true' : 'false',
             'PAYMENT_PARTIAL_OPTIONS' => (string) $normalizedPartialOption,
             'PAYMENT_PARTIAL_ALLOW_CUSTOM' => $this->allowCustomPartialPayment ? 'true' : 'false',
+            'PAYMENT_CANCELLATION_FEE_PERCENT' => (string) $this->cancellationFeePercent,
             'XENDIT_SECRET_KEY' => $this->xenditSecretKey,
             'XENDIT_PUBLIC_KEY' => $this->xenditPublicKey,
             'XENDIT_WEBHOOK_TOKEN' => $this->xenditWebhookToken,
@@ -355,6 +359,7 @@ class Settings extends Page
             'online_payment_enabled' => $this->onlinePaymentEnabled,
             'partial_payment_options' => [$normalizedPartialOption],
             'allow_custom_partial_payment' => $this->allowCustomPartialPayment,
+            'cancellation_fee_percent' => $this->cancellationFeePercent,
         ]);
 
         $this->partialPaymentOptions = (string) $normalizedPartialOption;
@@ -650,6 +655,7 @@ class Settings extends Page
         $this->maintenanceEta = (string) env('MAINTENANCE_MODE_ETA', '');
         $this->onlinePaymentEnabled = filter_var(env('PAYMENT_ONLINE_ENABLED', false), FILTER_VALIDATE_BOOLEAN);
         $this->allowCustomPartialPayment = filter_var(env('PAYMENT_PARTIAL_ALLOW_CUSTOM', false), FILTER_VALIDATE_BOOLEAN);
+        $this->cancellationFeePercent = max(0, min(100, (int) env('PAYMENT_CANCELLATION_FEE_PERCENT', 30)));
         $this->partialPaymentOptions = (string) env('PAYMENT_PARTIAL_OPTIONS', '30');
         $this->partialPaymentSelection = $this->normalizePartialPaymentSelection(
             $this->partialPaymentOptions,

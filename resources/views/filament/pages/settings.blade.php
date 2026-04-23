@@ -677,6 +677,17 @@
                                         @endif
                                     </div>
                                 </div>
+                                <div class="p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 shadow-sm md:col-span-2">
+                                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-3">Cancellation Deduction Rule</p>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="px-3 py-1 bg-white dark:bg-gray-700 rounded-lg text-sm font-bold text-rose-600 dark:text-rose-300 shadow-sm border border-gray-100 dark:border-gray-600">
+                                            {{ (int) $this->cancellationFeePercent }}%
+                                        </span>
+                                        <span class="text-xs text-gray-500 dark:text-gray-400">
+                                            Deduct from booking total (capped by amount already paid).
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
                         @else
                             <div class="space-y-6">
@@ -743,6 +754,28 @@
                                             />
                                             <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">Allow Custom Deposit Inputs</span>
                                         </label>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-rose-50/60 dark:bg-rose-900/10 p-6 rounded-2xl border border-rose-100 dark:border-rose-800/40">
+                                    <div>
+                                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Cancellation Deduction Percentage</label>
+                                        <div class="max-w-xs relative">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                wire:model.defer="cancellationFeePercent"
+                                                class="premium-input pr-10"
+                                                placeholder="e.g. 30"
+                                            />
+                                            <span class="absolute right-3 top-2.5 text-sm font-bold text-gray-500 dark:text-gray-300">%</span>
+                                        </div>
+                                    </div>
+                                    <div class="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+                                        <p class="font-semibold mb-1">Rule preview</p>
+                                        <p>Cancellation fee is based on booking total. Collected amount is capped by what the guest has already paid.</p>
+                                        <p class="mt-1">Example: if total is ₱10,000 and deduction is {{ (int) $this->cancellationFeePercent }}%, fee is ₱{{ number_format((10000 * (int) $this->cancellationFeePercent) / 100, 2) }}.</p>
                                     </div>
                                 </div>
 
