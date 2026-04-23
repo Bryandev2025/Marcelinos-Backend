@@ -818,7 +818,7 @@ class BookingForm
         $name = e(trim((string) $room->name));
         $summary = e($room->typeDashBedSummary());
 
-        return '<span class="inline-flex w-full max-w-full min-w-0 items-baseline gap-x-1 '.$class.'"><span class="font-medium text-gray-950 dark:text-white">'.$name.'</span><span class="text-gray-600 dark:text-gray-300 shrink-0">('.$summary.')</span></span>';
+        return '<span class="block w-full min-w-0 text-left '.$class.'"><span class="font-medium text-gray-950 dark:text-white">'.$name.'</span> <span class="text-gray-600 dark:text-gray-300">('.$summary.')</span></span>';
     }
 
     /**
