@@ -143,7 +143,7 @@
                             <table role="presentation" cellspacing="0" cellpadding="0">
                                 <tr>
                                     <td align="center" bgcolor="#749B66" style="border-radius:8px;">
-                                        <a href="{{ config('app.url') }}/contact"
+                                        <a href="{{ $continueConversationUrl }}"
                                            style="display:inline-block; padding:12px 22px; font-size:14px; font-weight:600; line-height:20px; color:#ffffff; text-decoration:none; border-radius:8px; font-family:'Poppins', Arial, Helvetica, sans-serif;">
                                             Visit Our Website
                                         </a>
