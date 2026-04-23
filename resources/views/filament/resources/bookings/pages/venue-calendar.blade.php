@@ -12,7 +12,7 @@
 
 <x-filament-panels::page>
     <div
-        class="mx-auto max-w-6xl space-y-5 px-1 pb-8 transition-opacity duration-200 sm:space-y-8 sm:px-0 sm:pb-10"
+        class="booking-cal-page mx-auto w-full min-w-0 max-w-6xl space-y-5 pb-8 transition-opacity duration-200 sm:space-y-8 sm:px-0 sm:pb-10"
         wire:loading.class="pointer-events-none opacity-60"
         wire:target="previousMonth,nextMonth,month,year"
     >
@@ -27,9 +27,9 @@
                 class="pointer-events-none absolute -bottom-20 -left-20 h-56 w-56 rounded-full bg-sky-400/10 blur-3xl dark:bg-sky-500/10"
             ></div>
 
-            <div class="relative flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
-                <div class="min-w-0 space-y-2">
-                    <div class="flex items-center gap-3">
+            <div class="relative flex min-w-0 flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
+                <div class="min-w-0 flex-1 space-y-2">
+                    <div class="flex min-w-0 items-start gap-3 sm:items-center">
                         <span
                             class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white shadow-md shadow-primary-900/20 ring-1 ring-white/20 dark:bg-primary-500 dark:ring-white/10"
                         >
@@ -38,13 +38,13 @@
                                 class="h-6 w-6"
                             />
                         </span>
-                        <div>
+                        <div class="min-w-0 flex-1">
                             <h1
                                 class="text-xl font-semibold tracking-tight text-gray-950 sm:text-2xl dark:text-white"
                             >
                                 {{ __('Venue Calendar') }}
                             </h1>
-                            <p class="text-sm text-gray-600 dark:text-gray-400">
+                            <p class="text-pretty break-words text-sm leading-relaxed text-gray-600 dark:text-gray-400">
                                 {{ __('Overlapping stays by venue. Cancelled reservations are excluded.') }}
                             </p>
                         </div>
@@ -52,7 +52,7 @@
                 </div>
 
                 <div
-                    class="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200/90 bg-gray-50/90 px-3 py-2 text-xs text-gray-600 shadow-inner dark:border-white/10 dark:bg-white/5 dark:text-gray-300"
+                    class="flex w-full min-w-0 max-w-full flex-wrap items-center gap-2 rounded-xl border border-gray-200/90 bg-gray-50/90 px-3 py-2 text-xs text-gray-600 shadow-inner sm:w-auto sm:max-w-none dark:border-white/10 dark:bg-white/5 dark:text-gray-300"
                 >
                     <x-filament::icon
                         icon="heroicon-m-sparkles"
@@ -72,6 +72,7 @@
 
         {{-- Calendar card --}}
         <x-filament::section
+            class="min-w-0 max-w-full"
             icon="heroicon-o-squares-2x2"
             icon-color="primary"
             :heading="$this->currentPeriodLabel()"
