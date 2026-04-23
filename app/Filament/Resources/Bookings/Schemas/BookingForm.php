@@ -165,7 +165,8 @@ class BookingForm
                                 ->label('Country')
                                 ->formatStateUsing(fn (?Booking $record): string => $record?->guest?->country ?? '—')
                                 ->disabled()
-                                ->dehydrated(false),
+                                ->dehydrated(false)
+                                ->visible(fn (?Booking $record): bool => $record?->guest?->is_international ?? false),
                             TextInput::make('guest_info_address')
                                 ->label('Address')
                                 ->formatStateUsing(function (?Booking $record): string {
