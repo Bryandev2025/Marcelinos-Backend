@@ -8,6 +8,7 @@ use App\Filament\Actions\TypedForceDeleteAction;
 use App\Filament\Actions\TypedForceDeleteBulkAction;
 use App\Filament\Exports\BookingExporter;
 use App\Mail\BookingCreated;
+use App\Mail\VerifyBookingEmail;
 use App\Models\Booking;
 use App\Models\Room;
 use App\Support\BookingAdminGuidance;
@@ -46,6 +47,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\URL;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class BookingsTable
@@ -789,7 +791,7 @@ class BookingsTable
                         ->color('gray')
                         ->requiresConfirmation()
                         ->modalHeading('Resend Booking Confirmation')
-                        ->modalDescription('This will send another booking confirmation email to the guest.')
+                        ->modalDescription('This will resend the booking email to the guest. Pending verification bookings receive the verification email.')
                         ->modalSubmitActionLabel('Yes, resend email')
                         ->successNotificationTitle('Email successfully resent.')
                         ->visible(fn (Booking $record) => $record->guest?->email !== null)
@@ -800,6 +802,18 @@ class BookingsTable
 
                                 if (filled($bookingCcAddress)) {
                                     $mail->cc($bookingCcAddress);
+                                }
+
+                                if ($record->booking_status === Booking::BOOKING_STATUS_PENDING_VERIFICATION) {
+                                    $hours = max(1, (int) config('booking.pending_verification_url_ttl_hours', 72));
+                                    $verifyUrl = URL::temporarySignedRoute(
+                                        'bookings.verify-email',
+                                        now()->addHours($hours),
+                                        ['booking' => $record->id],
+                                    );
+                                    $mail->send(new VerifyBookingEmail($record, $verifyUrl));
+
+                                    return;
                                 }
 
                                 $mail->send(new BookingCreated($record));
