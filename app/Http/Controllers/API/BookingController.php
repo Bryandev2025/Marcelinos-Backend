@@ -13,12 +13,12 @@ use App\Models\Payment;
 use App\Models\Room;
 use App\Models\Venue;
 use App\Services\BookingActionOtpService;
-use Barryvdh\DomPDF\Facade\Pdf;
-use App\Support\CancellationPolicy;
 use App\Support\BookingDuplicateGuard;
 use App\Support\BookingPricing;
+use App\Support\CancellationPolicy;
 use App\Support\RoomInventoryGroupAvailability;
 use App\Support\RoomInventoryGroupKey;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -307,6 +307,7 @@ class BookingController extends Controller
             'cancellation_policy' => [
                 'fee_percent' => CancellationPolicy::feePercent(),
             ],
+            'cancellation_refund' => CancellationPolicy::cancelledBookingRefundTransparency($bookingPayload),
             'unpaid_expires_at' => $bookingPayload->unpaidExpiresAt()?->toIso8601String(),
             'unpaid_expiry_days' => Booking::UNPAID_EXPIRY_DAYS,
             'use_messenger_deposit_instructions' => $bookingPayload->useMessengerDepositInstructions(),
@@ -482,6 +483,7 @@ class BookingController extends Controller
             'depositDueLabel' => $depositDueLabel,
             'showMessengerDepositBlock' => $showMessengerDepositBlock,
             'messengerLink' => $messengerLink,
+            'cancellationRefund' => CancellationPolicy::cancelledBookingRefundTransparency($booking),
         ];
     }
 
@@ -1205,14 +1207,24 @@ class BookingController extends Controller
                 ], 422);
             }
 
-            $booking->update([
-                'booking_status' => Booking::BOOKING_STATUS_CANCELLED,
-            ]);
-
             $cancellation = CancellationPolicy::breakdown(
                 (float) $booking->total_price,
                 (float) $booking->total_paid
             );
+
+            $updates = [
+                'booking_status' => Booking::BOOKING_STATUS_CANCELLED,
+            ];
+
+            $paymentStatus = (string) $booking->payment_status;
+            if (in_array($paymentStatus, [
+                Booking::PAYMENT_STATUS_PARTIAL,
+                Booking::PAYMENT_STATUS_PAID,
+            ], true)) {
+                $updates['payment_status'] = Booking::PAYMENT_STATUS_REFUND_PENDING;
+            }
+
+            $booking->update($updates);
 
             broadcast(new BookingCancelled($booking))->toOthers();
 

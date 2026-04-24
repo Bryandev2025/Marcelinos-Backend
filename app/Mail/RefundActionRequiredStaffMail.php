@@ -24,7 +24,7 @@ class RefundActionRequiredStaffMail extends Mailable
     public function build(): self
     {
         return $this
-            ->subject("Marcelino's Resort Hotel - Refund Alert for Rescheduled Booking")
+            ->subject("Marcelino's Resort Hotel - Refund action required")
             ->view('emails.refund-action-required-staff');
     }
 }

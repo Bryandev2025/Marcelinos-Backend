@@ -249,7 +249,7 @@ class BookingObserver
         }
 
         if ($booking->wasChanged('payment_status')) {
-            app(RefundNotificationService::class)->handleRescheduledPaymentStatusTransition($booking);
+            app(RefundNotificationService::class)->handleRefundPipelinePaymentStatusTransition($booking);
         }
 
         $this->safeBroadcast(
@@ -383,5 +383,4 @@ class BookingObserver
             ]);
         }
     }
-
 }

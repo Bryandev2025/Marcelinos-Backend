@@ -12,13 +12,17 @@ use Illuminate\Support\Facades\Mail;
 
 class RefundNotificationService
 {
-    public function handleRescheduledPaymentStatusTransition(Booking $booking): void
+    public function handleRefundPipelinePaymentStatusTransition(Booking $booking): void
     {
         if (! $booking->wasChanged('payment_status')) {
             return;
         }
 
-        if ((string) $booking->booking_status !== Booking::BOOKING_STATUS_RESCHEDULED) {
+        $stayStatus = (string) $booking->booking_status;
+        if (! in_array($stayStatus, [
+            Booking::BOOKING_STATUS_RESCHEDULED,
+            Booking::BOOKING_STATUS_CANCELLED,
+        ], true)) {
             return;
         }
 

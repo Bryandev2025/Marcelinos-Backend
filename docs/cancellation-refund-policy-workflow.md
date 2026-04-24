@@ -56,41 +56,67 @@ Returns:
 - `allow_custom_partial_payment`
 - `cancellation_fee_percent`
 
+## `GET /api/bookings/receipt/{token}` (and reference variant)
+
+When the booking is **cancelled** and `payment_status` is **`refund_pending`** or **`refunded`**, and the guest **paid** something, the JSON includes **`cancellation_refund`**:
+
+- `fee_percent` — cancellation deduction percentage (admin setting)
+- `fee_from_total` — fee amount from booking total (PHP)
+- `amount_paid` — total amount the guest paid (PHP)
+- `retained` — non-refundable portion kept (PHP)
+- `refund_to_guest` — amount the guest receives back after deduction (PHP)
+
+The same figures appear on the **billing statement PDF** download for those bookings. The guest-facing receipt (Step 5) renders this block for full transparency.
+
 ## `PATCH /api/bookings/{booking}/cancel`
 
-After OTP verification and status update to `cancelled`, response includes:
+After OTP verification:
 
-- `cancellation.fee_percent`
-- `cancellation.fee_from_total`
-- `cancellation.amount_paid`
-- `cancellation.amount_to_keep`
-- `cancellation.amount_to_refund`
+- `booking_status` is set to `cancelled`.
+- If the booking was **partial** or **paid**, `payment_status` is set to **`refund_pending`** (unpaid bookings stay `unpaid`).
+- Response `booking` reflects the updated row.
+- Response `cancellation` includes:
 
-## 5) Staff/Admin process for cancelled bookings
+  - `cancellation.fee_percent`
+  - `cancellation.fee_from_total`
+  - `cancellation.amount_paid`
+  - `cancellation.amount_to_keep`
+  - `cancellation.amount_to_refund`
 
-1. Open booking and trigger cancellation flow.
-2. OTP is verified for cancellation.
-3. Booking status changes to `cancelled`.
-4. System computes cancellation breakdown using active fee percentage.
-5. Staff/admin use `amount_to_refund` as the operational refund target.
+The `cancellation` object is computed **before** the status update, using the active admin **Cancellation Deduction Percentage** (`cancellation_fee_percent`).
+
+## 5a) Admin list & view (next step)
+
+- **Bookings list** (`/admin/bookings/list`): the **Next step** column shows **Complete refund** when stay is cancelled and payment is **Refund pending**. Hover the cell for a tooltip with **fee %, fee amount, paid, retained, refund to guest**.
+- **View / Edit booking** — **Front desk & payments** panel includes an orange **Cancellation — refund transparency** box (same figures) above the **Next:** line.
+
+## 5) Staff/Admin process: Refund pending → Refunded
+
+**Guest-cancel flow**
+
+1. Guest completes OTP cancellation (`PATCH .../cancel`).
+2. Booking is `cancelled`. If they had paid (partial or paid), `payment_status` is **`refund_pending`**.
+3. Staff receive the refund alert email (when enabled). The email includes policy-based lines for **cancelled** bookings (deduction %, retained amount, amount to refund).
+4. Staff process the refund externally using the policy breakdown (and `amount_to_refund` from the cancel API or admin context).
+5. In Filament (bookings table, booking edit/view actions, or room calendar where applicable), use **Mark refund completed** after payout. The confirmation modal shows the current policy breakdown (for cancelled bookings) or overpayment summary (for **rescheduled** bookings still in `refund_pending`).
+6. `payment_status` becomes **`refunded`**. Guest refund-completed email may be sent per notification settings.
+
+**Reschedule overpayment flow** (unchanged in spirit)
+
+- Shortening a stay can set `payment_status` to `refund_pending` while `booking_status` stays **`rescheduled`**. Staff complete the refund the same way (**Mark refund completed**).
 
 Operational guidance:
 
-- If `amount_to_refund = 0`, no refund processing is needed.
-- If `amount_to_refund > 0`, process refund externally and record internal notes according to ops procedure.
+- If `amount_to_refund = 0`, staff may still use **Mark refund completed** to close the pipeline when no cash movement is required.
+- Filament **Edit booking** does not auto-recompute `payment_status` from paid amounts when status is `refund_pending` or `refunded`, so those states are not overwritten on save.
 
 ## 6) Current scope and limitations
 
 - The global cancellation fee is configurable in admin settings.
 - Per-booking manual override amount is **not implemented yet**.
-- No automatic payment record mutation/refund transaction is posted at cancel time; current implementation returns computed refund guidance values in API response.
+- No automatic payment record mutation/refund transaction is posted at cancel time; staff confirm completion in admin after external refund.
 
-## 7) Verification checklist
+## 7) Automated tests
 
-- `php -l` passed for:
-  - `app/Filament/Pages/Settings.php`
-  - `app/Http/Controllers/API/PaymentSettingsController.php`
-  - `app/Support/CancellationPolicy.php`
-  - `app/Http/Controllers/API/BookingController.php`
-- React Doctor check passed (`100/100`) after frontend policy updates.
+- `tests/Feature/BookingGuestCancelRefundTest.php` — guest cancel sets `refund_pending` for paid bookings; unpaid stays unpaid; Edit booking preserves `refund_pending` when saving.
 

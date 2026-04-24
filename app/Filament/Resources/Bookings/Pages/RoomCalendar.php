@@ -592,7 +592,10 @@ class RoomCalendar extends Page
 
     protected function canMarkRefundCompletedForBooking(Booking $booking): bool
     {
-        return $booking->booking_status === Booking::BOOKING_STATUS_RESCHEDULED
+        return in_array($booking->booking_status, [
+            Booking::BOOKING_STATUS_RESCHEDULED,
+            Booking::BOOKING_STATUS_CANCELLED,
+        ], true)
             && $booking->payment_status === Booking::PAYMENT_STATUS_REFUND_PENDING;
     }
 

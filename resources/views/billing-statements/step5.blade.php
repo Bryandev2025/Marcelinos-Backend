@@ -185,6 +185,36 @@
             margin-bottom: 2px;
         }
 
+        .banner.cancellation-refund {
+            border-color: #fdba74;
+            background: #fff7ed;
+            color: #7c2d12;
+        }
+
+        .banner.cancellation-refund .cr-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 6px;
+            font-size: 9px;
+        }
+
+        .banner.cancellation-refund .cr-table td {
+            padding: 3px 0;
+            vertical-align: top;
+        }
+
+        .banner.cancellation-refund .cr-table td:first-child {
+            color: #9a3412;
+            width: 58%;
+            padding-right: 8px;
+        }
+
+        .banner.cancellation-refund .cr-table td:last-child {
+            text-align: right;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
         .two-col {
             width: 100%;
             border-collapse: collapse;
@@ -612,6 +642,37 @@
                     </td>
                 </tr>
             </table>
+
+            @if (! empty($cancellationRefund))
+                <div class="banner cancellation-refund" style="margin-top: 10px;">
+                    <strong>Cancellation — refund transparency</strong>
+                    <div class="muted" style="margin-top: 2px; font-size: 8.5px; line-height: 1.35;">
+                        Based on the cancellation policy in effect now: <strong>{{ (int) $cancellationRefund['fee_percent'] }}%</strong> of the booking total is the cancellation fee. Amounts below show how that applies to what you paid.
+                    </div>
+                    <table class="cr-table">
+                        <tr>
+                            <td>Booking total (for fee calculation)</td>
+                            <td>₱{{ number_format((float) $grandTotal, 2) }}</td>
+                        </tr>
+                        <tr>
+                            <td>Cancellation fee ({{ (int) $cancellationRefund['fee_percent'] }}% of booking total)</td>
+                            <td>₱{{ number_format((float) $cancellationRefund['fee_from_total'], 2) }}</td>
+                        </tr>
+                        <tr>
+                            <td>Amount you paid</td>
+                            <td>₱{{ number_format((float) $cancellationRefund['amount_paid'], 2) }}</td>
+                        </tr>
+                        <tr>
+                            <td>Deducted / retained (non-refundable portion)</td>
+                            <td>₱{{ number_format((float) $cancellationRefund['retained'], 2) }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Refund to you (after deduction)</strong></td>
+                            <td><strong>₱{{ number_format((float) $cancellationRefund['refund_to_guest'], 2) }}</strong></td>
+                        </tr>
+                    </table>
+                </div>
+            @endif
 
             @if (! empty($venueItems))
                 <div style="text-align:center; margin-top: 6px;">

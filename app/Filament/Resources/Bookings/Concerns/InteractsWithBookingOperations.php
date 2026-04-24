@@ -9,6 +9,7 @@ use App\Support\BookingCheckInEligibility;
 use App\Support\BookingFullBalancePayment;
 use App\Support\BookingLifecycleActions;
 use App\Support\BookingSpecialDiscount;
+use App\Support\CancellationPolicy;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
@@ -36,6 +37,7 @@ trait InteractsWithBookingOperations
                     Action::make('bookingOpSpecialDiscount')
                         ->label(function (): string {
                             $record = $this->getRecord();
+
                             return $record instanceof Booking && BookingSpecialDiscount::hasDiscount($record)
                                 ? __('Update special discount')
                                 : __('Apply special discount');
@@ -47,6 +49,7 @@ trait InteractsWithBookingOperations
                             if (! $record instanceof Booking) {
                                 return false;
                             }
+
                             return BookingSpecialDiscount::assessCanMutate($record, auth()->user())['allowed'];
                         })
                         ->modalHeading(__('Special discount'))
@@ -104,6 +107,7 @@ trait InteractsWithBookingOperations
                                         $value = (float) ($get('value') ?? 0);
                                         if ($type === '' || $value <= 0) {
                                             $gross = BookingSpecialDiscount::grossTotal($record);
+
                                             return 'Gross ₱'.number_format($gross, 2).' → Net ₱'.number_format((float) $record->total_price, 2);
                                         }
 
@@ -162,6 +166,7 @@ trait InteractsWithBookingOperations
                             if (! BookingSpecialDiscount::hasDiscount($record)) {
                                 return false;
                             }
+
                             return BookingSpecialDiscount::assessCanMutate($record, auth()->user())['allowed'];
                         })
                         ->action(function (): void {
@@ -210,7 +215,9 @@ trait InteractsWithBookingOperations
                         ->color('success')
                         ->requiresConfirmation()
                         ->modalHeading(__('Confirm refund completion?'))
-                        ->modalDescription(__('Use this only after the guest refund has been processed externally. This updates payment status to Refunded.'))
+                        ->modalDescription(fn (): string => $this->getRecord() instanceof Booking
+                            ? CancellationPolicy::adminMarkRefundCompletedModalBody($this->getRecord())
+                            : '')
                         ->visible(fn (): bool => $this->shouldOfferMarkRefundCompletedForRecord())
                         ->action(function (): void {
                             $this->runMarkRefundCompleted();
@@ -292,7 +299,9 @@ trait InteractsWithBookingOperations
                 ->color('success')
                 ->requiresConfirmation()
                 ->modalHeading(__('Confirm refund completion?'))
-                ->modalDescription(__('Use this only after the guest refund has been processed externally. This updates payment status to Refunded.'))
+                ->modalDescription(fn (): string => $this->getRecord() instanceof Booking
+                    ? CancellationPolicy::adminMarkRefundCompletedModalBody($this->getRecord())
+                    : '')
                 ->visible(fn (): bool => $this->shouldOfferMarkRefundCompletedForRecord())
                 ->action(function (): void {
                     $this->runMarkRefundCompleted();
@@ -300,6 +309,7 @@ trait InteractsWithBookingOperations
             Action::make('viewBookingSpecialDiscount')
                 ->label(function (): string {
                     $record = $this->getRecord();
+
                     return $record instanceof Booking && BookingSpecialDiscount::hasDiscount($record)
                         ? __('Update discount')
                         : __('Apply discount');
@@ -311,6 +321,7 @@ trait InteractsWithBookingOperations
                     if (! $record instanceof Booking) {
                         return false;
                     }
+
                     return BookingSpecialDiscount::assessCanMutate($record, auth()->user())['allowed'];
                 })
                 ->modalHeading(__('Special discount'))
@@ -368,6 +379,7 @@ trait InteractsWithBookingOperations
                                 $value = (float) ($get('value') ?? 0);
                                 if ($type === '' || $value <= 0) {
                                     $gross = BookingSpecialDiscount::grossTotal($record);
+
                                     return 'Gross ₱'.number_format($gross, 2).' → Net ₱'.number_format((float) $record->total_price, 2);
                                 }
 
@@ -492,14 +504,17 @@ trait InteractsWithBookingOperations
             return false;
         }
 
-        return $record->booking_status === Booking::BOOKING_STATUS_RESCHEDULED
+        return in_array($record->booking_status, [
+            Booking::BOOKING_STATUS_RESCHEDULED,
+            Booking::BOOKING_STATUS_CANCELLED,
+        ], true)
             && $record->payment_status === Booking::PAYMENT_STATUS_REFUND_PENDING;
     }
 
     public function runMarkRefundCompleted(): void
     {
         $record = $this->getRecord();
-        if (! $record instanceof Booking) {
+        if (! $record instanceof Booking || ! $this->shouldOfferMarkRefundCompletedForRecord()) {
             return;
         }
 
