@@ -6,958 +6,758 @@
         $emailPercent = $hasEmailLimit
             ? min(100, (int) round(($emailUsed / $emailLimit) * 100))
             : 0;
-        $emailOnline = str_starts_with(strtolower((string) $this->emailHealth), 'online');
-        $smsOnline = str_starts_with(strtolower((string) $this->smsHealth), 'online');
+
         $hostingerDaysLeft = $this->hostingerPlanDaysLeft();
-        
-        $tabMeta = [
-            'overview' => [
-                'label' => 'Dashboard Overview',
-                'icon' => 'heroicon-m-squares-2x2',
-                'desc' => 'System health & metrics',
-                'color' => 'text-indigo-600 dark:text-indigo-400',
-                'bg' => 'bg-indigo-50 dark:bg-indigo-500/10',
-                'active_border' => 'border-indigo-500',
-                'active_glow' => 'rgba(99, 102, 241, 0.15)',
-            ],
-            'actions' => [
-                'label' => 'Diagnostics & Ops',
-                'icon' => 'heroicon-m-cpu-chip',
-                'desc' => 'Run connectivity tests',
-                'color' => 'text-sky-600 dark:text-sky-400',
-                'bg' => 'bg-sky-50 dark:bg-sky-500/10',
-                'active_border' => 'border-sky-500',
-                'active_glow' => 'rgba(14, 165, 233, 0.15)',
-            ],
-            'email' => [
-                'label' => 'Email Configuration',
-                'icon' => 'heroicon-m-envelope',
-                'desc' => 'SMTP & mail quotas',
-                'color' => 'text-emerald-600 dark:text-emerald-400',
-                'bg' => 'bg-emerald-50 dark:bg-emerald-500/10',
-                'active_border' => 'border-emerald-500',
-                'active_glow' => 'rgba(16, 185, 129, 0.15)',
-            ],
-            'sms' => [
-                'label' => 'SMS Gateway',
-                'icon' => 'heroicon-m-chat-bubble-left-right',
-                'desc' => 'Manage Semaphore API',
-                'color' => 'text-purple-600 dark:text-purple-400',
-                'bg' => 'bg-purple-50 dark:bg-purple-500/10',
-                'active_border' => 'border-purple-500',
-                'active_glow' => 'rgba(168, 85, 247, 0.15)',
-            ],
-            'maintenance' => [
-                'label' => 'Maintenance Mode',
-                'icon' => 'heroicon-m-wrench',
-                'desc' => 'Control public access',
-                'color' => 'text-rose-600 dark:text-rose-400',
-                'bg' => 'bg-rose-50 dark:bg-rose-500/10',
-                'active_border' => 'border-rose-500',
-                'active_glow' => 'rgba(244, 63, 94, 0.15)',
-            ],
-            'payment' => [
-                'label' => 'Payment Processing',
-                'icon' => 'heroicon-m-credit-card',
-                'desc' => 'Xendit API & Webhooks',
-                'color' => 'text-amber-600 dark:text-amber-400',
-                'bg' => 'bg-amber-50 dark:bg-amber-500/10',
-                'active_border' => 'border-amber-500',
-                'active_glow' => 'rgba(245, 158, 11, 0.15)',
-            ],
+
+        $tabs = [
+            'overview' => ['label' => 'Overview', 'icon' => 'heroicon-m-squares-2x2'],
+            'actions' => ['label' => 'Diagnostics', 'icon' => 'heroicon-m-cpu-chip'],
+            'email' => ['label' => 'Email', 'icon' => 'heroicon-m-envelope'],
+            'sms' => ['label' => 'SMS', 'icon' => 'heroicon-m-chat-bubble-left-right'],
+            'maintenance' => ['label' => 'Maintenance', 'icon' => 'heroicon-m-wrench'],
+            'payment' => ['label' => 'Payment', 'icon' => 'heroicon-m-credit-card'],
         ];
-        $currentTab = $tabMeta[$this->activeTab] ?? $tabMeta['overview'];
     @endphp
 
-    <style>
-        .premium-settings {
-            color: inherit;
-        }
+    <div class="space-y-6">
+        <x-filament::section>
+            <x-slot name="heading">
+                <div class="flex items-center justify-between gap-3">
+                    <span class="inline-flex items-center gap-2">
+                        <x-filament::icon icon="heroicon-m-adjustments-horizontal" class="h-5 w-5 text-primary-500" />
+                        Platform settings
+                    </span>
 
-        .page-hero-card,
-        .premium-card {
-            background: rgb(255 255 255 / 1);
-            border: 1px solid rgb(226 232 240 / 1);
-            border-radius: 0.75rem;
-            box-shadow: 0 1px 2px rgb(15 23 42 / 0.06);
-        }
-
-        .dark .page-hero-card,
-        .dark .premium-card {
-            background: rgb(15 23 42 / 1);
-            border-color: rgb(51 65 85 / 0.7);
-        }
-
-        .section-shell {
-            border-top: 3px solid rgb(131 160 112 / 0.45);
-        }
-
-        .premium-input {
-            width: 100%;
-            border: 1px solid rgb(203 213 225 / 1);
-            border-radius: 0.625rem;
-            background: rgb(255 255 255 / 1);
-            color: inherit;
-            padding: 0.625rem 0.875rem;
-            font-size: 0.875rem;
-            line-height: 1.25rem;
-        }
-
-        .dark .premium-input {
-            border-color: rgb(71 85 105 / 0.75);
-            background: rgb(15 23 42 / 1);
-        }
-
-        .premium-input:focus {
-            outline: none;
-            border-color: rgb(131 160 112 / 1);
-            box-shadow: 0 0 0 3px rgb(131 160 112 / 0.2);
-        }
-
-        .premium-input:disabled {
-            opacity: 0.75;
-            cursor: not-allowed;
-        }
-
-        .pulse-indicator {
-            display: inline-flex;
-            width: 0.5rem;
-            height: 0.5rem;
-            border-radius: 9999px;
-        }
-
-        .settings-tabs {
-            scrollbar-width: none;
-        }
-
-        .settings-tabs::-webkit-scrollbar {
-            display: none;
-        }
-
-        .progress-bar-animated {
-            transition: width 0.3s ease;
-        }
-
-        .mobile-safe-actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.75rem;
-        }
-
-        .mobile-safe-actions > * {
-            flex: 1 1 auto;
-        }
-
-        @media (max-width: 640px) {
-            .mobile-safe-actions > * {
-                width: 100%;
-            }
-        }
-    </style>
-
-    <div class="premium-settings w-full">
-        <div class="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 space-y-6 pb-10 sm:pb-12">
-        
-        <!-- Hero Header Area -->
-        <div class="page-hero-card section-shell p-5 sm:p-7 lg:p-8">
-            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                <div>
-                    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-3">
-                        <div class="p-2.5 bg-[#83A070]/15 dark:bg-[#83A070]/20 rounded-xl text-[#618753] dark:text-[#9bb78b]">
-                            <x-filament::icon icon="heroicon-m-adjustments-horizontal" class="h-7 w-7" />
-                        </div>
-                        Platform Settings
-                    </h1>
-                    <p class="mt-3 text-sm sm:text-base text-gray-600 dark:text-gray-400 max-w-2xl leading-relaxed">
-                        Manage infrastructure, delivery channels, maintenance messaging, and payments in one professional control center.
-                    </p>
+                    <x-filament::button
+                        color="gray"
+                        size="sm"
+                        outlined
+                        wire:click="refreshHealth"
+                        icon="heroicon-m-arrow-path"
+                    >
+                        Refresh
+                    </x-filament::button>
                 </div>
-                
-                <div class="flex flex-col gap-3 w-full sm:w-auto sm:min-w-[260px] min-w-0">
-                    <div class="premium-card p-4 rounded-xl flex items-center justify-between">
-                        <div>
-                            <p class="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-1">Status Overview</p>
-                            @if ($emailOnline && $smsOnline)
-                                <div class="flex items-center gap-2">
-                                    <span class="pulse-indicator text-emerald-500 bg-emerald-500"></span>
-                                    <span class="text-sm font-bold text-emerald-600 dark:text-emerald-400">All Systems Online</span>
-                                </div>
-                            @else
-                                <div class="flex items-center gap-2">
-                                    <span class="pulse-indicator text-rose-500 bg-rose-500"></span>
-                                    <span class="text-sm font-bold text-rose-600 dark:text-rose-400">Degraded Service</span>
-                                </div>
-                            @endif
-                        </div>
-                        <x-filament::button size="sm" color="gray" wire:click="refreshHealth" icon="heroicon-m-arrow-path" class="!rounded-lg" title="Force Refresh Status">
-                            Refresh
-                        </x-filament::button>
-                    </div>
-                </div>
-            </div>
-        </div>
+            </x-slot>
+            <x-slot name="description">
+                Configure delivery channels, maintenance messaging, and payments. Health checks update automatically.
+            </x-slot>
 
-        <!-- Horizontal Tabs Row -->
-        <div class="w-full mx-auto overflow-x-auto settings-tabs pb-2 -mx-4 sm:mx-0">
-            <nav class="flex flex-col justify-center items-center sm:flex-row gap-2 bg-white dark:bg-slate-900 p-1.5 rounded-xl border border-gray-200 dark:border-slate-700 w-max min-w-full sm:w-full sm:flex-wrap sm:justify-start px-4 sm:px-1.5 shadow-sm">
-                @foreach ($tabMeta as $tabKey => $tabInfo)
-                    <button type="button"
-                        wire:click="setTab('{{ $tabKey }}')"
-                        class="shrink-0 whitespace-nowrap flex items-center gap-2.5 px-3.5 sm:px-4 py-3 rounded-lg font-semibold text-sm transition-all duration-200 min-h-[44px] {{ $this->activeTab === $tabKey ? 'bg-[#83A070]/15 text-[#618753] dark:bg-[#83A070]/20 dark:text-[#b4cca7] border border-[#83A070]/40' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700/50 border border-transparent' }}">
-                        <x-filament::icon :icon="$tabInfo['icon']" class="h-5 w-5" />
-                        {{ $tabInfo['label'] }}
+            <div class="flex flex-wrap items-center gap-2">
+                @foreach ($tabs as $key => $tab)
+                    <button
+                        type="button"
+                        wire:click="setTab('{{ $key }}')"
+                        @class([
+                            'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition',
+                            'bg-primary-600 text-white shadow-sm hover:bg-primary-500 dark:bg-primary-500 dark:hover:bg-primary-400' => $this->activeTab === $key,
+                            'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-white/5 dark:text-gray-300 dark:hover:bg-white/10' => $this->activeTab !== $key,
+                        ])
+                    >
+                        <x-filament::icon :icon="$tab['icon']" class="h-4 w-4" />
+                        {{ $tab['label'] }}
                     </button>
                 @endforeach
-            </nav>
-        </div>
+            </div>
+        </x-filament::section>
 
-        <!-- Main Content Area -->
-        <main class="w-full min-w-0 pb-16">
-            <!-- Intelligent Alerts -->
-            @if (count($this->alerts) > 0)
-                <div class="space-y-4 mb-8">
-                    @foreach ($this->alerts as $alert)
-                        <div class="rounded-xl p-4 flex items-start gap-4 border shadow-sm
-                            {{ $alert['level'] === 'danger' ? 'border-rose-200 bg-rose-50 dark:border-rose-500/20 dark:bg-rose-500/10' : 'border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10' }}">
-                            <div class="flex-shrink-0 mt-0.5 p-2 rounded-full {{ $alert['level'] === 'danger' ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400' : 'bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400' }}">
-                                <x-filament::icon :icon="$alert['level'] === 'danger' ? 'heroicon-m-exclamation-circle' : 'heroicon-m-exclamation-triangle'" class="h-6 w-6" />
-                            </div>
-                            <div class="flex-1">
-                                <h3 class="text-base font-bold tracking-tight {{ $alert['level'] === 'danger' ? 'text-rose-900 dark:text-rose-300' : 'text-amber-900 dark:text-amber-300' }}">{{ $alert['title'] }}</h3>
-                                <div class="mt-1 text-sm font-medium {{ $alert['level'] === 'danger' ? 'text-rose-700 dark:text-rose-400' : 'text-amber-700 dark:text-amber-400' }}">{{ $alert['detail'] }}</div>
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-            @endif
-
-            <div>
-                <!-- Section Header -->
-                <div class="mb-6 flex flex-col md:flex-row md:items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-4 gap-4">
-                    <div>
-                        <h2 class="text-2xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-3">
-                            <span class="{{ $currentTab['color'] }} p-2 {{ $currentTab['bg'] }} rounded-xl">
-                                <x-filament::icon :icon="$currentTab['icon']" class="h-6 w-6" />
+        @if (count($this->alerts) > 0)
+            <div class="space-y-3">
+                @foreach ($this->alerts as $alert)
+                    <x-filament::section>
+                        <x-slot name="heading">
+                            <span class="inline-flex items-center gap-2">
+                                <x-filament::icon
+                                    :icon="$alert['level'] === 'danger' ? 'heroicon-m-exclamation-circle' : 'heroicon-m-exclamation-triangle'"
+                                    class="h-5 w-5 {{ $alert['level'] === 'danger' ? 'text-danger-500' : 'text-warning-500' }}"
+                                />
+                                {{ $alert['title'] }}
                             </span>
-                            {{ $currentTab['label'] }}
-                        </h2>
-                        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400 font-medium">{{ $currentTab['desc'] }}</p>
-                    </div>
-                </div>
+                        </x-slot>
+                        <p class="text-sm text-gray-600 dark:text-gray-300">{{ $alert['detail'] }}</p>
+                    </x-filament::section>
+                @endforeach
+            </div>
+        @endif
 
-                <!-- DASHBOARD OVERVIEW TAB -->
-                @if ($this->activeTab === 'overview')
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <!-- Email KPI -->
-                        <div class="premium-card p-6 flex flex-col justify-between">
-                            <div class="flex justify-between items-start mb-6">
-                                <div class="p-3 bg-blue-50 dark:bg-blue-500/10 rounded-2xl">
-                                    <x-filament::icon icon="heroicon-o-envelope" class="h-7 w-7 text-blue-500" />
-                                </div>
-                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold {{ $emailOnline ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400' }}">
-                                    {{ $this->emailHealth }}
-                                </span>
+        @if ($this->activeTab === 'overview')
+            <div class="grid gap-6 lg:grid-cols-2">
+                <x-filament::section>
+                    <x-slot name="heading">
+                        <span class="inline-flex items-center gap-2">
+                            <x-filament::icon icon="heroicon-o-envelope" class="h-5 w-5 text-primary-500" />
+                            Email delivery health
+                        </span>
+                    </x-slot>
+                    <x-slot name="description">{{ $this->emailHealth }}</x-slot>
+
+                    <div class="space-y-3">
+                        <div class="flex items-end justify-between gap-3">
+                            <div class="text-3xl font-semibold tabular-nums text-gray-900 dark:text-white">
+                                {{ number_format($emailUsed) }}
                             </div>
-                            <dt class="text-sm font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-1">Email Delivery Health</dt>
-                            
-                            <div class="mt-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-100 dark:border-gray-800">
-                                <div class="flex justify-between items-end mb-2">
-                                    <span class="text-2xl font-bold text-gray-900 dark:text-white">{{ number_format($emailUsed) }}</span>
-                                    <span class="text-sm font-medium text-gray-500 dark:text-gray-400">
-                                        @if ($hasEmailLimit)
-                                            out of {{ number_format($emailLimit) }} limit
-                                        @else
-                                            no fixed daily limit
-                                        @endif
-                                    </span>
-                                </div>
-                                <div class="h-3 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                    <div class="progress-bar-animated h-full rounded-full {{ $emailPercent > 85 ? 'bg-rose-500' : 'bg-emerald-500' }}"
-                                         style="width: {{ $emailPercent }}%"></div>
-                                </div>
+                            <div class="text-sm text-gray-500 dark:text-gray-400">
                                 @if ($hasEmailLimit)
-                                    <p class="mt-2 text-[11px] font-bold uppercase tracking-widest {{ $emailPercent > 85 ? 'text-rose-600 dark:text-rose-400' : 'text-gray-500 dark:text-gray-400' }}">
-                                        {{ $emailPercent }}% Daily Quota Consumed
-                                    </p>
-                                    <p class="mt-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                                        Credits left: {{ number_format(max(0, (int) $this->emailsLeftToday)) }}
-                                    </p>
+                                    out of {{ number_format($emailLimit) }} limit
                                 @else
-                                    <p class="mt-2 text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
-                                        Quota Tracking Disabled
-                                    </p>
-                                @endif
-                            </div>
-                        </div>
-                        
-                        <!-- SMS KPI -->
-                        <div class="premium-card p-6 flex flex-col justify-between">
-                            <div class="flex justify-between items-start mb-6">
-                                <div class="p-3 bg-purple-50 dark:bg-purple-500/10 rounded-2xl">
-                                    <x-filament::icon icon="heroicon-o-device-phone-mobile" class="h-7 w-7 text-purple-500" />
-                                </div>
-                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold {{ $smsOnline ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' : 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400' }}">
-                                    {{ $this->smsHealth }}
-                                </span>
-                            </div>
-                            <dt class="text-sm font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-1">SMS Gateway Status</dt>
-                            
-                            <div class="mt-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-100 dark:border-gray-800 flex flex-col justify-center gap-1 h-[104px]">
-                                <span class="text-3xl font-bold text-gray-900 dark:text-white">
-                                    {{ $this->smsCredits !== null ? number_format($this->smsCredits, 2) : 'N/A' }}
-                                </span>
-                                <span class="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Available Credits</span>
-                            </div>
-                        </div>
-
-                        <!-- Hosting Plan KPI -->
-                        <div class="premium-card p-6 flex flex-col justify-between">
-                            <div class="flex justify-between items-start mb-6">
-                                <div class="p-3 bg-amber-50 dark:bg-amber-500/10 rounded-2xl">
-                                    <x-filament::icon icon="heroicon-o-server-stack" class="h-7 w-7 text-amber-500" />
-                                </div>
-                                @if ($hostingerDaysLeft === null)
-                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700 dark:bg-gray-700/50 dark:text-gray-300">
-                                        No Expiry Date
-                                    </span>
-                                @elseif ($hostingerDaysLeft <= 30)
-                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400">
-                                        Renewal Soon
-                                    </span>
-                                @else
-                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
-                                        Active
-                                    </span>
-                                @endif
-                            </div>
-                            <dt class="text-sm font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-1">Hostinger Plan Expiry</dt>
-
-                            <div class="mt-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-100 dark:border-gray-800 flex flex-col justify-center gap-1 h-[104px]">
-                                <span class="text-2xl font-bold text-gray-900 dark:text-white">
-                                    {{ $this->hostingerPlanExpiryDisplay() }}
-                                </span>
-                                <span class="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
-                                    @if ($hostingerDaysLeft === null)
-                                        Set `HOSTINGER_PLAN_EXPIRES_AT` in .env
-                                    @elseif ($hostingerDaysLeft < 0)
-                                        Expired {{ abs($hostingerDaysLeft) }} day(s) ago
-                                    @else
-                                        {{ $hostingerDaysLeft }} day(s) left
-                                    @endif
-                                </span>
-                            </div>
-                        </div>
-
-                        <!-- Recommendations -->
-                        <div class="premium-card p-6 lg:col-span-2">
-                            <div class="flex items-center gap-3 mb-4">
-                                <div class="p-2 bg-amber-50 dark:bg-amber-500/10 rounded-lg">
-                                    <x-filament::icon icon="heroicon-m-light-bulb" class="h-5 w-5 text-amber-500" />
-                                </div>
-                                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Smart Recommendations</h3>
-                            </div>
-                            <ul class="space-y-3">
-                                @foreach ($this->recommendations as $tip)
-                                    <li class="flex items-start gap-3 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                                        <div class="mt-0.5 flex-shrink-0">
-                                            <x-filament::icon icon="heroicon-m-check-circle" class="h-5 w-5 text-emerald-500" />
-                                        </div>
-                                        <span class="text-sm font-medium text-gray-700 dark:text-gray-300 leading-relaxed">{{ $tip }}</span>
-                                    </li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    </div>
-                @endif
-
-                <!-- ACTIONS / DIAGNOSTICS TAB -->
-                @if ($this->activeTab === 'actions')
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="premium-card p-8">
-                            <div class="w-12 h-12 bg-sky-100 dark:bg-sky-500/20 rounded-2xl flex items-center justify-center mb-6">
-                                <x-filament::icon icon="heroicon-o-paper-airplane" class="h-6 w-6 text-sky-600 dark:text-sky-400" />
-                            </div>
-                            <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Test Connectivity</h3>
-                            <p class="text-sm text-gray-500 dark:text-gray-400 font-medium mb-6 leading-relaxed">
-                                Dispatch test packets to your configured gateways to ensure credentials and network paths are clear.
-                            </p>
-                            
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
-                                        <x-filament::icon icon="heroicon-m-at-symbol" class="h-4 w-4 text-gray-400" />
-                                        Test Recipient Address
-                                    </label>
-                                    <input type="email" wire:model.defer="testEmailRecipient" class="premium-input" placeholder="admin@domain.com" />
-                                </div>
-                                
-                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 border-t border-gray-100 dark:border-gray-800">
-                                    <x-filament::button wire:click="sendTestEmail" color="primary" class="w-full !rounded-xl !py-2.5 shadow-md">
-                                        Dispatch Email
-                                    </x-filament::button>
-                                    <x-filament::button wire:click="testSmsConnectivity" color="info" class="w-full !rounded-xl !py-2.5 shadow-md">
-                                        Ping Semaphore
-                                    </x-filament::button>
-                                </div>
-                                <p wire:loading wire:target="sendTestEmail,testSmsConnectivity" class="text-xs font-semibold text-center text-emerald-600 dark:text-emerald-400 mt-2 w-full">
-                                    Executing Request...
-                                </p>
-                            </div>
-                        </div>
-                        
-                        <div class="premium-card p-8">
-                            <div class="w-12 h-12 bg-indigo-100 dark:bg-indigo-500/20 rounded-2xl flex items-center justify-center mb-6">
-                                <x-filament::icon icon="heroicon-o-bell-alert" class="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-                            </div>
-                            <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Alert Thresholds</h3>
-                            <p class="text-sm text-gray-500 dark:text-gray-400 font-medium mb-6 leading-relaxed">
-                                Define the limits at which the system will automatically push warnings to the dashboard interface.
-                            </p>
-                            
-                            <div class="space-y-5">
-                                <div>
-                                    <div class="flex justify-between items-center mb-2">
-                                        <label class="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Email Warning Percentage</label>
-                                        <span class="text-xs font-bold text-indigo-600 dark:text-indigo-400">{{ $this->emailAlertThreshold }}%</span>
-                                    </div>
-                                    <input type="range" min="1" max="100" wire:model.blur="emailAlertThreshold" class="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-indigo-600" />
-                                </div>
-                                
-                                <div>
-                                    <label class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
-                                        <x-filament::icon icon="heroicon-m-currency-dollar" class="h-4 w-4 text-gray-400" />
-                                        Low SMS Credits Mark (PHP)
-                                    </label>
-                                    <input type="number" min="0" step="0.01" wire:model.blur="smsLowCreditThreshold" class="premium-input" />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                @endif
-
-                <!-- EMAIL SETUP TAB -->
-                @if ($this->activeTab === 'email')
-                    <div class="premium-card p-6 md:p-8">
-                        <div class="flex flex-col sm:flex-row justify-between sm:items-center mb-8 pb-6 border-b border-gray-100 dark:border-gray-800 gap-4">
-                            <div>
-                                <h3 class="text-xl font-bold text-gray-900 dark:text-white">SMTP Credentials</h3>
-                                <p class="text-sm text-gray-500 mt-1">Configure primary and standby SMTP for automatic failover.</p>
-                            </div>
-                            <div class="flex-shrink-0">
-                                @if (! $this->editingMail)
-                                    <x-filament::button size="md" color="warning" wire:click="enableMailEdit" icon="heroicon-m-lock-closed" class="!rounded-xl shadow-sm">
-                                        Unlock for Editing
-                                    </x-filament::button>
-                                @else
-                                    <div class="mobile-safe-actions">
-                                        <x-filament::button size="md" color="gray" wire:click="cancelMailEdit" class="!rounded-xl w-full sm:w-auto">Cancel</x-filament::button>
-                                        <x-filament::button size="md" color="success" wire:click="saveMailSettings" icon="heroicon-m-check" class="!rounded-xl shadow-md w-full sm:w-auto">Save Configuration</x-filament::button>
-                                    </div>
+                                    no fixed daily limit
                                 @endif
                             </div>
                         </div>
 
-                        <div class="space-y-8">
-                            <div>
-                                <h4 class="text-sm font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-4">Primary Mailbox (Active)</h4>
-                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-7">
-                                    @foreach ([
-                                        ['key' => 'mailHost', 'label' => 'SMTP Host', 'type' => 'text', 'icon' => 'heroicon-m-server'],
-                                        ['key' => 'mailPort', 'label' => 'SMTP Port', 'type' => 'text', 'icon' => 'heroicon-m-hashtag'],
-                                        ['key' => 'mailEncryption', 'label' => 'Encryption Type', 'type' => 'text', 'icon' => 'heroicon-m-shield-check'],
-                                        ['key' => 'mailUsername', 'label' => 'Mail Username', 'type' => 'email', 'icon' => 'heroicon-m-user'],
-                                        ['key' => 'mailPassword', 'label' => 'Mail Password', 'type' => 'password', 'icon' => 'heroicon-m-key'],
-                                    ] as $field)
-                                        <div>
-                                            <label class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
-                                                <x-filament::icon :icon="$field['icon']" class="h-4 w-4 text-gray-400" />
-                                                {{ $field['label'] }}
-                                            </label>
-                                            <div class="relative">
-                                                <input type="{{ $field['key'] === 'mailPassword' && $this->showMailPassword ? 'text' : $field['type'] }}"
-                                                       wire:model.defer="{{ $field['key'] }}"
-                                                       class="premium-input {{ $field['key'] === 'mailPassword' ? 'pr-12' : '' }}"
-                                                       @disabled(! $this->editingMail) />
-
-                                                @if ($field['key'] === 'mailPassword' && $this->editingMail)
-                                                    <button type="button" class="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors" wire:click="toggleMailPasswordVisibility">
-                                                        <x-filament::icon :icon="$this->showMailPassword ? 'heroicon-m-eye-slash' : 'heroicon-m-eye'" class="h-5 w-5" />
-                                                    </button>
-                                                @endif
-                                            </div>
-                                        </div>
-                                    @endforeach
-                                </div>
-                            </div>
-
-                            <div>
-                                <h4 class="text-sm font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-4">Backup Mailbox (Standby)</h4>
-                                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">When primary SMTP fails (for example quota reached), Laravel failover automatically retries using this mailbox.</p>
-                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-7">
-                                    @foreach ([
-                                        ['key' => 'mailBackupHost', 'label' => 'Backup SMTP Host', 'type' => 'text', 'icon' => 'heroicon-m-server'],
-                                        ['key' => 'mailBackupPort', 'label' => 'Backup SMTP Port', 'type' => 'text', 'icon' => 'heroicon-m-hashtag'],
-                                        ['key' => 'mailBackupEncryption', 'label' => 'Backup Encryption Type', 'type' => 'text', 'icon' => 'heroicon-m-shield-check'],
-                                        ['key' => 'mailBackupUsername', 'label' => 'Backup Username', 'type' => 'email', 'icon' => 'heroicon-m-user'],
-                                        ['key' => 'mailBackupPassword', 'label' => 'Backup Password', 'type' => 'password', 'icon' => 'heroicon-m-key'],
-                                    ] as $field)
-                                        <div>
-                                            <label class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
-                                                <x-filament::icon :icon="$field['icon']" class="h-4 w-4 text-gray-400" />
-                                                {{ $field['label'] }}
-                                            </label>
-                                            <div class="relative">
-                                                <input type="{{ $field['key'] === 'mailBackupPassword' && $this->showMailBackupPassword ? 'text' : $field['type'] }}"
-                                                       wire:model.defer="{{ $field['key'] }}"
-                                                       class="premium-input {{ $field['key'] === 'mailBackupPassword' ? 'pr-12' : '' }}"
-                                                       @disabled(! $this->editingMail) />
-
-                                                @if ($field['key'] === 'mailBackupPassword' && $this->editingMail)
-                                                    <button type="button" class="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors" wire:click="toggleMailBackupPasswordVisibility">
-                                                        <x-filament::icon :icon="$this->showMailBackupPassword ? 'heroicon-m-eye-slash' : 'heroicon-m-eye'" class="h-5 w-5" />
-                                                    </button>
-                                                @endif
-                                            </div>
-                                        </div>
-                                    @endforeach
-                                </div>
-                            </div>
-
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-7">
-                                @foreach ([
-                                    ['key' => 'mailDailyLimit', 'label' => 'Daily Quota Limit (0 = unlimited)', 'type' => 'number', 'icon' => 'heroicon-m-chart-bar'],
-                                    ['key' => 'mailFromAddress', 'label' => 'Sender Address', 'type' => 'email', 'icon' => 'heroicon-m-at-symbol'],
-                                    ['key' => 'mailFromName', 'label' => 'Sender Name', 'type' => 'text', 'icon' => 'heroicon-m-identification'],
-                                ] as $field)
-                                <div>
-                                    <label class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
-                                        <x-filament::icon :icon="$field['icon']" class="h-4 w-4 text-gray-400" />
-                                        {{ $field['label'] }}
-                                    </label>
-                                    <div class="relative">
-                                        <input type="{{ $field['type'] }}"
-                                               wire:model.defer="{{ $field['key'] }}"
-                                               class="premium-input"
-                                               @disabled(! $this->editingMail) />
-                                    </div>
-                                </div>
-                            @endforeach
-                            </div>
-                        </div>
-                    </div>
-                @endif
-
-                <!-- SMS SETUP TAB -->
-                @if ($this->activeTab === 'sms')
-                    <div class="premium-card p-6 md:p-8">
-                        <div class="flex flex-col sm:flex-row justify-between sm:items-center mb-8 pb-6 border-b border-gray-100 dark:border-gray-800 gap-4">
-                            <div>
-                                <h3 class="text-xl font-bold text-gray-900 dark:text-white">Semaphore Gateway</h3>
-                                <p class="text-sm text-gray-500 mt-1">Connect your verified Semaphore account.</p>
-                            </div>
-                            <div class="flex-shrink-0">
-                                @if (! $this->editingSms)
-                                    <x-filament::button size="md" color="warning" wire:click="enableSmsEdit" icon="heroicon-m-lock-closed" class="!rounded-xl shadow-sm">
-                                        Unlock for Editing
-                                    </x-filament::button>
-                                @else
-                                    <div class="mobile-safe-actions">
-                                        <x-filament::button size="md" color="gray" wire:click="cancelSmsEdit" class="!rounded-xl w-full sm:w-auto">Cancel</x-filament::button>
-                                        <x-filament::button size="md" color="success" wire:click="saveSmsSettings" icon="heroicon-m-check" class="!rounded-xl shadow-md w-full sm:w-auto">Save Settings</x-filament::button>
-                                    </div>
-                                @endif
-                            </div>
+                        <div class="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-white/10">
+                            <div
+                                class="h-full rounded-full {{ $emailPercent >= 85 ? 'bg-danger-500' : 'bg-success-500' }}"
+                                style="width: {{ $emailPercent }}%"
+                            ></div>
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-7">
-                            <div class="md:col-span-2">
-                                <label class="block text-[10px] font-bold uppercase tracking-widest text-purple-600 dark:text-purple-400 mb-2">Secure Value</label>
-                                <label class="flex items-center gap-2 text-sm font-bold text-gray-800 dark:text-gray-200 mb-2">
-                                    <x-filament::icon icon="heroicon-m-key" class="h-4 w-4 text-gray-400" />
-                                    Semaphore API Key
-                                </label>
-                                <div class="relative">
-                                    <input type="{{ $this->showSmsApiKey ? 'text' : 'password' }}" wire:model.defer="semaphoreApiKey" class="premium-input text-lg font-mono tracking-widest pr-12 py-3" @disabled(! $this->editingSms) />
-                                    @if ($this->editingSms)
-                                        <button type="button" class="absolute right-4 top-[14px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" wire:click="toggleSmsApiKeyVisibility">
-                                            <x-filament::icon :icon="$this->showSmsApiKey ? 'heroicon-m-eye-slash' : 'heroicon-m-eye'" class="h-6 w-6" />
-                                        </button>
-                                    @endif
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <label class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
-                                    <x-filament::icon icon="heroicon-m-link" class="h-4 w-4 text-gray-400" />
-                                    OTP Endpoint URL
-                                </label>
-                                <input type="url" wire:model.defer="semaphoreOtpUrl" class="premium-input" @disabled(! $this->editingSms) />
-                            </div>
-                            
-                            <div>
-                                <label class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
-                                    <x-filament::icon icon="heroicon-m-megaphone" class="h-4 w-4 text-gray-400" />
-                                    Verified Sender Name
-                                </label>
-                                <input type="text" wire:model.defer="semaphoreSenderName" class="premium-input" maxlength="11" @disabled(! $this->editingSms) />
-                            </div>
-                        </div>
-                    </div>
-                @endif
-
-                <!-- MAINTENANCE TAB -->
-                @if ($this->activeTab === 'maintenance')
-                    <div class="premium-card p-6 md:p-8">
-                        <div class="flex flex-col sm:flex-row sm:items-center justify-between mb-8 pb-6 border-b border-gray-100 dark:border-gray-800 gap-4">
-                            <div>
-                                <h3 class="text-xl font-bold text-gray-900 dark:text-white">Public Access Control</h3>
-                                <p class="text-sm text-gray-500 mt-1">Manage the holding page displayed to front-end visitors.</p>
-                            </div>
-                            <div class="flex-shrink-0">
-                                @if (! $this->editingMaintenance)
-                                    <x-filament::button size="md" color="primary" wire:click="enableMaintenanceEdit" icon="heroicon-m-pencil-square" class="!rounded-xl shadow-sm w-full sm:w-auto">
-                                        Modify Notice
-                                    </x-filament::button>
-                                @else
-                                    <div class="mobile-safe-actions">
-                                        <x-filament::button size="md" color="gray" wire:click="cancelMaintenanceEdit" class="!rounded-xl w-full sm:w-auto">Cancel</x-filament::button>
-                                        <x-filament::button size="md" color="success" wire:click="saveMaintenanceSettings" icon="heroicon-m-check" class="!rounded-xl shadow-md w-full sm:w-auto">Deploy Changes</x-filament::button>
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
-
-                        @if (! $this->editingMaintenance)
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div class="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
-                                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Gate Status</p>
-                                    <div class="flex items-center gap-3">
-                                        <div class="relative">
-                                            <div class="w-12 h-6 rounded-full {{ $this->maintenanceModeEnabled ? 'bg-rose-500' : 'bg-emerald-500' }}"></div>
-                                            <div class="absolute top-1 bg-white w-4 h-4 rounded-full transition-all {{ $this->maintenanceModeEnabled ? 'right-1' : 'left-1' }} shadow-sm"></div>
-                                        </div>
-                                        <span class="text-base font-extrabold {{ $this->maintenanceModeEnabled ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400' }}">{{ $this->maintenanceModeEnabled ? 'OFFLINE (Active)' : 'ONLINE (Disabled)' }}</span>
-                                    </div>
-                                </div>
-                                <div class="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
-                                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Active Layout</p>
-                                    <p class="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                        <x-filament::icon icon="heroicon-m-swatch" class="h-5 w-5 text-indigo-500" />
-                                        {{ \App\Support\MaintenancePageVariant::labels()[$this->maintenanceVariant] ?? $this->maintenanceVariant }}
-                                    </p>
-                                </div>
-                                <div class="bg-gray-50 dark:bg-gray-800/50 rounded-2xl p-5 border border-gray-100 dark:border-gray-800">
-                                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Estimated Return</p>
-                                    <p class="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                        <x-filament::icon icon="heroicon-m-clock" class="h-5 w-5 text-amber-500" />
-                                        {{ $this->maintenanceEta !== '' ? $this->maintenanceEta : 'Indefinite' }}
-                                    </p>
-                                </div>
-                            </div>
-                        @else
-                            <div class="space-y-8">
-                                <div class="bg-amber-50 dark:bg-amber-500/10 rounded-2xl p-6 border border-amber-200 dark:border-amber-500/20">
-                                    <p class="text-[11px] font-bold uppercase tracking-widest text-amber-700 dark:text-amber-400 mb-3 flex items-center gap-2">
-                                        <x-filament::icon icon="heroicon-m-bolt" class="h-4 w-4" />
-                                        1-Click Presets
-                                    </p>
-                                    <div class="flex flex-wrap gap-3">
-                                        <x-filament::button color="warning" variant="outlined" wire:click="applyMaintenancePreset('quick-fix')" class="!rounded-xl bg-white dark:bg-transparent">Quick Fix (2H)</x-filament::button>
-                                        <x-filament::button color="warning" variant="outlined" wire:click="applyMaintenancePreset('scheduled-upgrade')" class="!rounded-xl bg-white dark:bg-transparent">Scheduled Upgrade (1D)</x-filament::button>
-                                        <x-filament::button color="danger" variant="outlined" wire:click="applyMaintenancePreset('emergency')" class="!rounded-xl bg-white dark:bg-transparent">Emergency Lockdown</x-filament::button>
-                                    </div>
-                                </div>
-
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <label class="md:col-span-2 relative flex items-start gap-4 p-5 rounded-2xl border-2 {{ $this->maintenanceModeEnabled ? 'border-rose-500 bg-rose-50 dark:bg-rose-500/10' : 'border-gray-200 dark:border-gray-700' }} cursor-pointer transition-all">
-                                        <div class="flex flex-col flex-1">
-                                            <span class="text-base font-bold text-gray-900 dark:text-white">Enable Maintenance Gateway</span>
-                                            <span class="text-sm text-gray-500 dark:text-gray-400 mt-1">Diverts all public traffic to the holding page unconditionally.</span>
-                                        </div>
-                                        <div class="relative align-middle select-none mt-1">
-                                            <input type="checkbox" wire:model.defer="maintenanceModeEnabled" class="sr-only peer" />
-                                            <div class="w-14 h-8 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-600 peer-checked:bg-rose-500"></div>
-                                        </div>
-                                    </label>
-
-                                    <div>
-                                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Display Theme</label>
-                                        <select wire:model.defer="maintenanceVariant" class="premium-input bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3E%3Cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'m6 8 4 4 4-4\'/%3E%3C/svg%3E')] appearance-none bg-no-repeat bg-[position:right_0.75rem_center] bg-[length:1.25em_1.25em] pr-10">
-                                            @foreach (\App\Support\MaintenancePageVariant::labels() as $value => $label)
-                                                <option value="{{ $value }}">{{ $label }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-
-                                    <div>
-                                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Notice Badge</label>
-                                        <input type="text" wire:model.defer="maintenanceBadge" class="premium-input" />
-                                    </div>
-
-                                    <div class="md:col-span-2">
-                                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Primary Heading</label>
-                                        <input type="text" wire:model.defer="maintenanceTitle" class="premium-input text-lg font-semibold" />
-                                    </div>
-
-                                    <div class="md:col-span-2">
-                                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Body Description</label>
-                                        <textarea rows="4" wire:model.defer="maintenanceDescription" class="premium-input resize-none"></textarea>
-                                    </div>
-                                    
-                                    <div class="md:col-span-2">
-                                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">ETA Text (Optional)</label>
-                                        <input type="text" wire:model.defer="maintenanceEta" class="premium-input" placeholder="e.g. Next couple of hours..." />
-                                    </div>
-                                </div>
+                        @if ($hasEmailLimit)
+                            <div class="text-xs text-gray-500 dark:text-gray-400">
+                                <span class="font-medium">{{ $emailPercent }}%</span> daily quota consumed ·
+                                <span class="font-medium">Credits left:</span> {{ number_format(max(0, (int) $this->emailsLeftToday)) }}
                             </div>
                         @endif
                     </div>
-                @endif
+                </x-filament::section>
 
-                <!-- PAYMENT TAB -->
-                @if ($this->activeTab === 'payment')
-                    <div class="premium-card p-6 md:p-8 space-y-8">
-                        <div class="flex flex-col sm:flex-row justify-between sm:items-center pb-6 border-b border-gray-100 dark:border-gray-800 gap-4">
-                            <div>
-                                <h3 class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                                    Payment Setting
-                                    @if($this->xenditSecretKey !== '' && $this->xenditPublicKey !== '')
-                                        <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20">Configured</span>
-                                    @else
-                                        <span class="inline-flex items-center rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-bold text-rose-700 ring-1 ring-inset ring-rose-600/20 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-500/20">Pending Keys</span>
-                                    @endif
-                                </h3>
-                                <p class="text-sm text-gray-500 mt-1">Manage external payment gateway credentials and checkout flows.</p>
-                            </div>
-                            <div class="flex-shrink-0">
-                                @if (! $this->editingPayment)
-                                    <x-filament::button size="md" color="primary" wire:click="enablePaymentEdit" icon="heroicon-m-adjustments-vertical" class="!rounded-xl shadow-sm w-full sm:w-auto">
-                                        Configure Settings
-                                    </x-filament::button>
-                                @else
-                                    <div class="mobile-safe-actions">
-                                        <x-filament::button size="md" color="gray" wire:click="cancelPaymentEdit" class="!rounded-xl w-full sm:w-auto">Cancel</x-filament::button>
-                                        <x-filament::button size="md" color="success" wire:click="savePaymentSettings" icon="heroicon-m-check" class="!rounded-xl shadow-md w-full sm:w-auto">Apply Strategy</x-filament::button>
-                                    </div>
-                                @endif
-                            </div>
+                <x-filament::section>
+                    <x-slot name="heading">
+                        <span class="inline-flex items-center gap-2">
+                            <x-filament::icon icon="heroicon-o-device-phone-mobile" class="h-5 w-5 text-primary-500" />
+                            SMS gateway status
+                        </span>
+                    </x-slot>
+                    <x-slot name="description">{{ $this->smsHealth }}</x-slot>
+
+                    <div class="space-y-1">
+                        <div class="text-3xl font-semibold tabular-nums text-gray-900 dark:text-white">
+                            {{ $this->smsCredits !== null ? number_format($this->smsCredits, 2) : 'N/A' }}
                         </div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">Available credits</div>
+                    </div>
+                </x-filament::section>
 
-                        @if (! $this->editingPayment)
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div class="p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 shadow-sm">
-                                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">Checkout Status</p>
-                                    <div class="flex items-center gap-3">
-                                        <span class="relative flex h-4 w-4">
-                                          @if($this->onlinePaymentEnabled)
-                                              <span class="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-white dark:border-gray-900"></span>
-                                          @else
-                                              <span class="relative inline-flex rounded-full h-4 w-4 bg-gray-400 border-2 border-white dark:border-gray-900"></span>
-                                          @endif
-                                        </span>
-                                        <span class="text-lg font-bold text-gray-900 dark:text-white">{{ $this->onlinePaymentEnabled ? 'Live Payments Active' : 'Offline Mode Only' }}</span>
-                                    </div>
-                                </div>
+                <x-filament::section>
+                    <x-slot name="heading">
+                        <span class="inline-flex items-center gap-2">
+                            <x-filament::icon icon="heroicon-o-server-stack" class="h-5 w-5 text-primary-500" />
+                            Hosting plan expiry
+                        </span>
+                    </x-slot>
+                    <x-slot name="description">
+                        {{ $hostingerDaysLeft === null ? 'No expiry date set' : ($hostingerDaysLeft <= 30 ? 'Renewal soon' : 'Active') }}
+                    </x-slot>
 
-                                <div class="p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 shadow-sm">
-                                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-3">Deposit Structure</p>
-                                    <div class="flex items-center gap-2 flex-wrap">
-                                        <span class="px-3 py-1 bg-white dark:bg-gray-700 rounded-lg text-sm font-bold text-indigo-600 dark:text-indigo-400 shadow-sm border border-gray-100 dark:border-gray-600">
-                                            {{ (int) $this->partialPaymentSelection }}%
-                                        </span>
-                                        @if($this->allowCustomPartialPayment)
-                                            <span class="px-3 py-1 bg-indigo-50 dark:bg-indigo-500/20 rounded-lg text-sm font-bold text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/30 border-dashed">
-                                                + Custom Value
-                                            </span>
-                                        @endif
-                                    </div>
-                                </div>
-                                <div class="p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 shadow-sm md:col-span-2">
-                                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-3">Cancellation Deduction Rule</p>
-                                    <div class="flex items-center gap-2 flex-wrap">
-                                        <span class="px-3 py-1 bg-white dark:bg-gray-700 rounded-lg text-sm font-bold text-rose-600 dark:text-rose-300 shadow-sm border border-gray-100 dark:border-gray-600">
-                                            {{ (int) $this->cancellationFeePercent }}%
-                                        </span>
-                                        <span class="text-xs text-gray-500 dark:text-gray-400">
-                                            Deduct from booking total (capped by amount already paid).
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        @else
-                            <div class="space-y-6">
-                                <label class="relative flex items-start gap-4 p-5 rounded-2xl border-2 {{ $this->onlinePaymentEnabled ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-500/10' : 'border-gray-200 dark:border-gray-700' }} cursor-pointer transition-all">
-                                    <div class="flex w-full justify-between items-center group">
-                                        <div class="flex flex-col">
-                                            <span class="text-base font-bold text-gray-900 dark:text-white">Activate Front-End Payments</span>
-                                            <span class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Permits clients to pay via Xendit immediately on step 4 of booking.</span>
-                                        </div>
-                                        <div class="relative align-middle select-none">
-                                            <input type="checkbox" wire:model.defer="onlinePaymentEnabled" class="sr-only peer" />
-                                            <div class="w-14 h-8 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-500"></div>
-                                        </div>
-                                    </div>
-                                </label>
-
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50 dark:bg-gray-800/40 p-6 rounded-2xl border border-gray-100 dark:border-gray-800">
-                                    <div>
-                                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Partial Payment Percentage</label>
-                                        @if (! $this->allowCustomPartialPayment)
-                                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                                @foreach ([10, 20, 30, 40, 50, 60, 70, 80, 90] as $option)
-                                                    <label class="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-slate-800 px-3 py-2 cursor-pointer">
-                                                        <input
-                                                            type="radio"
-                                                            value="{{ $option }}"
-                                                            wire:model.defer="partialPaymentSelection"
-                                                            class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-500 dark:bg-slate-700"
-                                                        />
-                                                        <span class="text-sm font-semibold text-gray-700 dark:text-slate-100">{{ $option }}%</span>
-                                                    </label>
-                                                @endforeach
-                                            </div>
-                                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                                Select one deposit option. Full payment (100%) is intentionally excluded.
-                                            </p>
-                                        @else
-                                            <div class="max-w-xs">
-                                                <label class="block text-xs font-semibold text-indigo-600 dark:text-indigo-300 mb-2">Custom Deposit Percentage</label>
-                                                <div class="relative">
-                                                    <input
-                                                        type="number"
-                                                        min="1"
-                                                        max="99"
-                                                        wire:model.defer="partialPaymentSelection"
-                                                        class="premium-input pr-10"
-                                                        placeholder="e.g. 25"
-                                                    />
-                                                    <span class="absolute right-3 top-2.5 text-sm font-bold text-gray-500 dark:text-gray-300">%</span>
-                                                </div>
-                                            </div>
-                                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                                Enter a custom deposit percentage from 1 to 99.
-                                            </p>
-                                        @endif
-                                    </div>
-                                    
-                                    <div class="flex items-center mt-3 md:mt-0">
-                                        <label class="inline-flex items-center gap-3 cursor-pointer select-none">
-                                            <input
-                                                type="checkbox"
-                                                wire:model.live="allowCustomPartialPayment"
-                                                class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800"
-                                            />
-                                            <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">Allow Custom Deposit Inputs</span>
-                                        </label>
-                                    </div>
-                                </div>
-
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-rose-50/60 dark:bg-rose-900/10 p-6 rounded-2xl border border-rose-100 dark:border-rose-800/40">
-                                    <div>
-                                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Cancellation Deduction Percentage</label>
-                                        <div class="max-w-xs relative">
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                max="100"
-                                                wire:model.defer="cancellationFeePercent"
-                                                class="premium-input pr-10"
-                                                placeholder="e.g. 30"
-                                            />
-                                            <span class="absolute right-3 top-2.5 text-sm font-bold text-gray-500 dark:text-gray-300">%</span>
-                                        </div>
-                                    </div>
-                                    <div class="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
-                                        <p class="font-semibold mb-1">Rule preview</p>
-                                        <p>Cancellation fee is based on booking total. Collected amount is capped by what the guest has already paid.</p>
-                                        <p class="mt-1">Example: if total is ₱10,000 and deduction is {{ (int) $this->cancellationFeePercent }}%, fee is ₱{{ number_format((10000 * (int) $this->cancellationFeePercent) / 100, 2) }}.</p>
-                                    </div>
-                                </div>
-
-                                <div class="space-y-4 pt-4 border-t border-gray-100 dark:border-gray-800">
-                                    <p class="text-[11px] font-bold uppercase tracking-widest text-gray-400">API Credentials</p>
-                                    
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                        <div>
-                                            <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Public Identity Key</label>
-                                            <input type="text" wire:model.defer="xenditPublicKey" class="premium-input font-mono text-sm" placeholder="xnd_public_..." />
-                                        </div>
-                                        <div>
-                                            <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Secret Identity Key</label>
-                                            <input type="password" wire:model.defer="xenditSecretKey" class="premium-input font-mono text-sm text-indigo-600" placeholder="••••••••••••••••" />
-                                        </div>
-                                        <div class="md:col-span-2">
-                                            <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Secure Webhook Token</label>
-                                            <input type="password" wire:model.defer="xenditWebhookToken" class="premium-input font-mono text-sm text-rose-600" placeholder="••••••••••••••••" />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        @endif
-
-                        <!-- Diagnostics Log section -->
-                        <div class="mt-10 rounded-2xl border border-sky-200/60 bg-sky-50/60 dark:bg-sky-900/10 p-6 shadow-sm overflow-hidden relative">
-                            <div class="flex sm:items-center flex-col sm:flex-row justify-between gap-4 mb-6">
-                                <div>
-                                    <h4 class="text-base font-extrabold text-sky-900 dark:text-sky-300 flex items-center gap-2">
-                                        <x-filament::icon icon="heroicon-m-code-bracket-square" class="h-5 w-5" />
-                                        Live Webhook Trace
-                                    </h4>
-                                    <p class="text-[11px] text-sky-600/80 dark:text-sky-400/80 mt-1 uppercase font-bold tracking-widest">Diagnostic Telemetry Output</p>
-                                </div>
-                                <x-filament::button size="sm" color="info" variant="outlined" wire:click="refreshPaymentDebug" class="!rounded-xl bg-white dark:bg-transparent">Pull Latest Event</x-filament::button>
-                            </div>
-
-                            @if ($this->lastXenditWebhookEvent)
-                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    <div class="bg-white/60 dark:bg-gray-900/50 p-3 rounded-xl border border-white/50 dark:border-gray-800">
-                                        <p class="text-[10px] font-bold uppercase text-gray-400">Time Delta</p>
-                                        <p class="text-sm font-bold text-gray-900 dark:text-white mt-1">{{ $this->lastXenditWebhookEvent['received_at'] ?? '—' }}</p>
-                                    </div>
-                                    <div class="bg-white/60 dark:bg-gray-900/50 p-3 rounded-xl border border-white/50 dark:border-gray-800">
-                                        <p class="text-[10px] font-bold uppercase text-gray-400">Response Code</p>
-                                        <p class="text-sm font-bold text-gray-900 dark:text-white mt-1">{{ $this->lastXenditWebhookEvent['raw_status'] ?? '—' }}</p>
-                                    </div>
-                                    <div class="bg-white/60 dark:bg-gray-900/50 p-3 rounded-xl border border-white/50 dark:border-gray-800 md:col-span-2">
-                                        <p class="text-[10px] font-bold uppercase text-gray-400">Action Resolution</p>
-                                        <p class="text-sm font-bold {{ isset($this->lastXenditWebhookEvent['result']) && str_contains(strtolower($this->lastXenditWebhookEvent['result']), 'error') ? 'text-rose-600' : 'text-emerald-600' }} mt-1">
-                                            {{ $this->lastXenditWebhookEvent['result'] ?? '—' }}
-                                            @if (! empty($this->lastXenditWebhookEvent['reason']))
-                                                <span class="opacity-75 font-normal ml-1">({{ $this->lastXenditWebhookEvent['reason'] }})</span>
-                                            @endif
-                                        </p>
-                                    </div>
-                                    <div class="bg-white/60 dark:bg-gray-900/50 p-3 rounded-xl border border-white/50 dark:border-gray-800">
-                                        <p class="text-[10px] font-bold uppercase text-gray-400">Booking Ref</p>
-                                        <p class="text-sm font-bold text-gray-900 dark:text-white mt-1 font-mono">{{ $this->lastXenditWebhookEvent['booking_reference'] ?? '—' }}</p>
-                                    </div>
-                                    <div class="bg-white/60 dark:bg-gray-900/50 p-3 rounded-xl border border-white/50 dark:border-gray-800">
-                                        <p class="text-[10px] font-bold uppercase text-gray-400">Tx Status</p>
-                                        <p class="text-sm font-bold text-gray-900 dark:text-white mt-1 uppercase">{{ $this->lastXenditWebhookEvent['booking_status'] ?? '—' }}</p>
-                                    </div>
-                                    <div class="bg-white/60 dark:bg-gray-900/50 p-3 rounded-xl border border-white/50 dark:border-gray-800 md:col-span-2 flex justify-between items-center">
-                                        <div>
-                                            <p class="text-[10px] font-bold uppercase text-gray-400">Cleared Volume</p>
-                                            <p class="text-sm font-bold text-gray-900 dark:text-white mt-1">₱{{ number_format((float) ($this->lastXenditWebhookEvent['paid_amount'] ?? 0), 2) }}</p>
-                                        </div>
-                                        <div class="text-right flex flex-col">
-                                            <span class="text-[10px] font-mono text-gray-500">inv_{{ substr($this->lastXenditWebhookEvent['invoice_id'] ?? 'xxxx', -6) }}</span>
-                                            <span class="text-[10px] font-mono text-gray-400 mt-0.5">ext_{{ substr($this->lastXenditWebhookEvent['external_id'] ?? 'xxxx', -6) }}</span>
-                                        </div>
-                                    </div>
-                                </div>
+                    <div class="space-y-1">
+                        <div class="text-2xl font-semibold text-gray-900 dark:text-white">
+                            {{ $this->hostingerPlanExpiryDisplay() }}
+                        </div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400">
+                            @if ($hostingerDaysLeft === null)
+                                Set `HOSTINGER_PLAN_EXPIRES_AT` in .env
+                            @elseif ($hostingerDaysLeft < 0)
+                                Expired {{ abs($hostingerDaysLeft) }} day(s) ago
                             @else
-                                <div class="text-center p-8 border border-dashed border-sky-300 dark:border-sky-700/50 rounded-2xl">
-                                    <x-filament::icon icon="heroicon-o-inbox" class="h-10 w-10 text-sky-300 dark:text-sky-700 mx-auto mb-3" />
-                                    <p class="text-sm font-bold tracking-wide text-sky-800/60 dark:text-sky-300/60">Awaiting Submissions...</p>
-                                    <p class="text-xs text-sky-600/50 dark:text-sky-400/50 mt-1">Telemetry will display when the gateway triggers an event.</p>
-                                </div>
+                                {{ $hostingerDaysLeft }} day(s) left
                             @endif
                         </div>
                     </div>
-                @endif
+                </x-filament::section>
+
+                <x-filament::section class="lg:col-span-2">
+                    <x-slot name="heading">
+                        <span class="inline-flex items-center gap-2">
+                            <x-filament::icon icon="heroicon-m-light-bulb" class="h-5 w-5 text-primary-500" />
+                            Smart recommendations
+                        </span>
+                    </x-slot>
+                    <ul class="space-y-2">
+                        @foreach ($this->recommendations as $tip)
+                            <li class="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                <x-filament::icon icon="heroicon-m-check-circle" class="mt-0.5 h-4 w-4 text-success-500" />
+                                <span>{{ $tip }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                </x-filament::section>
             </div>
-        </main>
-        </div>
+        @endif
+
+        @if ($this->activeTab === 'actions')
+            <div class="grid gap-6 md:grid-cols-2">
+                <x-filament::section>
+                    <x-slot name="heading">
+                        <span class="inline-flex items-center gap-2">
+                            <x-filament::icon icon="heroicon-o-paper-airplane" class="h-5 w-5 text-primary-500" />
+                            Test connectivity
+                        </span>
+                    </x-slot>
+                    <x-slot name="description">
+                        Send a test email and ping Semaphore using your saved credentials.
+                    </x-slot>
+
+                    <div class="space-y-4">
+                        <x-filament::input.wrapper>
+                            <x-filament::input type="email" wire:model.defer="testEmailRecipient" placeholder="admin@domain.com" />
+                        </x-filament::input.wrapper>
+
+                        <div class="flex flex-wrap gap-2">
+                            <x-filament::button wire:click="sendTestEmail">Dispatch email</x-filament::button>
+                            <x-filament::button
+                                color="info"
+                                wire:click="testSmsConnectivity"
+                                :disabled="$this->smsRateLimitedSeconds > 0 || $this->smsPingCooldownSeconds > 0"
+                            >
+                                @if ($this->smsRateLimitedSeconds > 0)
+                                    Ping Semaphore (retry in {{ $this->smsRateLimitedSeconds }}s)
+                                @elseif ($this->smsPingCooldownSeconds > 0)
+                                    Ping Semaphore (cooldown {{ $this->smsPingCooldownSeconds }}s)
+                                @else
+                                    Ping Semaphore
+                                @endif
+                            </x-filament::button>
+                        </div>
+
+                        <p wire:loading wire:target="sendTestEmail,testSmsConnectivity" class="text-xs text-gray-500 dark:text-gray-400">
+                            Executing request…
+                        </p>
+                    </div>
+                </x-filament::section>
+
+                <x-filament::section>
+                    <x-slot name="heading">
+                        <span class="inline-flex items-center gap-2">
+                            <x-filament::icon icon="heroicon-o-bell-alert" class="h-5 w-5 text-primary-500" />
+                            Alert thresholds
+                        </span>
+                    </x-slot>
+                    <x-slot name="description">
+                        When to show warnings in this page.
+                    </x-slot>
+
+                    <div class="space-y-4">
+                        <div>
+                            <div class="mb-2 flex items-center justify-between gap-2">
+                                <label class="text-xs font-medium text-gray-700 dark:text-gray-200">Email warning percentage</label>
+                                <span class="text-xs text-gray-500 dark:text-gray-400">{{ $this->emailAlertThreshold }}%</span>
+                            </div>
+                            <input type="range" min="1" max="100" wire:model.blur="emailAlertThreshold" class="w-full" />
+                        </div>
+
+                        <x-filament::input.wrapper>
+                            <x-filament::input type="number" min="0" step="0.01" wire:model.blur="smsLowCreditThreshold" placeholder="Low SMS credits threshold" />
+                        </x-filament::input.wrapper>
+                    </div>
+                </x-filament::section>
+            </div>
+        @endif
+
+        @if ($this->activeTab === 'email')
+            <x-filament::section>
+                <x-slot name="heading">
+                    <span class="inline-flex items-center gap-2">
+                        <x-filament::icon icon="heroicon-m-envelope" class="h-5 w-5 text-primary-500" />
+                        SMTP configuration
+                    </span>
+                </x-slot>
+                <x-slot name="description">
+                    Primary + backup SMTP for failover.
+                </x-slot>
+
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="text-sm text-gray-600 dark:text-gray-300">
+                        Status: <span class="font-medium">{{ $this->editingMail ? 'Editing' : 'Locked' }}</span>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        @if (! $this->editingMail)
+                            <x-filament::button color="warning" outlined wire:click="enableMailEdit" icon="heroicon-m-lock-closed">
+                                Unlock
+                            </x-filament::button>
+                        @else
+                            <x-filament::button color="gray" outlined wire:click="cancelMailEdit">Cancel</x-filament::button>
+                            <x-filament::button color="success" wire:click="saveMailSettings" icon="heroicon-m-check">Save</x-filament::button>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="mt-6 grid gap-6 lg:grid-cols-2">
+                    <x-filament::section>
+                        <x-slot name="heading">Primary</x-slot>
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <x-filament::input.wrapper>
+                                <x-filament::input type="text" wire:model.defer="mailHost" :disabled="! $this->editingMail" placeholder="SMTP host" />
+                            </x-filament::input.wrapper>
+
+                            <x-filament::input.wrapper>
+                                <x-filament::input type="text" wire:model.defer="mailPort" :disabled="! $this->editingMail" placeholder="Port" />
+                            </x-filament::input.wrapper>
+
+                            <x-filament::input.wrapper>
+                                <x-filament::input type="text" wire:model.defer="mailEncryption" :disabled="! $this->editingMail" placeholder="Encryption (ssl/tls)" />
+                            </x-filament::input.wrapper>
+
+                            <x-filament::input.wrapper>
+                                <x-filament::input type="email" wire:model.defer="mailUsername" :disabled="! $this->editingMail" placeholder="Username" />
+                            </x-filament::input.wrapper>
+
+                            <div class="sm:col-span-2">
+                                <div class="flex items-center gap-2">
+                                    <x-filament::input.wrapper class="flex-1">
+                                        <x-filament::input
+                                            :type="$this->showMailPassword ? 'text' : 'password'"
+                                            wire:model.defer="mailPassword"
+                                            :disabled="! $this->editingMail"
+                                            placeholder="Password"
+                                        />
+                                    </x-filament::input.wrapper>
+                                    @if ($this->editingMail)
+                                        <x-filament::icon-button
+                                            color="gray"
+                                            outlined
+                                            :icon="$this->showMailPassword ? 'heroicon-m-eye-slash' : 'heroicon-m-eye'"
+                                            :label="$this->showMailPassword ? 'Hide password' : 'Show password'"
+                                            wire:click="toggleMailPasswordVisibility"
+                                        />
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    </x-filament::section>
+
+                    <x-filament::section>
+                        <x-slot name="heading">Backup</x-slot>
+                        <x-slot name="description">Used automatically when primary fails.</x-slot>
+
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <x-filament::input.wrapper>
+                                <x-filament::input type="text" wire:model.defer="mailBackupHost" :disabled="! $this->editingMail" placeholder="Backup SMTP host" />
+                            </x-filament::input.wrapper>
+
+                            <x-filament::input.wrapper>
+                                <x-filament::input type="text" wire:model.defer="mailBackupPort" :disabled="! $this->editingMail" placeholder="Backup port" />
+                            </x-filament::input.wrapper>
+
+                            <x-filament::input.wrapper>
+                                <x-filament::input type="text" wire:model.defer="mailBackupEncryption" :disabled="! $this->editingMail" placeholder="Backup encryption" />
+                            </x-filament::input.wrapper>
+
+                            <x-filament::input.wrapper>
+                                <x-filament::input type="email" wire:model.defer="mailBackupUsername" :disabled="! $this->editingMail" placeholder="Backup username" />
+                            </x-filament::input.wrapper>
+
+                            <div class="sm:col-span-2">
+                                <div class="flex items-center gap-2">
+                                    <x-filament::input.wrapper class="flex-1">
+                                        <x-filament::input
+                                            :type="$this->showMailBackupPassword ? 'text' : 'password'"
+                                            wire:model.defer="mailBackupPassword"
+                                            :disabled="! $this->editingMail"
+                                            placeholder="Backup password"
+                                        />
+                                    </x-filament::input.wrapper>
+                                    @if ($this->editingMail)
+                                        <x-filament::icon-button
+                                            color="gray"
+                                            outlined
+                                            :icon="$this->showMailBackupPassword ? 'heroicon-m-eye-slash' : 'heroicon-m-eye'"
+                                            :label="$this->showMailBackupPassword ? 'Hide password' : 'Show password'"
+                                            wire:click="toggleMailBackupPasswordVisibility"
+                                        />
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    </x-filament::section>
+                </div>
+
+                <div class="mt-6 grid gap-4 sm:grid-cols-3">
+                    <x-filament::input.wrapper>
+                        <x-filament::input type="number" min="0" wire:model.defer="mailDailyLimit" :disabled="! $this->editingMail" placeholder="Daily limit (0 = unlimited)" />
+                    </x-filament::input.wrapper>
+                    <x-filament::input.wrapper>
+                        <x-filament::input type="email" wire:model.defer="mailFromAddress" :disabled="! $this->editingMail" placeholder="From address" />
+                    </x-filament::input.wrapper>
+                    <x-filament::input.wrapper>
+                        <x-filament::input type="text" wire:model.defer="mailFromName" :disabled="! $this->editingMail" placeholder="From name" />
+                    </x-filament::input.wrapper>
+                </div>
+            </x-filament::section>
+        @endif
+
+        @if ($this->activeTab === 'sms')
+            <x-filament::section>
+                <x-slot name="heading">
+                    <span class="inline-flex items-center gap-2">
+                        <x-filament::icon icon="heroicon-m-chat-bubble-left-right" class="h-5 w-5 text-primary-500" />
+                        Semaphore gateway
+                    </span>
+                </x-slot>
+                <x-slot name="description">
+                    Configure the API key and sender identity.
+                </x-slot>
+
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="text-sm text-gray-600 dark:text-gray-300">
+                        Status: <span class="font-medium">{{ $this->editingSms ? 'Editing' : 'Locked' }}</span>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        @if (! $this->editingSms)
+                            <x-filament::button color="warning" outlined wire:click="enableSmsEdit" icon="heroicon-m-lock-closed">
+                                Unlock
+                            </x-filament::button>
+                        @else
+                            <x-filament::button color="gray" outlined wire:click="cancelSmsEdit">Cancel</x-filament::button>
+                            <x-filament::button color="success" wire:click="saveSmsSettings" icon="heroicon-m-check">Save</x-filament::button>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="mt-6 grid gap-4 md:grid-cols-2">
+                    <div class="md:col-span-2">
+                        <div class="flex items-center gap-2">
+                            <x-filament::input.wrapper class="flex-1">
+                                <x-filament::input
+                                    :type="$this->showSmsApiKey ? 'text' : 'password'"
+                                    wire:model.defer="semaphoreApiKey"
+                                    :disabled="! $this->editingSms"
+                                    placeholder="Semaphore API key"
+                                />
+                            </x-filament::input.wrapper>
+                            @if ($this->editingSms)
+                                <x-filament::icon-button
+                                    color="gray"
+                                    outlined
+                                    :icon="$this->showSmsApiKey ? 'heroicon-m-eye-slash' : 'heroicon-m-eye'"
+                                    :label="$this->showSmsApiKey ? 'Hide key' : 'Show key'"
+                                    wire:click="toggleSmsApiKeyVisibility"
+                                />
+                            @endif
+                        </div>
+                    </div>
+
+                    <x-filament::input.wrapper>
+                        <x-filament::input type="url" wire:model.defer="semaphoreOtpUrl" :disabled="! $this->editingSms" placeholder="OTP endpoint URL" />
+                    </x-filament::input.wrapper>
+
+                    <x-filament::input.wrapper>
+                        <x-filament::input type="text" maxlength="11" wire:model.defer="semaphoreSenderName" :disabled="! $this->editingSms" placeholder="Sender name (max 11 chars)" />
+                    </x-filament::input.wrapper>
+                </div>
+            </x-filament::section>
+        @endif
+
+        @if ($this->activeTab === 'maintenance')
+            <x-filament::section>
+                <x-slot name="heading">
+                    <span class="inline-flex items-center gap-2">
+                        <x-filament::icon icon="heroicon-m-wrench" class="h-5 w-5 text-primary-500" />
+                        Maintenance mode
+                    </span>
+                </x-slot>
+                <x-slot name="description">
+                    Control the public maintenance gateway message.
+                </x-slot>
+
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="text-sm text-gray-600 dark:text-gray-300">
+                        Status: <span class="font-medium">{{ $this->editingMaintenance ? 'Editing' : 'Viewing' }}</span>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        @if (! $this->editingMaintenance)
+                            <x-filament::button color="primary" outlined wire:click="enableMaintenanceEdit" icon="heroicon-m-pencil-square">
+                                Edit
+                            </x-filament::button>
+                        @else
+                            <x-filament::button color="gray" outlined wire:click="cancelMaintenanceEdit">Cancel</x-filament::button>
+                            <x-filament::button color="success" wire:click="saveMaintenanceSettings" icon="heroicon-m-check">Save</x-filament::button>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="mt-6 space-y-6">
+                    @if (! $this->editingMaintenance)
+                        <div class="grid gap-4 md:grid-cols-3">
+                            <x-filament::section>
+                                <x-slot name="heading">Gateway</x-slot>
+                                <div class="text-sm text-gray-600 dark:text-gray-300">
+                                    <span class="font-medium {{ $this->maintenanceModeEnabled ? 'text-danger-600 dark:text-danger-400' : 'text-success-600 dark:text-success-400' }}">
+                                        {{ $this->maintenanceModeEnabled ? 'Enabled' : 'Disabled' }}
+                                    </span>
+                                </div>
+                            </x-filament::section>
+
+                            <x-filament::section>
+                                <x-slot name="heading">Layout</x-slot>
+                                <div class="text-sm text-gray-600 dark:text-gray-300">
+                                    {{ \App\Support\MaintenancePageVariant::labels()[$this->maintenanceVariant] ?? $this->maintenanceVariant }}
+                                </div>
+                            </x-filament::section>
+
+                            <x-filament::section>
+                                <x-slot name="heading">ETA</x-slot>
+                                <div class="text-sm text-gray-600 dark:text-gray-300">
+                                    {{ $this->maintenanceEta !== '' ? $this->maintenanceEta : '—' }}
+                                </div>
+                            </x-filament::section>
+                        </div>
+                    @else
+                        <div class="flex flex-wrap gap-2">
+                            <x-filament::button color="warning" outlined wire:click="applyMaintenancePreset('quick-fix')">Quick fix</x-filament::button>
+                            <x-filament::button color="warning" outlined wire:click="applyMaintenancePreset('scheduled-upgrade')">Scheduled upgrade</x-filament::button>
+                            <x-filament::button color="danger" outlined wire:click="applyMaintenancePreset('emergency')">Emergency</x-filament::button>
+                        </div>
+
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <label class="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm dark:border-white/10 dark:bg-gray-900">
+                                <span class="font-medium text-gray-900 dark:text-white">Enable maintenance gateway</span>
+                                <input type="checkbox" wire:model.defer="maintenanceModeEnabled" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-white/20 dark:bg-gray-950" />
+                            </label>
+
+                            <x-filament::input.wrapper>
+                                <select wire:model.defer="maintenanceVariant" class="fi-input block w-full rounded-lg border border-gray-300 bg-white py-2 ps-3 pe-8 text-sm shadow-sm transition duration-75 focus:border-primary-600 focus:ring-2 focus:ring-primary-600/20 dark:border-white/10 dark:bg-gray-900 dark:text-white dark:focus:border-primary-500 dark:focus:ring-primary-500/20">
+                                    @foreach (\App\Support\MaintenancePageVariant::labels() as $value => $label)
+                                        <option value="{{ $value }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </x-filament::input.wrapper>
+
+                            <x-filament::input.wrapper>
+                                <x-filament::input type="text" wire:model.defer="maintenanceBadge" placeholder="Badge" />
+                            </x-filament::input.wrapper>
+
+                            <x-filament::input.wrapper>
+                                <x-filament::input type="text" wire:model.defer="maintenanceEta" placeholder="ETA (optional)" />
+                            </x-filament::input.wrapper>
+
+                            <div class="md:col-span-2">
+                                <x-filament::input.wrapper>
+                                    <x-filament::input type="text" wire:model.defer="maintenanceTitle" placeholder="Title" />
+                                </x-filament::input.wrapper>
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <x-filament::input.wrapper>
+                                    <textarea rows="4" wire:model.defer="maintenanceDescription" class="fi-textarea block w-full rounded-lg border border-gray-300 bg-white py-2 px-3 text-sm shadow-sm transition duration-75 focus:border-primary-600 focus:ring-2 focus:ring-primary-600/20 dark:border-white/10 dark:bg-gray-900 dark:text-white dark:focus:border-primary-500 dark:focus:ring-primary-500/20"></textarea>
+                                </x-filament::input.wrapper>
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            </x-filament::section>
+        @endif
+
+        @if ($this->activeTab === 'payment')
+            <x-filament::section>
+                <x-slot name="heading">
+                    <span class="inline-flex items-center gap-2">
+                        <x-filament::icon icon="heroicon-m-credit-card" class="h-5 w-5 text-primary-500" />
+                        Payment settings
+                    </span>
+                </x-slot>
+                <x-slot name="description">
+                    Xendit keys, deposits, and cancellation fee rules.
+                </x-slot>
+
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="text-sm text-gray-600 dark:text-gray-300">
+                        Status: <span class="font-medium">{{ $this->editingPayment ? 'Editing' : 'Viewing' }}</span>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        @if (! $this->editingPayment)
+                            <x-filament::button color="primary" outlined wire:click="enablePaymentEdit" icon="heroicon-m-pencil-square">
+                                Edit
+                            </x-filament::button>
+                        @else
+                            <x-filament::button color="gray" outlined wire:click="cancelPaymentEdit">Cancel</x-filament::button>
+                            <x-filament::button color="success" wire:click="savePaymentSettings" icon="heroicon-m-check">Save</x-filament::button>
+                        @endif
+                    </div>
+                </div>
+
+                <div class="mt-6 space-y-6">
+                    @php
+                        $xenditConfigured = trim((string) $this->xenditSecretKey) !== '' && trim((string) $this->xenditPublicKey) !== '';
+                    @endphp
+
+                    @if (! $this->editingPayment)
+                        <div class="grid gap-4 md:grid-cols-3">
+                            <x-filament::section>
+                                <x-slot name="heading">Checkout status</x-slot>
+                                <div class="text-sm font-medium {{ $this->onlinePaymentEnabled ? 'text-success-600 dark:text-success-400' : 'text-gray-700 dark:text-gray-300' }}">
+                                    {{ $this->onlinePaymentEnabled ? 'Live Payments Active' : 'Offline Mode Only' }}
+                                </div>
+                            </x-filament::section>
+
+                            <x-filament::section>
+                                <x-slot name="heading">Deposit structure</x-slot>
+                                <div class="text-sm text-gray-700 dark:text-gray-300">
+                                    <span class="font-semibold">{{ (int) $this->partialPaymentSelection }}%</span>
+                                    @if ($this->allowCustomPartialPayment)
+                                        <span class="text-xs text-gray-500 dark:text-gray-400">· custom allowed</span>
+                                    @endif
+                                </div>
+                            </x-filament::section>
+
+                            <x-filament::section>
+                                <x-slot name="heading">Payment setting</x-slot>
+                                <div class="text-sm text-gray-700 dark:text-gray-300">
+                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $xenditConfigured ? 'bg-success-50 text-success-700 dark:bg-success-500/15 dark:text-success-300' : 'bg-danger-50 text-danger-700 dark:bg-danger-500/15 dark:text-danger-300' }}">
+                                        {{ $xenditConfigured ? 'Configured' : 'Pending keys' }}
+                                    </span>
+                                </div>
+                            </x-filament::section>
+                        </div>
+
+                        <x-filament::section>
+                            <x-slot name="heading">Cancellation deduction rule</x-slot>
+                            <x-slot name="description">Deduct from booking total (capped by amount already paid).</x-slot>
+
+                            <div class="text-sm text-gray-700 dark:text-gray-300">
+                                Current: <span class="font-semibold">{{ (int) $this->cancellationFeePercent }}%</span>
+                            </div>
+                        </x-filament::section>
+                    @else
+                        <label class="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm dark:border-white/10 dark:bg-gray-900">
+                            <span class="font-medium text-gray-900 dark:text-white">Activate front-end payments</span>
+                            <input type="checkbox" wire:model.defer="onlinePaymentEnabled" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-white/20 dark:bg-gray-950" />
+                        </label>
+
+                        <x-filament::section>
+                            <x-slot name="heading">Partial payment percentage</x-slot>
+                            <x-slot name="description">Select one deposit option. Full payment (100%) is intentionally excluded.</x-slot>
+
+                            <div class="space-y-4">
+                                <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                    <input type="checkbox" wire:model.live="allowCustomPartialPayment" class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-white/20 dark:bg-gray-950" />
+                                    Allow custom deposit inputs
+                                </label>
+
+                                @if (! $this->allowCustomPartialPayment)
+                                    <div class="grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                                        @foreach ([10, 20, 30, 40, 50, 60, 70, 80, 90] as $option)
+                                            <label class="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-gray-900">
+                                                <input
+                                                    type="radio"
+                                                    value="{{ $option }}"
+                                                    wire:model.defer="partialPaymentSelection"
+                                                    class="h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-white/20 dark:bg-gray-950"
+                                                />
+                                                <span class="font-medium text-gray-800 dark:text-gray-200">{{ $option }}%</span>
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <div class="max-w-xs">
+                                        <x-filament::input.wrapper>
+                                            <x-filament::input
+                                                type="number"
+                                                min="1"
+                                                max="99"
+                                                wire:model.defer="partialPaymentSelection"
+                                                placeholder="e.g. 25"
+                                            />
+                                        </x-filament::input.wrapper>
+                                    </div>
+                                @endif
+                            </div>
+                        </x-filament::section>
+
+                        <x-filament::section>
+                            <x-slot name="heading">Cancellation deduction percentage</x-slot>
+                            <x-slot name="description">Cancellation fee is based on booking total. Collected amount is capped by what the guest has already paid.</x-slot>
+
+                            <div class="grid gap-4 md:grid-cols-2">
+                                <div class="max-w-xs">
+                                    <x-filament::input.wrapper>
+                                        <x-filament::input type="number" min="0" max="100" wire:model.defer="cancellationFeePercent" placeholder="e.g. 30" />
+                                    </x-filament::input.wrapper>
+                                </div>
+
+                                <div class="text-sm text-gray-600 dark:text-gray-300">
+                                    <div class="font-medium text-gray-900 dark:text-white">Rule preview</div>
+                                    <div class="mt-1">
+                                        Example: if total is ₱10,000 and deduction is {{ (int) $this->cancellationFeePercent }}%, fee is ₱{{ number_format((10000 * (int) $this->cancellationFeePercent) / 100, 2) }}.
+                                    </div>
+                                </div>
+                            </div>
+                        </x-filament::section>
+                    @endif
+
+                    <div class="grid gap-4 md:grid-cols-2">
+                        <x-filament::input.wrapper>
+                            <x-filament::input type="text" wire:model.defer="xenditPublicKey" :disabled="! $this->editingPayment" placeholder="Xendit public key" />
+                        </x-filament::input.wrapper>
+                        <x-filament::input.wrapper>
+                            <x-filament::input type="password" wire:model.defer="xenditSecretKey" :disabled="! $this->editingPayment" placeholder="Xendit secret key" />
+                        </x-filament::input.wrapper>
+                        <div class="md:col-span-2">
+                            <x-filament::input.wrapper>
+                                <x-filament::input type="password" wire:model.defer="xenditWebhookToken" :disabled="! $this->editingPayment" placeholder="Webhook token" />
+                            </x-filament::input.wrapper>
+                        </div>
+                    </div>
+
+                    <x-filament::section :collapsible="true" :collapsed="true">
+                        <x-slot name="heading">
+                            Webhook diagnostics
+                        </x-slot>
+                        <x-slot name="description">
+                            Shows the most recent Xendit webhook event processed by the system.
+                        </x-slot>
+
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="text-sm text-gray-600 dark:text-gray-300">
+                                Last event: {{ $this->lastXenditWebhookEvent ? 'available' : 'none yet' }}
+                            </div>
+                            <x-filament::button color="info" outlined size="sm" wire:click="refreshPaymentDebug">
+                                Refresh
+                            </x-filament::button>
+                        </div>
+
+                        <div class="mt-4">
+                            @if ($this->lastXenditWebhookEvent)
+                                <div class="grid gap-3 md:grid-cols-3">
+                                    @foreach ([
+                                        'received_at' => 'Received at',
+                                        'raw_status' => 'Response code',
+                                        'result' => 'Resolution',
+                                        'booking_reference' => 'Booking ref',
+                                        'booking_status' => 'Booking status',
+                                        'paid_amount' => 'Paid amount',
+                                        'invoice_id' => 'Invoice ID',
+                                        'external_id' => 'External ID',
+                                    ] as $k => $label)
+                                        <div class="rounded-xl border border-gray-200 bg-white p-3 text-sm dark:border-white/10 dark:bg-gray-900">
+                                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ $label }}</div>
+                                            <div class="mt-1 font-medium text-gray-900 dark:text-white break-words">
+                                                @if ($k === 'paid_amount')
+                                                    ₱{{ number_format((float) ($this->lastXenditWebhookEvent[$k] ?? 0), 2) }}
+                                                @else
+                                                    {{ $this->lastXenditWebhookEvent[$k] ?? '—' }}
+                                                @endif
+                                            </div>
+                                            @if ($k === 'result' && ! empty($this->lastXenditWebhookEvent['reason']))
+                                                <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                                    Reason: {{ $this->lastXenditWebhookEvent['reason'] }}
+                                                </div>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="rounded-xl border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500 dark:border-white/10 dark:text-gray-400">
+                                    No webhook event captured yet.
+                                </div>
+                            @endif
+                        </div>
+                    </x-filament::section>
+                </div>
+            </x-filament::section>
+        @endif
     </div>
 </x-filament-panels::page>

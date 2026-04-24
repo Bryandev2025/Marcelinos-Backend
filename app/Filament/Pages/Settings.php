@@ -541,7 +541,8 @@ class Settings extends Page
 
         $apiHash = md5($this->semaphoreApiKey);
         $cooldownKey = "semaphore_connectivity_test_cooldown_{$apiHash}";
-        if (! Cache::add($cooldownKey, 1, now()->addSeconds(20))) {
+        $cooldownUntil = now()->addSeconds(20);
+        if (! Cache::add($cooldownKey, $cooldownUntil->timestamp, $cooldownUntil)) {
             Notification::make()
                 ->title('Please wait')
                 ->body('SMS connectivity test is cooling down to avoid rate limits.')
@@ -594,6 +595,39 @@ class Settings extends Page
         }
 
         $this->refreshHealth();
+    }
+
+    public function getSmsPingCooldownSecondsProperty(): int
+    {
+        if (trim($this->semaphoreApiKey) === '') {
+            return 0;
+        }
+
+        $apiHash = md5($this->semaphoreApiKey);
+        $cooldownKey = "semaphore_connectivity_test_cooldown_{$apiHash}";
+        $untilTs = Cache::get($cooldownKey);
+
+        if (! is_numeric($untilTs)) {
+            return 0;
+        }
+
+        return max(0, (int) $untilTs - now()->timestamp);
+    }
+
+    public function getSmsRateLimitedSecondsProperty(): int
+    {
+        if (trim($this->semaphoreApiKey) === '') {
+            return 0;
+        }
+
+        $apiHash = md5($this->semaphoreApiKey);
+        $untilTs = Cache::get("semaphore_rate_limited_until_{$apiHash}");
+
+        if (! is_numeric($untilTs)) {
+            return 0;
+        }
+
+        return max(0, (int) $untilTs - now()->timestamp);
     }
 
     public function getAlertsProperty(): array
