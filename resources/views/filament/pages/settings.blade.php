@@ -441,7 +441,7 @@
                         <div class="flex flex-col sm:flex-row justify-between sm:items-center mb-8 pb-6 border-b border-gray-100 dark:border-gray-800 gap-4">
                             <div>
                                 <h3 class="text-xl font-bold text-gray-900 dark:text-white">SMTP Credentials</h3>
-                                <p class="text-sm text-gray-500 mt-1">Configure your outbound mail driver seamlessly.</p>
+                                <p class="text-sm text-gray-500 mt-1">Configure primary and standby SMTP for automatic failover.</p>
                             </div>
                             <div class="flex-shrink-0">
                                 @if (! $this->editingMail)
@@ -457,36 +457,92 @@
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-7">
-                            @foreach ([
-                                ['key' => 'mailHost', 'label' => 'SMTP Host', 'type' => 'text', 'icon' => 'heroicon-m-server'],
-                                ['key' => 'mailPort', 'label' => 'SMTP Port', 'type' => 'text', 'icon' => 'heroicon-m-hashtag'],
-                                ['key' => 'mailEncryption', 'label' => 'Encryption Type', 'type' => 'text', 'icon' => 'heroicon-m-shield-check'],
-                                ['key' => 'mailUsername', 'label' => 'Mail Username', 'type' => 'email', 'icon' => 'heroicon-m-user'],
-                                ['key' => 'mailPassword', 'label' => 'Mail Password', 'type' => 'password', 'icon' => 'heroicon-m-key'],
-                                ['key' => 'mailDailyLimit', 'label' => 'Daily Quota Limit (0 = unlimited)', 'type' => 'number', 'icon' => 'heroicon-m-chart-bar'],
-                                ['key' => 'mailFromAddress', 'label' => 'Sender Address', 'type' => 'email', 'icon' => 'heroicon-m-at-symbol'],
-                                ['key' => 'mailFromName', 'label' => 'Sender Name', 'type' => 'text', 'icon' => 'heroicon-m-identification'],
-                            ] as $field)
+                        <div class="space-y-8">
+                            <div>
+                                <h4 class="text-sm font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-4">Primary Mailbox (Active)</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-7">
+                                    @foreach ([
+                                        ['key' => 'mailHost', 'label' => 'SMTP Host', 'type' => 'text', 'icon' => 'heroicon-m-server'],
+                                        ['key' => 'mailPort', 'label' => 'SMTP Port', 'type' => 'text', 'icon' => 'heroicon-m-hashtag'],
+                                        ['key' => 'mailEncryption', 'label' => 'Encryption Type', 'type' => 'text', 'icon' => 'heroicon-m-shield-check'],
+                                        ['key' => 'mailUsername', 'label' => 'Mail Username', 'type' => 'email', 'icon' => 'heroicon-m-user'],
+                                        ['key' => 'mailPassword', 'label' => 'Mail Password', 'type' => 'password', 'icon' => 'heroicon-m-key'],
+                                    ] as $field)
+                                        <div>
+                                            <label class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
+                                                <x-filament::icon :icon="$field['icon']" class="h-4 w-4 text-gray-400" />
+                                                {{ $field['label'] }}
+                                            </label>
+                                            <div class="relative">
+                                                <input type="{{ $field['key'] === 'mailPassword' && $this->showMailPassword ? 'text' : $field['type'] }}"
+                                                       wire:model.defer="{{ $field['key'] }}"
+                                                       class="premium-input {{ $field['key'] === 'mailPassword' ? 'pr-12' : '' }}"
+                                                       @disabled(! $this->editingMail) />
+
+                                                @if ($field['key'] === 'mailPassword' && $this->editingMail)
+                                                    <button type="button" class="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors" wire:click="toggleMailPasswordVisibility">
+                                                        <x-filament::icon :icon="$this->showMailPassword ? 'heroicon-m-eye-slash' : 'heroicon-m-eye'" class="h-5 w-5" />
+                                                    </button>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+
+                            <div>
+                                <h4 class="text-sm font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-4">Backup Mailbox (Standby)</h4>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">When primary SMTP fails (for example quota reached), Laravel failover automatically retries using this mailbox.</p>
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-7">
+                                    @foreach ([
+                                        ['key' => 'mailBackupHost', 'label' => 'Backup SMTP Host', 'type' => 'text', 'icon' => 'heroicon-m-server'],
+                                        ['key' => 'mailBackupPort', 'label' => 'Backup SMTP Port', 'type' => 'text', 'icon' => 'heroicon-m-hashtag'],
+                                        ['key' => 'mailBackupEncryption', 'label' => 'Backup Encryption Type', 'type' => 'text', 'icon' => 'heroicon-m-shield-check'],
+                                        ['key' => 'mailBackupUsername', 'label' => 'Backup Username', 'type' => 'email', 'icon' => 'heroicon-m-user'],
+                                        ['key' => 'mailBackupPassword', 'label' => 'Backup Password', 'type' => 'password', 'icon' => 'heroicon-m-key'],
+                                    ] as $field)
+                                        <div>
+                                            <label class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
+                                                <x-filament::icon :icon="$field['icon']" class="h-4 w-4 text-gray-400" />
+                                                {{ $field['label'] }}
+                                            </label>
+                                            <div class="relative">
+                                                <input type="{{ $field['key'] === 'mailBackupPassword' && $this->showMailBackupPassword ? 'text' : $field['type'] }}"
+                                                       wire:model.defer="{{ $field['key'] }}"
+                                                       class="premium-input {{ $field['key'] === 'mailBackupPassword' ? 'pr-12' : '' }}"
+                                                       @disabled(! $this->editingMail) />
+
+                                                @if ($field['key'] === 'mailBackupPassword' && $this->editingMail)
+                                                    <button type="button" class="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors" wire:click="toggleMailBackupPasswordVisibility">
+                                                        <x-filament::icon :icon="$this->showMailBackupPassword ? 'heroicon-m-eye-slash' : 'heroicon-m-eye'" class="h-5 w-5" />
+                                                    </button>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-7">
+                                @foreach ([
+                                    ['key' => 'mailDailyLimit', 'label' => 'Daily Quota Limit (0 = unlimited)', 'type' => 'number', 'icon' => 'heroicon-m-chart-bar'],
+                                    ['key' => 'mailFromAddress', 'label' => 'Sender Address', 'type' => 'email', 'icon' => 'heroicon-m-at-symbol'],
+                                    ['key' => 'mailFromName', 'label' => 'Sender Name', 'type' => 'text', 'icon' => 'heroicon-m-identification'],
+                                ] as $field)
                                 <div>
                                     <label class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
                                         <x-filament::icon :icon="$field['icon']" class="h-4 w-4 text-gray-400" />
                                         {{ $field['label'] }}
                                     </label>
                                     <div class="relative">
-                                        <input type="{{ $field['key'] === 'mailPassword' && $this->showMailPassword ? 'text' : $field['type'] }}" 
+                                        <input type="{{ $field['type'] }}"
                                                wire:model.defer="{{ $field['key'] }}"
-                                               class="premium-input {{ $field['key'] === 'mailPassword' ? 'pr-12' : '' }}"
+                                               class="premium-input"
                                                @disabled(! $this->editingMail) />
-                                        
-                                        @if ($field['key'] === 'mailPassword' && $this->editingMail)
-                                            <button type="button" class="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors" wire:click="toggleMailPasswordVisibility">
-                                                <x-filament::icon :icon="$this->showMailPassword ? 'heroicon-m-eye-slash' : 'heroicon-m-eye'" class="h-5 w-5" />
-                                            </button>
-                                        @endif
                                     </div>
                                 </div>
                             @endforeach
+                            </div>
                         </div>
                     </div>
                 @endif

@@ -50,6 +50,16 @@ class Settings extends Page
 
     public string $mailEncryption = '';
 
+    public string $mailBackupHost = '';
+
+    public string $mailBackupPort = '';
+
+    public string $mailBackupUsername = '';
+
+    public string $mailBackupPassword = '';
+
+    public string $mailBackupEncryption = '';
+
     public string $mailFromAddress = '';
 
     public string $mailFromName = '';
@@ -89,6 +99,8 @@ class Settings extends Page
     public string $activeTab = 'overview';
 
     public bool $showMailPassword = false;
+
+    public bool $showMailBackupPassword = false;
 
     public bool $showSmsApiKey = false;
 
@@ -150,6 +162,7 @@ class Settings extends Page
     {
         $this->editingMail = false;
         $this->showMailPassword = false;
+        $this->showMailBackupPassword = false;
         $this->loadFromEnv();
     }
 
@@ -170,6 +183,11 @@ class Settings extends Page
         $this->showMailPassword = ! $this->showMailPassword;
     }
 
+    public function toggleMailBackupPasswordVisibility(): void
+    {
+        $this->showMailBackupPassword = ! $this->showMailBackupPassword;
+    }
+
     public function toggleSmsApiKeyVisibility(): void
     {
         $this->showSmsApiKey = ! $this->showSmsApiKey;
@@ -187,6 +205,11 @@ class Settings extends Page
             'mailUsername' => ['required', 'email'],
             'mailPassword' => ['required', 'string'],
             'mailEncryption' => ['nullable', 'string'],
+            'mailBackupHost' => ['nullable', 'string', 'required_with:mailBackupPort,mailBackupUsername,mailBackupPassword'],
+            'mailBackupPort' => ['nullable', 'string', 'required_with:mailBackupHost,mailBackupUsername,mailBackupPassword'],
+            'mailBackupUsername' => ['nullable', 'email', 'required_with:mailBackupHost,mailBackupPort,mailBackupPassword'],
+            'mailBackupPassword' => ['nullable', 'string', 'required_with:mailBackupHost,mailBackupPort,mailBackupUsername'],
+            'mailBackupEncryption' => ['nullable', 'string'],
             'mailFromAddress' => ['required', 'email'],
             'mailFromName' => ['required', 'string'],
             'mailDailyLimit' => ['required', 'integer', 'min:0', 'max:100000'],
@@ -198,17 +221,31 @@ class Settings extends Page
             'MAIL_USERNAME' => $this->mailUsername,
             'MAIL_PASSWORD' => $this->mailPassword,
             'MAIL_ENCRYPTION' => $this->mailEncryption,
+            'MAIL_BACKUP_HOST' => $this->mailBackupHost,
+            'MAIL_BACKUP_PORT' => $this->mailBackupPort,
+            'MAIL_BACKUP_USERNAME' => $this->mailBackupUsername,
+            'MAIL_BACKUP_PASSWORD' => $this->mailBackupPassword,
+            'MAIL_BACKUP_ENCRYPTION' => $this->mailBackupEncryption,
             'MAIL_FROM_ADDRESS' => $this->mailFromAddress,
             'MAIL_FROM_NAME' => $this->mailFromName,
             'MAIL_DAILY_LIMIT' => $this->mailDailyLimit,
+            'MAIL_MAILER' => 'failover',
+            'MAIL_FAILOVER_MAILERS' => 'smtp,smtp_backup,log',
         ]);
 
         config([
+            'mail.default' => 'failover',
             'mail.mailers.smtp.host' => $this->mailHost,
             'mail.mailers.smtp.port' => (int) $this->mailPort,
             'mail.mailers.smtp.username' => $this->mailUsername,
             'mail.mailers.smtp.password' => $this->mailPassword,
             'mail.mailers.smtp.encryption' => $this->mailEncryption,
+            'mail.mailers.smtp_backup.host' => $this->mailBackupHost,
+            'mail.mailers.smtp_backup.port' => $this->mailBackupPort !== '' ? (int) $this->mailBackupPort : null,
+            'mail.mailers.smtp_backup.username' => $this->mailBackupUsername,
+            'mail.mailers.smtp_backup.password' => $this->mailBackupPassword,
+            'mail.mailers.smtp_backup.encryption' => $this->mailBackupEncryption,
+            'mail.mailers.failover.mailers' => ['smtp', 'smtp_backup', 'log'],
             'mail.from.address' => $this->mailFromAddress,
             'mail.from.name' => $this->mailFromName,
             'mail.daily_limit' => $this->mailDailyLimit,
@@ -219,11 +256,12 @@ class Settings extends Page
 
         Notification::make()
             ->title('Email settings saved')
-            ->body('SMTP and sender settings were updated successfully.')
+            ->body('Primary/backup SMTP and sender settings were updated successfully.')
             ->success()
             ->send();
 
         $this->showMailPassword = false;
+        $this->showMailBackupPassword = false;
     }
 
     public function saveSmsSettings(): void
@@ -632,6 +670,10 @@ class Settings extends Page
             $items[] = 'Email quota is nearing limit. Consider spreading sends or increasing mailbox tier.';
         }
 
+        if (trim($this->mailBackupHost) === '' || trim($this->mailBackupUsername) === '' || trim($this->mailBackupPassword) === '') {
+            $items[] = 'Configure backup SMTP credentials so failover can continue sending after primary quota or transport failures.';
+        }
+
         if ($this->smsCredits !== null && $this->smsCredits <= $this->smsLowCreditThresholdValue()) {
             $items[] = 'SMS credits are low. Top up Semaphore credits to avoid delivery failures.';
         }
@@ -657,6 +699,11 @@ class Settings extends Page
         $this->mailUsername = (string) config('mail.mailers.smtp.username', '');
         $this->mailPassword = (string) config('mail.mailers.smtp.password', '');
         $this->mailEncryption = (string) config('mail.mailers.smtp.encryption', 'ssl');
+        $this->mailBackupHost = (string) config('mail.mailers.smtp_backup.host', '');
+        $this->mailBackupPort = (string) config('mail.mailers.smtp_backup.port', '');
+        $this->mailBackupUsername = (string) config('mail.mailers.smtp_backup.username', '');
+        $this->mailBackupPassword = (string) config('mail.mailers.smtp_backup.password', '');
+        $this->mailBackupEncryption = (string) config('mail.mailers.smtp_backup.encryption', $this->mailEncryption);
         $this->mailFromAddress = (string) config('mail.from.address', '');
         $this->mailFromName = (string) config('mail.from.name', '');
         $this->mailDailyLimit = max(0, (int) config('mail.daily_limit', 100));

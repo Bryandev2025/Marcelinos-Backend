@@ -60,7 +60,7 @@ class CreateStaff extends CreateRecord
 
                     try {
                         $otp = OtpVerification::createForEmail($email);
-                        Mail::mailer('smtp')->to($email)->send(new StaffOtpVerification($otp->code));
+                        Mail::to($email)->send(new StaffOtpVerification($otp->code));
                         $this->otpSentTo = $email;
 
                         Log::info('Staff OTP sent', [
@@ -81,7 +81,7 @@ class CreateStaff extends CreateRecord
                         try {
                             $otp ??= OtpVerification::createForEmail($email);
 
-                            Mail::mailer('smtp')->raw(
+                            Mail::raw(
                                 "Your verification code is {$otp->code}. This code expires in 10 minutes.",
                                 function ($message) use ($email): void {
                                     $message->to($email)->subject('Staff Account Verification Code');
