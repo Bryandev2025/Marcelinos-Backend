@@ -7,6 +7,8 @@ use App\Http\Resources\API\VenueResource;
 use App\Models\Booking;
 use App\Models\Venue;
 use App\Models\VenueBlockedDate;
+use App\Support\BookingPricing;
+use App\Support\VenueWeddingPreparation;
 use Exception;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
@@ -75,10 +77,26 @@ class VenueController extends Controller
             $bookedVenueIds = [];
             if (! $isAll && $venues->isNotEmpty()) {
                 $venueIds = $venues->pluck('id')->all();
+                $qVet = $request->query('venue_event_type');
+                $venueEventTypeForList = is_string($qVet) && $qVet !== ''
+                    ? BookingPricing::normalizeVenueEventType($qVet)
+                    : BookingPricing::VENUE_EVENT_WEDDING;
                 $availableVenueIds = Venue::whereIn('id', $venueIds)
-                    ->availableBetween($checkIn, $checkOut)
+                    ->availableBetween($checkIn, $checkOut, null, $venueEventTypeForList, true)
                     ->pluck('id')
                     ->all();
+                $effClientStart = VenueWeddingPreparation::effectiveVenueBlockStart($checkIn, $venueEventTypeForList, true);
+                $bookedByOverlapQuery = Booking::query()
+                    ->join('booking_venue', 'bookings.id', '=', 'booking_venue.booking_id')
+                    ->whereIn('booking_venue.venue_id', $venueIds)
+                    ->whereIn('bookings.booking_status', Booking::availabilityBlockingStatuses());
+                VenueWeddingPreparation::constrainToBookingsThatCollideWithVenueCandidateRange(
+                    $bookedByOverlapQuery,
+                    $effClientStart,
+                    $checkOut,
+                    null
+                );
+                $bookedVenueIds = $bookedByOverlapQuery->distinct()->pluck('booking_venue.venue_id')->all();
                 $blockedOverlaps = VenueBlockedDate::query()
                     ->whereIn('venue_id', $venueIds)
                     ->overlappingBookingRange($checkIn, $checkOut)
@@ -98,16 +116,6 @@ class VenueController extends Controller
                         ->values()
                         ->all()
                     )
-                    ->all();
-
-                $bookedVenueIds = Booking::query()
-                    ->join('booking_venue', 'bookings.id', '=', 'booking_venue.booking_id')
-                    ->whereIn('booking_venue.venue_id', $venueIds)
-                    ->whereIn('bookings.booking_status', Booking::availabilityBlockingStatuses())
-                    ->where('bookings.check_in', '<', $checkOut)
-                    ->where('bookings.check_out', '>', $checkIn)
-                    ->distinct()
-                    ->pluck('booking_venue.venue_id')
                     ->all();
             }
 

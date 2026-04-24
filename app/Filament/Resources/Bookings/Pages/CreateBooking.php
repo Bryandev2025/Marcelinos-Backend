@@ -63,6 +63,7 @@ class CreateBooking extends CreateRecord
             $data['check_in'] ?? null,
             $data['check_out'] ?? null,
             null,
+            is_string($data['venue_event_type'] ?? null) ? $data['venue_event_type'] : null,
         )) {
             throw ValidationException::withMessages([
                 'data.venues' => __('One or more selected venues are not available for the chosen dates.'),

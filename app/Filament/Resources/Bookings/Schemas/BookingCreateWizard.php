@@ -3,8 +3,8 @@
 namespace App\Filament\Resources\Bookings\Schemas;
 
 use App\Filament\Forms\Components\PhAddressFields;
-use App\Models\Booking;
 use App\Models\BedSpecification;
+use App\Models\Booking;
 use App\Models\Guest;
 use App\Models\Room;
 use App\Models\Venue;
@@ -164,6 +164,7 @@ class BookingCreateWizard
                                 $bedSpecId = $get('bed_specification_id');
                                 if (! $checkIn || ! $checkOut || ! $bedSpecId) {
                                     $query->whereRaw('0 = 1');
+
                                     return;
                                 }
                                 try {
@@ -171,10 +172,12 @@ class BookingCreateWizard
                                     $end = Carbon::parse((string) $checkOut);
                                 } catch (\Exception $e) {
                                     $query->whereRaw('0 = 1');
+
                                     return;
                                 }
                                 if ($end->lessThanOrEqualTo($start)) {
                                     $query->whereRaw('0 = 1');
+
                                     return;
                                 }
 
@@ -228,7 +231,13 @@ class BookingCreateWizard
                                 if (! self::bookingTypeUsesVenues($get)) {
                                     return;
                                 }
-                                if (BookingForm::hasVenueConflicts($value, $get('check_in'), $get('check_out'), $record)) {
+                                if (BookingForm::hasVenueConflicts(
+                                    $value,
+                                    $get('check_in'),
+                                    $get('check_out'),
+                                    $record,
+                                    is_string($get('venue_event_type')) ? $get('venue_event_type') : null,
+                                )) {
                                     $fail('One or more selected venues are not available for the chosen dates.');
                                 }
                             },
