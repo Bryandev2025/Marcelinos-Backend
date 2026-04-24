@@ -122,6 +122,8 @@ class Settings extends Page
 
     public ?array $lastXenditWebhookEvent = null;
 
+    public string $hostingerPlanExpiresAt = '';
+
     public function mount(): void
     {
         $this->loadFromEnv();
@@ -600,6 +602,17 @@ class Settings extends Page
             ];
         }
 
+        $hostingerDaysLeft = $this->hostingerPlanDaysLeft();
+        if ($hostingerDaysLeft !== null && $hostingerDaysLeft <= 30) {
+            $alerts[] = [
+                'title' => 'Hosting plan is nearing expiry',
+                'detail' => $hostingerDaysLeft <= 0
+                    ? 'Your Hostinger plan expiry date has passed. Please renew immediately.'
+                    : "Hostinger plan expires in {$hostingerDaysLeft} day(s).",
+                'level' => 'warning',
+            ];
+        }
+
         return $alerts;
     }
 
@@ -621,6 +634,13 @@ class Settings extends Page
 
         if ($this->smsCredits !== null && $this->smsCredits <= $this->smsLowCreditThresholdValue()) {
             $items[] = 'SMS credits are low. Top up Semaphore credits to avoid delivery failures.';
+        }
+
+        $hostingerDaysLeft = $this->hostingerPlanDaysLeft();
+        if ($hostingerDaysLeft !== null && $hostingerDaysLeft <= 30) {
+            $items[] = $hostingerDaysLeft <= 0
+                ? 'Hostinger plan appears expired. Renew now to avoid downtime.'
+                : "Hostinger plan expires in {$hostingerDaysLeft} day(s). Plan a renewal early.";
         }
 
         if ($items === []) {
@@ -667,6 +687,33 @@ class Settings extends Page
         $this->xenditWebhookToken = (string) env('XENDIT_WEBHOOK_TOKEN', '');
         $webhookEvent = Cache::get('xendit_webhook_last_event');
         $this->lastXenditWebhookEvent = is_array($webhookEvent) ? $webhookEvent : null;
+        $this->hostingerPlanExpiresAt = (string) env('HOSTINGER_PLAN_EXPIRES_AT', '');
+    }
+
+    public function hostingerPlanExpiryDisplay(): string
+    {
+        if (trim($this->hostingerPlanExpiresAt) === '') {
+            return 'Not set';
+        }
+
+        try {
+            return Carbon::parse($this->hostingerPlanExpiresAt)->format('M d, Y');
+        } catch (\Throwable) {
+            return 'Invalid date format';
+        }
+    }
+
+    public function hostingerPlanDaysLeft(): ?int
+    {
+        if (trim($this->hostingerPlanExpiresAt) === '') {
+            return null;
+        }
+
+        try {
+            return now()->startOfDay()->diffInDays(Carbon::parse($this->hostingerPlanExpiresAt)->startOfDay(), false);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function checkEmailHealth(): string

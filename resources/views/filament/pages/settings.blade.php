@@ -8,6 +8,7 @@
             : 0;
         $emailOnline = str_starts_with(strtolower((string) $this->emailHealth), 'online');
         $smsOnline = str_starts_with(strtolower((string) $this->smsHealth), 'online');
+        $hostingerDaysLeft = $this->hostingerPlanDaysLeft();
         
         $tabMeta = [
             'overview' => [
@@ -306,6 +307,44 @@
                                     {{ $this->smsCredits !== null ? number_format($this->smsCredits, 2) : 'N/A' }}
                                 </span>
                                 <span class="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Available Credits</span>
+                            </div>
+                        </div>
+
+                        <!-- Hosting Plan KPI -->
+                        <div class="premium-card p-6 flex flex-col justify-between">
+                            <div class="flex justify-between items-start mb-6">
+                                <div class="p-3 bg-amber-50 dark:bg-amber-500/10 rounded-2xl">
+                                    <x-filament::icon icon="heroicon-o-server-stack" class="h-7 w-7 text-amber-500" />
+                                </div>
+                                @if ($hostingerDaysLeft === null)
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700 dark:bg-gray-700/50 dark:text-gray-300">
+                                        No Expiry Date
+                                    </span>
+                                @elseif ($hostingerDaysLeft <= 30)
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400">
+                                        Renewal Soon
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
+                                        Active
+                                    </span>
+                                @endif
+                            </div>
+                            <dt class="text-sm font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-1">Hostinger Plan Expiry</dt>
+
+                            <div class="mt-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-100 dark:border-gray-800 flex flex-col justify-center gap-1 h-[104px]">
+                                <span class="text-2xl font-bold text-gray-900 dark:text-white">
+                                    {{ $this->hostingerPlanExpiryDisplay() }}
+                                </span>
+                                <span class="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                                    @if ($hostingerDaysLeft === null)
+                                        Set `HOSTINGER_PLAN_EXPIRES_AT` in .env
+                                    @elseif ($hostingerDaysLeft < 0)
+                                        Expired {{ abs($hostingerDaysLeft) }} day(s) ago
+                                    @else
+                                        {{ $hostingerDaysLeft }} day(s) left
+                                    @endif
+                                </span>
                             </div>
                         </div>
 
