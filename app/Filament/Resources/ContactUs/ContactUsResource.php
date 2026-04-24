@@ -10,6 +10,7 @@ use App\Filament\Resources\ContactUs\Schemas\ContactUsForm;
 use App\Filament\Resources\ContactUs\Tables\ContactUsTable;
 use App\Models\ContactUs;
 use BackedEnum;
+use Filament\Navigation\NavigationItem;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -28,6 +29,24 @@ class ContactUsResource extends Resource
         $count = ContactUs::where('status', 'new')->count();
 
         return $count > 0 ? (string) $count : null;
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'danger';
+    }
+
+    /**
+     * Add a custom class so we can style this nav badge via Blade/CSS.
+     *
+     * @return array<NavigationItem>
+     */
+    public static function getNavigationItems(): array
+    {
+        return array_map(
+            fn (NavigationItem $item): NavigationItem => $item->extraAttributes(['class' => 'fi-nav-item-alert-badge']),
+            parent::getNavigationItems(),
+        );
     }
 
     protected static ?string $model = ContactUs::class;

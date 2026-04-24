@@ -43,7 +43,7 @@ class AdminPanelProvider extends PanelProvider
                 'primary' => Color::hex('#83A070'),
                 'gray' => Color::Slate,
                 'success' => Color::Emerald,
-                'danger' => Color::Rose,
+                'danger' => Color::hex('#EF4444'),
                 'warning' => Color::Amber,
                 'info' => Color::Sky,            ])
             ->font('Inter')
@@ -91,6 +91,10 @@ class AdminPanelProvider extends PanelProvider
                         'trashedCount' => RecycleBin::allTrashedTotal(),
                     ])->render()
                     : '',
+            )
+            ->renderHook(
+                PanelsRenderHook::STYLES_AFTER,
+                fn (): string => view('filament.hooks.navigation-alert-badge-styles')->render(),
             )
             ->resourceCreatePageRedirect('index')
             ->resourceEditPageRedirect('index')

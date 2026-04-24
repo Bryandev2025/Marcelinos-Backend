@@ -18,6 +18,7 @@ use App\Models\Booking;
 use BackedEnum;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
+use Filament\Navigation\NavigationItem;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
@@ -52,6 +53,24 @@ class BookingResource extends Resource
             ->count();
 
         return $count > 0 ? (string) $count : null;
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'danger';
+    }
+
+    /**
+     * Add a custom class so we can style this nav badge via Blade/CSS.
+     *
+     * @return array<NavigationItem>
+     */
+    public static function getNavigationItems(): array
+    {
+        return array_map(
+            fn (NavigationItem $item): NavigationItem => $item->extraAttributes(['class' => 'fi-nav-item-alert-badge']),
+            parent::getNavigationItems(),
+        );
     }
 
     public static function markBookingAsViewed(int $bookingId): void

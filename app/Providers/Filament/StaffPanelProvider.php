@@ -18,6 +18,7 @@ use Filament\Navigation\MenuItem;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -76,6 +77,10 @@ class StaffPanelProvider extends PanelProvider
                     ->visible(fn (): bool => ActivityHistory::canAccess()),
             ])
             ->viteTheme('resources/css/filament/admin/theme.css')
+            ->renderHook(
+                PanelsRenderHook::STYLES_AFTER,
+                fn (): string => view('filament.hooks.navigation-alert-badge-styles')->render(),
+            )
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
