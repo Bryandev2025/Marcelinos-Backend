@@ -15,33 +15,35 @@ class BookingUnpaidExpiryTest extends TestCase
     }
 
     #[Test]
-    public function future_check_in_is_not_expired_before_check_in_day_evening(): void
+    public function future_check_in_is_not_expired_before_tomorrow_21_00(): void
     {
         $booking = new Booking([
-            'status' => Booking::STATUS_UNPAID,
+            'booking_status' => Booking::BOOKING_STATUS_RESERVED,
+            'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
         ]);
-        $booking->created_at = self::manila('2026-04-01 10:00:00');
+        $booking->created_at = self::manila('2026-04-04 10:00:00');
         $booking->check_in = self::manila('2026-04-20 14:00:00');
 
-        $at = self::manila('2026-04-04 13:00:00');
+        $at = self::manila('2026-04-05 13:00:00');
 
         $this->assertTrue($booking->isCheckInStrictlyAfterTodayManila($at));
         $this->assertFalse($booking->isExpiredUnpaid($at));
     }
 
     #[Test]
-    public function future_check_in_expires_at_or_after_check_in_day_21_00_manila(): void
+    public function future_check_in_expires_at_or_after_tomorrow_21_00_manila(): void
     {
         $booking = new Booking([
-            'status' => Booking::STATUS_UNPAID,
+            'booking_status' => Booking::BOOKING_STATUS_RESERVED,
+            'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
         ]);
-        $booking->created_at = self::manila('2026-04-01 10:00:00');
+        $booking->created_at = self::manila('2026-04-05 10:00:00');
         $booking->check_in = self::manila('2026-04-20 14:00:00');
 
-        $beforeDeadline = self::manila('2026-04-20 20:59:00');
+        $beforeDeadline = self::manila('2026-04-06 20:59:00');
         $this->assertFalse($booking->isExpiredUnpaid($beforeDeadline));
 
-        $atDeadline = self::manila('2026-04-20 21:00:00');
+        $atDeadline = self::manila('2026-04-06 21:00:00');
         $this->assertTrue($booking->isExpiredUnpaid($atDeadline));
     }
 
@@ -52,7 +54,8 @@ class BookingUnpaidExpiryTest extends TestCase
     public function short_lead_booking_expires_at_21_00_on_check_in_day(): void
     {
         $booking = new Booking([
-            'status' => Booking::STATUS_UNPAID,
+            'booking_status' => Booking::BOOKING_STATUS_RESERVED,
+            'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
         ]);
         $booking->created_at = self::manila('2026-04-14 10:00:00');
         $booking->check_in = self::manila('2026-04-15 14:00:00');
@@ -62,10 +65,11 @@ class BookingUnpaidExpiryTest extends TestCase
     }
 
     #[Test]
-    public function messenger_path_unpaid_expires_at_is_check_in_day_21_00_manila(): void
+    public function messenger_path_unpaid_expires_at_is_tomorrow_21_00_for_future_check_in(): void
     {
         $booking = new Booking([
-            'status' => Booking::STATUS_UNPAID,
+            'booking_status' => Booking::BOOKING_STATUS_RESERVED,
+            'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
         ]);
         $booking->created_at = self::manila('2026-04-10 10:00:00');
         $booking->check_in = self::manila('2026-04-16 14:00:00');
@@ -76,7 +80,7 @@ class BookingUnpaidExpiryTest extends TestCase
             $this->assertTrue($booking->useMessengerDepositInstructions());
             $expires = $booking->unpaidExpiresAt();
             $this->assertNotNull($expires);
-            $this->assertSame('2026-04-16', $expires->timezone(Booking::timezoneManila())->format('Y-m-d'));
+            $this->assertSame('2026-04-11', $expires->timezone(Booking::timezoneManila())->format('Y-m-d'));
             $this->assertSame('21:00:00', $expires->timezone(Booking::timezoneManila())->format('H:i:s'));
         } finally {
             Carbon::setTestNow();
@@ -87,7 +91,8 @@ class BookingUnpaidExpiryTest extends TestCase
     public function same_calendar_day_booking_not_expired_before_21_00_on_check_in_day(): void
     {
         $booking = new Booking([
-            'status' => Booking::STATUS_UNPAID,
+            'booking_status' => Booking::BOOKING_STATUS_RESERVED,
+            'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
         ]);
         $booking->created_at = self::manila('2026-04-10 09:00:00');
         $booking->check_in = self::manila('2026-04-10 15:00:00');
@@ -100,7 +105,8 @@ class BookingUnpaidExpiryTest extends TestCase
     public function past_check_in_day_is_expired_when_unpaid_after_deadline(): void
     {
         $booking = new Booking([
-            'status' => Booking::STATUS_UNPAID,
+            'booking_status' => Booking::BOOKING_STATUS_RESERVED,
+            'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
         ]);
         $booking->created_at = self::manila('2026-04-01 10:00:00');
         $booking->check_in = self::manila('2026-04-05 14:00:00');
@@ -113,7 +119,8 @@ class BookingUnpaidExpiryTest extends TestCase
     public function unpaid_expires_at_matches_check_in_day_21_00_when_not_messenger_path(): void
     {
         $booking = new Booking([
-            'status' => Booking::STATUS_UNPAID,
+            'booking_status' => Booking::BOOKING_STATUS_RESERVED,
+            'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
         ]);
         $booking->created_at = self::manila('2026-04-10 09:00:00');
         $booking->check_in = self::manila('2026-04-10 15:00:00');
@@ -135,11 +142,26 @@ class BookingUnpaidExpiryTest extends TestCase
     public function day_before_check_in_is_not_expired_even_late_at_night(): void
     {
         $booking = new Booking([
-            'status' => Booking::STATUS_UNPAID,
+            'booking_status' => Booking::BOOKING_STATUS_RESERVED,
+            'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
         ]);
-        $booking->created_at = self::manila('2026-04-09 10:00:00');
+        $booking->created_at = self::manila('2026-04-10 10:00:00');
         $booking->check_in = self::manila('2026-04-11 12:00:00');
 
         $this->assertFalse($booking->isExpiredUnpaid(self::manila('2026-04-10 23:59:00')));
+    }
+
+    #[Test]
+    public function far_future_check_in_still_expires_tomorrow_at_21_00(): void
+    {
+        $booking = new Booking([
+            'booking_status' => Booking::BOOKING_STATUS_RESERVED,
+            'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
+        ]);
+        $booking->created_at = self::manila('2026-04-05 10:00:00');
+        $booking->check_in = self::manila('2026-04-30 14:00:00');
+
+        $this->assertFalse($booking->isExpiredUnpaid(self::manila('2026-04-06 20:59:00')));
+        $this->assertTrue($booking->isExpiredUnpaid(self::manila('2026-04-06 21:00:00')));
     }
 }

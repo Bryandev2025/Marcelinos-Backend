@@ -15,7 +15,6 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Auth;
 
 class RoomsTable
 {
@@ -73,7 +72,7 @@ class RoomsTable
                     RestoreBulkAction::make(),
                     TypedForceDeleteBulkAction::make(),
                 ])
-                    ->visible(fn () => Auth::user() && Auth::user()->role === 'admin'),
+                    ->visible(fn (): bool => auth()->user()?->can('deleteAny', Room::class) ?? false),
             ]);
     }
 }

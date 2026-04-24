@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Filament\Resources\ContactUs\Pages\ContactConversation;
 use App\Models\ContactUs;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -37,6 +38,13 @@ class NewContactInquiry extends Notification implements ShouldQueue
      */
     public function toMail(object $notifiable): MailMessage
     {
+        $firstMessage = (string) ($this->contact->message ?: ($this->contact->messages()->oldest()->value('body') ?? ''));
+
+        $conversationUrl = ContactConversation::getUrl(
+            ['record' => $this->contact->getKey()],
+            panel: 'admin',
+        );
+
         return (new MailMessage)
             ->subject('New Contact Inquiry Received')
             ->greeting('Hello Admin,')
@@ -45,9 +53,10 @@ class NewContactInquiry extends Notification implements ShouldQueue
             ->line('**Email:** ' . $this->contact->email)
             ->line('**Phone:** ' . ($this->contact->phone ?? 'Not provided'))
             ->line('**Subject:** ' . $this->contact->subject)
-            ->line('**Message:** ' . $this->contact->message)
-            ->action('View in Admin Panel', url('/admin/contact-us/' . $this->contact->id))
-            ->line('Please review and respond accordingly.');
+            ->line('**Message:** ' . $firstMessage)
+            ->action('View in Admin Panel', $conversationUrl)
+            ->line('Please review and respond accordingly.')
+            ->salutation('Regards, System Admin');
     }
 
     /**

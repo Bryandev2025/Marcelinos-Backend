@@ -15,6 +15,8 @@ use App\Support\BookingCheckInEligibility;
 use App\Support\BookingFullBalancePayment;
 use App\Support\BookingLifecycleActions;
 use App\Support\BookingPricing;
+use App\Support\BookingSpecialDiscount;
+use App\Support\CancellationPolicy;
 use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -25,6 +27,8 @@ use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
@@ -40,7 +44,9 @@ use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class BookingsTable
 {
@@ -71,6 +77,20 @@ class BookingsTable
                     ->label('Guest')
                     ->formatStateUsing(fn ($record) => $record->guest?->full_name ?? '—')
                     ->description(fn ($record) => $record->guest?->email ?: 'No email')
+                    ->extraAttributes(['class' => 'cursor-pointer'])
+                    ->action(
+                        Action::make('viewGuest')
+                            ->modalHeading('Guest information')
+                            ->modalCancelActionLabel('Close')
+                            ->modalSubmitAction(false)
+                            ->modalContent(function ($record): View {
+                                $guest = $record->guest;
+
+                                return view('filament.bookings.guest-modal', [
+                                    'guest' => $guest,
+                                ]);
+                            })
+                    )
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         return $query->whereHas('guest', function (Builder $guestQuery) use ($search): void {
                             $guestQuery
@@ -335,7 +355,19 @@ class BookingsTable
                 TextColumn::make('total_price')
                     ->label('Total')
                     ->money('PHP', true)
-                    ->description(fn ($record) => 'Paid: '.number_format((float) ($record->total_paid ?? 0), 2).' · Balance: '.number_format((float) ($record->balance ?? 0), 2))
+                    ->description(function (Booking $record): string {
+                        $paid = number_format((float) ($record->total_paid ?? 0), 2);
+                        $balance = number_format((float) ($record->balance ?? 0), 2);
+                        $desc = "Paid: {$paid} · Balance: {$balance}";
+
+                        if (BookingSpecialDiscount::hasDiscount($record)) {
+                            $gross = number_format(BookingSpecialDiscount::grossTotal($record), 2);
+                            $discount = number_format(BookingSpecialDiscount::discountAmount($record), 2);
+                            $desc .= " · Discount: -{$discount} (Gross {$gross})";
+                        }
+
+                        return $desc;
+                    })
                     ->sortable(),
 
                 TextColumn::make('total_paid')
@@ -373,14 +405,21 @@ class BookingsTable
                         ->orderBy('payment_method', $direction)
                         ->orderBy('online_payment_plan', $direction)),
 
-                BadgeColumn::make('status')
-                    ->colors(Booking::statusColors())
-                    ->formatStateUsing(fn (?string $state): string => Booking::statusOptions()[$state] ?? (string) $state)
+                BadgeColumn::make('booking_status')
+                    ->label('Stay')
+                    ->colors(Booking::bookingStatusColors())
+                    ->formatStateUsing(fn (?string $state): string => Booking::bookingStatusOptions()[$state] ?? (string) $state)
+                    ->sortable(),
+                BadgeColumn::make('payment_status')
+                    ->label('Payment')
+                    ->colors(Booking::paymentStatusColors())
+                    ->formatStateUsing(fn (?string $state): string => Booking::paymentStatusOptions()[$state] ?? (string) $state)
                     ->sortable(),
 
                 TextColumn::make('next_step')
                     ->label('Next step')
                     ->getStateUsing(fn (Booking $record): string => BookingAdminGuidance::listNextActionLabel($record))
+                    ->tooltip(fn (Booking $record): ?string => BookingAdminGuidance::listNextStepTooltip($record))
                     ->wrap()
                     ->toggleable(),
 
@@ -391,8 +430,12 @@ class BookingsTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                SelectFilter::make('status')
-                    ->options(Booking::statusOptions()),
+                SelectFilter::make('booking_status')
+                    ->label('Stay status')
+                    ->options(Booking::bookingStatusOptions()),
+                SelectFilter::make('payment_status')
+                    ->label('Payment status')
+                    ->options(Booking::paymentStatusOptions()),
                 SelectFilter::make('payment_method')
                     ->label('Payment intent')
                     ->options([
@@ -463,7 +506,7 @@ class BookingsTable
                         Select::make('month')
                             ->label(fn (Get $get): string => 'Month ('.($get('year') ?? now()->year).')')
                             ->options(self::monthButtonLabels())
-                            ->default(now()->format('m'))
+                            ->placeholder('Select a month')
                             ->native(false)
                             ->searchable()
                             ->visible(fn (Get $get) => ! (bool) $get('use_custom')),
@@ -533,6 +576,76 @@ class BookingsTable
             ])
             ->defaultSort('created_at', 'desc')
             ->headerActions([
+                Action::make('import')
+                    ->label('Import')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->color('warning')
+                    ->modalHeading('Import')
+                    ->modalDescription('Step 1: Upload your CSV file. Step 2: Keep "Check file only" turned on and click import. Step 3: If results look correct, turn it off and import again to save.')
+                    ->form([
+                        Placeholder::make('template_path')
+                            ->label('CSV Template')
+                            ->content('Copy this template format: `storage/app/examples/legacy-bookings-template.csv`.'),
+                        FileUpload::make('csv_file')
+                            ->label('CSV File')
+                            ->disk('local')
+                            ->directory('imports/legacy-bookings')
+                            ->storeFiles(false)
+                            ->acceptedFileTypes([
+                                'text/csv',
+                                'text/plain',
+                                'application/vnd.ms-excel',
+                            ])
+                            ->required(),
+                        Toggle::make('dry_run')
+                            ->label('Check file only (do not save yet)')
+                            ->default(true),
+                        Toggle::make('allow_duplicates')
+                            ->label('Import even if booking may already exist')
+                            ->helperText('Keep this OFF in normal use to avoid duplicate bookings.')
+                            ->default(false),
+                    ])
+                    ->action(function (array $data): void {
+                        $uploaded = $data['csv_file'] ?? null;
+                        $absolutePath = null;
+
+                        if ($uploaded instanceof TemporaryUploadedFile) {
+                            $absolutePath = $uploaded->getRealPath();
+                        } elseif (is_string($uploaded) && trim($uploaded) !== '') {
+                            $candidate = storage_path('app/'.$uploaded);
+                            $absolutePath = is_file($candidate) ? $candidate : $uploaded;
+                        }
+
+                        if (! is_string($absolutePath) || trim($absolutePath) === '' || ! is_readable($absolutePath)) {
+                            Notification::make()
+                                ->title('Uploaded CSV file is not readable.')
+                                ->body('Please upload the file again and retry import.')
+                                ->danger()
+                                ->send();
+
+                            return;
+                        }
+
+                        $dryRun = (bool) ($data['dry_run'] ?? true);
+                        $allowDuplicates = (bool) ($data['allow_duplicates'] ?? false);
+
+                        $exitCode = Artisan::call('bookings:import-legacy-csv', [
+                            'file' => $absolutePath,
+                            '--dry-run' => $dryRun,
+                            '--allow-duplicates' => $allowDuplicates,
+                        ]);
+
+                        $output = trim(Artisan::output());
+                        $notification = Notification::make()
+                            ->title($exitCode === 0 ? 'Import processed.' : 'Import failed.')
+                            ->body($output !== '' ? $output : 'No command output.');
+
+                        if ($exitCode === 0) {
+                            $notification->success()->send();
+                        } else {
+                            $notification->danger()->send();
+                        }
+                    }),
                 ExportAction::make()
                     ->label('Export')
                     ->icon('heroicon-o-arrow-down-tray')
@@ -552,7 +665,7 @@ class BookingsTable
                         ->color('info')
                         ->requiresConfirmation()
                         ->modalHeading('Mark booking as fully paid?')
-                        ->modalDescription('Records one payment for the full remaining balance and sets status to Paid. For partial cash amounts, use the Payments tab on the booking.')
+                        ->modalDescription('Records one payment for the full remaining balance and sets payment to Paid. For partial cash amounts, use the Payments tab on the booking.')
                         ->modalSubmitActionLabel('Yes, mark as paid')
                         ->successNotificationTitle('Remaining balance recorded. Booking is now paid.')
                         ->visible(fn (Booking $record): bool => BookingFullBalancePayment::assess($record)['allowed'])
@@ -569,13 +682,36 @@ class BookingsTable
                                 throw new Halt;
                             }
                         }),
+                    Action::make('markRefundCompleted')
+                        ->label('Mark refund completed')
+                        ->icon('heroicon-o-arrow-path-rounded-square')
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->modalHeading('Confirm refund completion?')
+                        ->modalDescription(fn (Booking $record): string => CancellationPolicy::adminMarkRefundCompletedModalBody($record))
+                        ->visible(fn (Booking $record): bool => ! $record->trashed()
+                            && in_array($record->booking_status, [
+                                Booking::BOOKING_STATUS_RESCHEDULED,
+                                Booking::BOOKING_STATUS_CANCELLED,
+                            ], true)
+                            && $record->payment_status === Booking::PAYMENT_STATUS_REFUND_PENDING)
+                        ->action(function (Booking $record): void {
+                            $record->update([
+                                'payment_status' => Booking::PAYMENT_STATUS_REFUNDED,
+                            ]);
+
+                            Notification::make()
+                                ->title('Refund marked as completed.')
+                                ->success()
+                                ->send();
+                        }),
                     Action::make('checkIn')
                         ->label('Check in guest')
                         ->icon('heroicon-o-arrow-right-circle')
                         ->color('warning')
                         ->requiresConfirmation()
                         ->modalHeading('Check in this guest?')
-                        ->modalDescription('Sets status to Occupied (guest is on site).')
+                        ->modalDescription('Sets stay status to Occupied (guest is on site).')
                         ->visible(fn (Booking $record) => ! $record->trashed() && BookingCheckInEligibility::assess($record)['allowed'])
                         ->action(function (Booking $record) {
                             $record->loadMissing(['roomLines', 'venues', 'rooms.bedSpecifications']);
@@ -601,7 +737,7 @@ class BookingsTable
                         ->icon('heroicon-o-flag')
                         ->color('secondary')
                         ->requiresConfirmation()
-                        ->visible(fn (Booking $record) => ! $record->trashed() && $record->status === Booking::STATUS_OCCUPIED)
+                        ->visible(fn (Booking $record) => ! $record->trashed() && $record->booking_status === Booking::BOOKING_STATUS_OCCUPIED && $record->isCheckOutTodayManila())
                         ->action(function (Booking $record) {
                             try {
                                 BookingLifecycleActions::complete($record);
@@ -625,7 +761,7 @@ class BookingsTable
                         ->icon('heroicon-o-x-circle')
                         ->color('danger')
                         ->requiresConfirmation()
-                        ->visible(fn (Booking $record) => ! $record->trashed() && ! in_array($record->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true))
+                        ->visible(fn (Booking $record) => ! $record->trashed() && ! in_array($record->booking_status, [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED], true))
                         ->action(function (Booking $record) {
                             try {
                                 BookingLifecycleActions::cancel($record);

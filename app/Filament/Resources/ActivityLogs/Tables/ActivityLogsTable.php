@@ -107,6 +107,23 @@ class ActivityLogsTable
             };
         }
 
+        if ($modelName === 'payment') {
+            $cleanSubject = preg_match('/^#\d+$/', $subject) === 1 ? '' : $subject;
+
+            return match ($verb) {
+                'created' => $cleanSubject !== ''
+                    ? sprintf('recorded a payment for %s.', $cleanSubject)
+                    : 'recorded a payment.',
+                'updated' => $cleanSubject !== ''
+                    ? sprintf('updated the payment details for %s.', $cleanSubject)
+                    : 'updated payment details.',
+                'deleted' => $cleanSubject !== ''
+                    ? sprintf('removed a payment record for %s.', $cleanSubject)
+                    : 'removed a payment record.',
+                default => sprintf('%s %s: %s.', $verb, $modelName, $subject),
+            };
+        }
+
         return sprintf('%s %s: %s.', $verb, $modelName, $subject);
     }
 

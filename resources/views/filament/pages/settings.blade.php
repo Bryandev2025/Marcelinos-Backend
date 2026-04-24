@@ -1,10 +1,14 @@
 <x-filament-panels::page wire:poll.180s="refreshHealth">
     @php
         $emailUsed = max(0, (int) $this->emailsSentToday);
-        $emailLimit = max(1, (int) $this->mailDailyLimit);
-        $emailPercent = min(100, (int) round(($emailUsed / $emailLimit) * 100));
+        $emailLimit = max(0, (int) $this->mailDailyLimit);
+        $hasEmailLimit = $emailLimit > 0;
+        $emailPercent = $hasEmailLimit
+            ? min(100, (int) round(($emailUsed / $emailLimit) * 100))
+            : 0;
         $emailOnline = str_starts_with(strtolower((string) $this->emailHealth), 'online');
         $smsOnline = str_starts_with(strtolower((string) $this->smsHealth), 'online');
+        $hostingerDaysLeft = $this->hostingerPlanDaysLeft();
         
         $tabMeta = [
             'overview' => [
@@ -259,15 +263,30 @@
                             <div class="mt-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-100 dark:border-gray-800">
                                 <div class="flex justify-between items-end mb-2">
                                     <span class="text-2xl font-bold text-gray-900 dark:text-white">{{ number_format($emailUsed) }}</span>
-                                    <span class="text-sm font-medium text-gray-500 dark:text-gray-400">out of {{ number_format($emailLimit) }} limit</span>
+                                    <span class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                                        @if ($hasEmailLimit)
+                                            out of {{ number_format($emailLimit) }} limit
+                                        @else
+                                            no fixed daily limit
+                                        @endif
+                                    </span>
                                 </div>
                                 <div class="h-3 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                                     <div class="progress-bar-animated h-full rounded-full {{ $emailPercent > 85 ? 'bg-rose-500' : 'bg-emerald-500' }}"
                                          style="width: {{ $emailPercent }}%"></div>
                                 </div>
-                                <p class="mt-2 text-[11px] font-bold uppercase tracking-widest {{ $emailPercent > 85 ? 'text-rose-600 dark:text-rose-400' : 'text-gray-500 dark:text-gray-400' }}">
-                                    {{ $emailPercent }}% Daily Quota Consumed
-                                </p>
+                                @if ($hasEmailLimit)
+                                    <p class="mt-2 text-[11px] font-bold uppercase tracking-widest {{ $emailPercent > 85 ? 'text-rose-600 dark:text-rose-400' : 'text-gray-500 dark:text-gray-400' }}">
+                                        {{ $emailPercent }}% Daily Quota Consumed
+                                    </p>
+                                    <p class="mt-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                                        Credits left: {{ number_format(max(0, (int) $this->emailsLeftToday)) }}
+                                    </p>
+                                @else
+                                    <p class="mt-2 text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                                        Quota Tracking Disabled
+                                    </p>
+                                @endif
                             </div>
                         </div>
                         
@@ -288,6 +307,44 @@
                                     {{ $this->smsCredits !== null ? number_format($this->smsCredits, 2) : 'N/A' }}
                                 </span>
                                 <span class="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">Available Credits</span>
+                            </div>
+                        </div>
+
+                        <!-- Hosting Plan KPI -->
+                        <div class="premium-card p-6 flex flex-col justify-between">
+                            <div class="flex justify-between items-start mb-6">
+                                <div class="p-3 bg-amber-50 dark:bg-amber-500/10 rounded-2xl">
+                                    <x-filament::icon icon="heroicon-o-server-stack" class="h-7 w-7 text-amber-500" />
+                                </div>
+                                @if ($hostingerDaysLeft === null)
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700 dark:bg-gray-700/50 dark:text-gray-300">
+                                        No Expiry Date
+                                    </span>
+                                @elseif ($hostingerDaysLeft <= 30)
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400">
+                                        Renewal Soon
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400">
+                                        Active
+                                    </span>
+                                @endif
+                            </div>
+                            <dt class="text-sm font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-1">Hostinger Plan Expiry</dt>
+
+                            <div class="mt-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-100 dark:border-gray-800 flex flex-col justify-center gap-1 h-[104px]">
+                                <span class="text-2xl font-bold text-gray-900 dark:text-white">
+                                    {{ $this->hostingerPlanExpiryDisplay() }}
+                                </span>
+                                <span class="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400">
+                                    @if ($hostingerDaysLeft === null)
+                                        Set `HOSTINGER_PLAN_EXPIRES_AT` in .env
+                                    @elseif ($hostingerDaysLeft < 0)
+                                        Expired {{ abs($hostingerDaysLeft) }} day(s) ago
+                                    @else
+                                        {{ $hostingerDaysLeft }} day(s) left
+                                    @endif
+                                </span>
                             </div>
                         </div>
 
@@ -384,7 +441,7 @@
                         <div class="flex flex-col sm:flex-row justify-between sm:items-center mb-8 pb-6 border-b border-gray-100 dark:border-gray-800 gap-4">
                             <div>
                                 <h3 class="text-xl font-bold text-gray-900 dark:text-white">SMTP Credentials</h3>
-                                <p class="text-sm text-gray-500 mt-1">Configure your outbound mail driver seamlessly.</p>
+                                <p class="text-sm text-gray-500 mt-1">Configure primary and standby SMTP for automatic failover.</p>
                             </div>
                             <div class="flex-shrink-0">
                                 @if (! $this->editingMail)
@@ -400,36 +457,92 @@
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-7">
-                            @foreach ([
-                                ['key' => 'mailHost', 'label' => 'SMTP Host', 'type' => 'text', 'icon' => 'heroicon-m-server'],
-                                ['key' => 'mailPort', 'label' => 'SMTP Port', 'type' => 'text', 'icon' => 'heroicon-m-hashtag'],
-                                ['key' => 'mailEncryption', 'label' => 'Encryption Type', 'type' => 'text', 'icon' => 'heroicon-m-shield-check'],
-                                ['key' => 'mailUsername', 'label' => 'Mail Username', 'type' => 'email', 'icon' => 'heroicon-m-user'],
-                                ['key' => 'mailPassword', 'label' => 'Mail Password', 'type' => 'password', 'icon' => 'heroicon-m-key'],
-                                ['key' => 'mailDailyLimit', 'label' => 'Daily Quota Limit', 'type' => 'number', 'icon' => 'heroicon-m-chart-bar'],
-                                ['key' => 'mailFromAddress', 'label' => 'Sender Address', 'type' => 'email', 'icon' => 'heroicon-m-at-symbol'],
-                                ['key' => 'mailFromName', 'label' => 'Sender Name', 'type' => 'text', 'icon' => 'heroicon-m-identification'],
-                            ] as $field)
+                        <div class="space-y-8">
+                            <div>
+                                <h4 class="text-sm font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-4">Primary Mailbox (Active)</h4>
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-7">
+                                    @foreach ([
+                                        ['key' => 'mailHost', 'label' => 'SMTP Host', 'type' => 'text', 'icon' => 'heroicon-m-server'],
+                                        ['key' => 'mailPort', 'label' => 'SMTP Port', 'type' => 'text', 'icon' => 'heroicon-m-hashtag'],
+                                        ['key' => 'mailEncryption', 'label' => 'Encryption Type', 'type' => 'text', 'icon' => 'heroicon-m-shield-check'],
+                                        ['key' => 'mailUsername', 'label' => 'Mail Username', 'type' => 'email', 'icon' => 'heroicon-m-user'],
+                                        ['key' => 'mailPassword', 'label' => 'Mail Password', 'type' => 'password', 'icon' => 'heroicon-m-key'],
+                                    ] as $field)
+                                        <div>
+                                            <label class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
+                                                <x-filament::icon :icon="$field['icon']" class="h-4 w-4 text-gray-400" />
+                                                {{ $field['label'] }}
+                                            </label>
+                                            <div class="relative">
+                                                <input type="{{ $field['key'] === 'mailPassword' && $this->showMailPassword ? 'text' : $field['type'] }}"
+                                                       wire:model.defer="{{ $field['key'] }}"
+                                                       class="premium-input {{ $field['key'] === 'mailPassword' ? 'pr-12' : '' }}"
+                                                       @disabled(! $this->editingMail) />
+
+                                                @if ($field['key'] === 'mailPassword' && $this->editingMail)
+                                                    <button type="button" class="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors" wire:click="toggleMailPasswordVisibility">
+                                                        <x-filament::icon :icon="$this->showMailPassword ? 'heroicon-m-eye-slash' : 'heroicon-m-eye'" class="h-5 w-5" />
+                                                    </button>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+
+                            <div>
+                                <h4 class="text-sm font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-4">Backup Mailbox (Standby)</h4>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">When primary SMTP fails (for example quota reached), Laravel failover automatically retries using this mailbox.</p>
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-7">
+                                    @foreach ([
+                                        ['key' => 'mailBackupHost', 'label' => 'Backup SMTP Host', 'type' => 'text', 'icon' => 'heroicon-m-server'],
+                                        ['key' => 'mailBackupPort', 'label' => 'Backup SMTP Port', 'type' => 'text', 'icon' => 'heroicon-m-hashtag'],
+                                        ['key' => 'mailBackupEncryption', 'label' => 'Backup Encryption Type', 'type' => 'text', 'icon' => 'heroicon-m-shield-check'],
+                                        ['key' => 'mailBackupUsername', 'label' => 'Backup Username', 'type' => 'email', 'icon' => 'heroicon-m-user'],
+                                        ['key' => 'mailBackupPassword', 'label' => 'Backup Password', 'type' => 'password', 'icon' => 'heroicon-m-key'],
+                                    ] as $field)
+                                        <div>
+                                            <label class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
+                                                <x-filament::icon :icon="$field['icon']" class="h-4 w-4 text-gray-400" />
+                                                {{ $field['label'] }}
+                                            </label>
+                                            <div class="relative">
+                                                <input type="{{ $field['key'] === 'mailBackupPassword' && $this->showMailBackupPassword ? 'text' : $field['type'] }}"
+                                                       wire:model.defer="{{ $field['key'] }}"
+                                                       class="premium-input {{ $field['key'] === 'mailBackupPassword' ? 'pr-12' : '' }}"
+                                                       @disabled(! $this->editingMail) />
+
+                                                @if ($field['key'] === 'mailBackupPassword' && $this->editingMail)
+                                                    <button type="button" class="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors" wire:click="toggleMailBackupPasswordVisibility">
+                                                        <x-filament::icon :icon="$this->showMailBackupPassword ? 'heroicon-m-eye-slash' : 'heroicon-m-eye'" class="h-5 w-5" />
+                                                    </button>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-7">
+                                @foreach ([
+                                    ['key' => 'mailDailyLimit', 'label' => 'Daily Quota Limit (0 = unlimited)', 'type' => 'number', 'icon' => 'heroicon-m-chart-bar'],
+                                    ['key' => 'mailFromAddress', 'label' => 'Sender Address', 'type' => 'email', 'icon' => 'heroicon-m-at-symbol'],
+                                    ['key' => 'mailFromName', 'label' => 'Sender Name', 'type' => 'text', 'icon' => 'heroicon-m-identification'],
+                                ] as $field)
                                 <div>
                                     <label class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
                                         <x-filament::icon :icon="$field['icon']" class="h-4 w-4 text-gray-400" />
                                         {{ $field['label'] }}
                                     </label>
                                     <div class="relative">
-                                        <input type="{{ $field['key'] === 'mailPassword' && $this->showMailPassword ? 'text' : $field['type'] }}" 
+                                        <input type="{{ $field['type'] }}"
                                                wire:model.defer="{{ $field['key'] }}"
-                                               class="premium-input {{ $field['key'] === 'mailPassword' ? 'pr-12' : '' }}"
+                                               class="premium-input"
                                                @disabled(! $this->editingMail) />
-                                        
-                                        @if ($field['key'] === 'mailPassword' && $this->editingMail)
-                                            <button type="button" class="absolute right-3 top-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors" wire:click="toggleMailPasswordVisibility">
-                                                <x-filament::icon :icon="$this->showMailPassword ? 'heroicon-m-eye-slash' : 'heroicon-m-eye'" class="h-5 w-5" />
-                                            </button>
-                                        @endif
                                     </div>
                                 </div>
                             @endforeach
+                            </div>
                         </div>
                     </div>
                 @endif
@@ -607,7 +720,7 @@
                         <div class="flex flex-col sm:flex-row justify-between sm:items-center pb-6 border-b border-gray-100 dark:border-gray-800 gap-4">
                             <div>
                                 <h3 class="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                                    Xendit Integration
+                                    Payment Setting
                                     @if($this->xenditSecretKey !== '' && $this->xenditPublicKey !== '')
                                         <span class="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-500/20">Configured</span>
                                     @else
@@ -619,7 +732,7 @@
                             <div class="flex-shrink-0">
                                 @if (! $this->editingPayment)
                                     <x-filament::button size="md" color="primary" wire:click="enablePaymentEdit" icon="heroicon-m-adjustments-vertical" class="!rounded-xl shadow-sm w-full sm:w-auto">
-                                        Configure Gateway
+                                        Configure Settings
                                     </x-filament::button>
                                 @else
                                     <div class="mobile-safe-actions">
@@ -657,6 +770,17 @@
                                                 + Custom Value
                                             </span>
                                         @endif
+                                    </div>
+                                </div>
+                                <div class="p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700/50 shadow-sm md:col-span-2">
+                                    <p class="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-3">Cancellation Deduction Rule</p>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="px-3 py-1 bg-white dark:bg-gray-700 rounded-lg text-sm font-bold text-rose-600 dark:text-rose-300 shadow-sm border border-gray-100 dark:border-gray-600">
+                                            {{ (int) $this->cancellationFeePercent }}%
+                                        </span>
+                                        <span class="text-xs text-gray-500 dark:text-gray-400">
+                                            Deduct from booking total (capped by amount already paid).
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -725,6 +849,28 @@
                                             />
                                             <span class="text-sm font-semibold text-gray-700 dark:text-gray-200">Allow Custom Deposit Inputs</span>
                                         </label>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 bg-rose-50/60 dark:bg-rose-900/10 p-6 rounded-2xl border border-rose-100 dark:border-rose-800/40">
+                                    <div>
+                                        <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">Cancellation Deduction Percentage</label>
+                                        <div class="max-w-xs relative">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                wire:model.defer="cancellationFeePercent"
+                                                class="premium-input pr-10"
+                                                placeholder="e.g. 30"
+                                            />
+                                            <span class="absolute right-3 top-2.5 text-sm font-bold text-gray-500 dark:text-gray-300">%</span>
+                                        </div>
+                                    </div>
+                                    <div class="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+                                        <p class="font-semibold mb-1">Rule preview</p>
+                                        <p>Cancellation fee is based on booking total. Collected amount is capped by what the guest has already paid.</p>
+                                        <p class="mt-1">Example: if total is ₱10,000 and deduction is {{ (int) $this->cancellationFeePercent }}%, fee is ₱{{ number_format((10000 * (int) $this->cancellationFeePercent) / 100, 2) }}.</p>
                                     </div>
                                 </div>
 

@@ -47,7 +47,7 @@ class GoogleSheetsBookingSyncService
             $service = $this->makeSheetsService();
 
             $allTabs = $this->allSheetTabs();
-            $targetTab = $this->statusTabName((string) $booking->status);
+            $targetTab = $this->statusTabName((string) $booking->booking_status);
             $this->ensureSheetsExist($service, $spreadsheetId, $allTabs);
 
             $newRow = $this->buildBookingRow($booking);
@@ -70,6 +70,47 @@ class GoogleSheetsBookingSyncService
             Log::error('Google Sheets booking sync failed', [
                 'booking_id' => $booking->id,
                 'reference_number' => $booking->reference_number,
+                'error' => $exception->getMessage(),
+                'exception' => get_class($exception),
+            ]);
+        }
+    }
+
+    public function syncAllBookings(): void
+    {
+        if (! $this->isEnabled()) {
+            return;
+        }
+
+        $spreadsheetId = $this->spreadsheetId();
+        if ($spreadsheetId === '') {
+            Log::warning('Google Sheets booking full sync skipped: spreadsheet id is missing.');
+
+            return;
+        }
+
+        try {
+            $service = $this->makeSheetsService();
+            $allTabs = $this->allSheetTabs();
+            $this->ensureSheetsExist($service, $spreadsheetId, $allTabs);
+
+            $rowsByTab = collect($allTabs)->mapWithKeys(fn (string $tab): array => [$tab => []])->all();
+
+            Booking::query()
+                ->with(['guest', 'rooms', 'venues', 'roomLines'])
+                ->orderBy('id')
+                ->chunkById(200, function (Collection $bookings) use (&$rowsByTab): void {
+                    foreach ($bookings as $booking) {
+                        $tab = $this->statusTabName((string) $booking->booking_status);
+                        $rowsByTab[$tab][] = $this->buildBookingRow($booking);
+                    }
+                });
+
+            foreach ($allTabs as $tabName) {
+                $this->writeDataRows($service, $spreadsheetId, $tabName, $rowsByTab[$tabName] ?? []);
+            }
+        } catch (\Throwable $exception) {
+            Log::error('Google Sheets booking full sync failed', [
                 'error' => $exception->getMessage(),
                 'exception' => get_class($exception),
             ]);
@@ -124,7 +165,7 @@ class GoogleSheetsBookingSyncService
         $map = (array) config('services.google_sheets.status_to_sheet', []);
         $key = strtolower(trim($status));
 
-        return (string) ($map[$key] ?? ($map['unpaid'] ?? 'Unpaid'));
+        return (string) ($map[$key] ?? ($map['reserved'] ?? 'Reserved'));
     }
 
     /**
@@ -248,7 +289,7 @@ class GoogleSheetsBookingSyncService
 
         return [
             (string) $booking->reference_number,
-            $this->statusLabel((string) $booking->status),
+            $this->compositeStatusLabel($booking),
             $guestName,
             $guestEmail,
             $guestContact,
@@ -264,18 +305,12 @@ class GoogleSheetsBookingSyncService
         ];
     }
 
-    private function statusLabel(string $status): string
+    private function compositeStatusLabel(Booking $booking): string
     {
-        return match (strtolower(trim($status))) {
-            Booking::STATUS_UNPAID => 'Unpaid',
-            Booking::STATUS_PARTIAL => 'Partial',
-            Booking::STATUS_PAID => 'Paid',
-            Booking::STATUS_COMPLETED => 'Complete',
-            Booking::STATUS_OCCUPIED => 'Checked in',
-            Booking::STATUS_CANCELLED => 'Cancel',
-            Booking::STATUS_RESCHEDULED => 'Rescheduled',
-            default => ucfirst($status),
-        };
+        $stay = Booking::bookingStatusOptions()[(string) $booking->booking_status] ?? (string) $booking->booking_status;
+        $pay = Booking::paymentStatusOptions()[(string) $booking->payment_status] ?? (string) $booking->payment_status;
+
+        return "{$stay} · {$pay}";
     }
 
     /**

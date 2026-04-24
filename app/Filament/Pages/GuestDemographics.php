@@ -90,16 +90,9 @@ class GuestDemographics extends Page
 
     protected function getViewData(): array
     {
-        $unpaidStatuses = [Booking::STATUS_UNPAID, Booking::STATUS_PARTIAL];
-        $successStatuses = [
-            Booking::STATUS_PAID,
-            Booking::STATUS_COMPLETED,
-            Booking::STATUS_OCCUPIED,
-        ];
-
         // Overview report (calendar/presets)
         [$overviewStart, $overviewEnd] = $this->resolveOverviewRange();
-        $overviewDemographics = $this->getHierarchicalData($successStatuses, $overviewStart, $overviewEnd);
+        $overviewDemographics = $this->getHierarchicalData('successful', $overviewStart, $overviewEnd);
         $overviewLocalDemographics = $overviewDemographics->where('is_international', false);
         $overviewForeignDemographics = $overviewDemographics->where('is_international', true);
 
@@ -111,33 +104,33 @@ class GuestDemographics extends Page
 
         return [
             'unpaid' => [
-                'today' => $this->getTopLocation($unpaidStatuses, Carbon::today(), Carbon::today()),
-                'next_7_days' => $this->getTopLocation($unpaidStatuses, Carbon::tomorrow(), Carbon::today()->addDays(7)),
-                'this_month' => $this->getTopLocation($unpaidStatuses, $startOfMonth, $endOfMonth),
-                'next_month' => $this->getTopLocation($unpaidStatuses, Carbon::now()->addMonth()->startOfMonth(), Carbon::now()->addMonth()->endOfMonth()),
+                'today' => $this->getTopLocation('unpaid', Carbon::today(), Carbon::today()),
+                'next_7_days' => $this->getTopLocation('unpaid', Carbon::tomorrow(), Carbon::today()->addDays(7)),
+                'this_month' => $this->getTopLocation('unpaid', $startOfMonth, $endOfMonth),
+                'next_month' => $this->getTopLocation('unpaid', Carbon::now()->addMonth()->startOfMonth(), Carbon::now()->addMonth()->endOfMonth()),
             ],
             'successful' => [
-                'today' => $this->getTopLocation($successStatuses, Carbon::today(), Carbon::today()),
-                'next_7_days' => $this->getTopLocation($successStatuses, Carbon::tomorrow(), Carbon::today()->addDays(7)),
-                'this_month' => $this->getTopLocation($successStatuses, $startOfMonth, $endOfMonth),
-                'next_month' => $this->getTopLocation($successStatuses, Carbon::now()->addMonth()->startOfMonth(), Carbon::now()->addMonth()->endOfMonth()),
+                'today' => $this->getTopLocation('successful', Carbon::today(), Carbon::today()),
+                'next_7_days' => $this->getTopLocation('successful', Carbon::tomorrow(), Carbon::today()->addDays(7)),
+                'this_month' => $this->getTopLocation('successful', $startOfMonth, $endOfMonth),
+                'next_month' => $this->getTopLocation('successful', Carbon::now()->addMonth()->startOfMonth(), Carbon::now()->addMonth()->endOfMonth()),
             ],
 
             // Raw data for printing complete hierarchy reports
             'reports' => [
                 'unpaid' => [
-                    'today' => $this->getHierarchicalData($unpaidStatuses, Carbon::today(), Carbon::today()),
-                    'next_7_days' => $this->getHierarchicalData($unpaidStatuses, Carbon::tomorrow(), Carbon::today()->addDays(7)),
-                    'this_month' => $this->getHierarchicalData($unpaidStatuses, $startOfMonth, $endOfMonth),
-                    'next_month' => $this->getHierarchicalData($unpaidStatuses, Carbon::now()->addMonth()->startOfMonth(), Carbon::now()->addMonth()->endOfMonth()),
-                    'all' => $this->getHierarchicalData($unpaidStatuses, Carbon::now()->subYears(10), Carbon::now()->addYears(10)), // all time approx
+                    'today' => $this->getHierarchicalData('unpaid', Carbon::today(), Carbon::today()),
+                    'next_7_days' => $this->getHierarchicalData('unpaid', Carbon::tomorrow(), Carbon::today()->addDays(7)),
+                    'this_month' => $this->getHierarchicalData('unpaid', $startOfMonth, $endOfMonth),
+                    'next_month' => $this->getHierarchicalData('unpaid', Carbon::now()->addMonth()->startOfMonth(), Carbon::now()->addMonth()->endOfMonth()),
+                    'all' => $this->getHierarchicalData('unpaid', Carbon::now()->subYears(10), Carbon::now()->addYears(10)), // all time approx
                 ],
                 'successful' => [
-                    'today' => $this->getHierarchicalData($successStatuses, Carbon::today(), Carbon::today()),
-                    'next_7_days' => $this->getHierarchicalData($successStatuses, Carbon::tomorrow(), Carbon::today()->addDays(7)),
-                    'this_month' => $this->getHierarchicalData($successStatuses, $startOfMonth, $endOfMonth),
-                    'next_month' => $this->getHierarchicalData($successStatuses, Carbon::now()->addMonth()->startOfMonth(), Carbon::now()->addMonth()->endOfMonth()),
-                    'all' => $this->getHierarchicalData($successStatuses, Carbon::now()->subYears(10), Carbon::now()->addYears(10)),
+                    'today' => $this->getHierarchicalData('successful', Carbon::today(), Carbon::today()),
+                    'next_7_days' => $this->getHierarchicalData('successful', Carbon::tomorrow(), Carbon::today()->addDays(7)),
+                    'this_month' => $this->getHierarchicalData('successful', $startOfMonth, $endOfMonth),
+                    'next_month' => $this->getHierarchicalData('successful', Carbon::now()->addMonth()->startOfMonth(), Carbon::now()->addMonth()->endOfMonth()),
+                    'all' => $this->getHierarchicalData('successful', Carbon::now()->subYears(10), Carbon::now()->addYears(10)),
                 ]
             ],
 
@@ -167,7 +160,7 @@ class GuestDemographics extends Page
         );
     }
 
-    private function getHierarchicalData(array $statusGroup, Carbon $startDate, Carbon $endDate)
+    private function getHierarchicalData(string $kind, Carbon $startDate, Carbon $endDate)
     {
         return Booking::select(
             'guests.is_international',
@@ -179,18 +172,46 @@ class GuestDemographics extends Page
             DB::raw('count(*) as total')
         )
             ->join('guests', 'bookings.guest_id', '=', 'guests.id')
-            ->whereIn('bookings.status', $statusGroup)
+            ->when($kind === 'unpaid', function ($query): void {
+                $query->whereIn('bookings.payment_status', [
+                    Booking::PAYMENT_STATUS_UNPAID,
+                    Booking::PAYMENT_STATUS_PARTIAL,
+                ]);
+            })
+            ->when($kind === 'successful', function ($query): void {
+                $query->where(function ($q): void {
+                    $q->where('bookings.payment_status', Booking::PAYMENT_STATUS_PAID)
+                        ->orWhereIn('bookings.booking_status', [
+                            Booking::BOOKING_STATUS_OCCUPIED,
+                            Booking::BOOKING_STATUS_COMPLETED,
+                        ]);
+                });
+            })
             ->whereBetween('bookings.check_in', [$startDate->startOfDay(), $endDate->endOfDay()])
             ->groupBy('guests.is_international', 'guests.country', 'guests.region', 'guests.province', 'guests.municipality', 'guests.barangay')
             ->orderByRaw("guests.is_international ASC, total DESC, guests.region ASC")
             ->get();
     }
 
-    private function getTopLocation(array $statusGroup, Carbon $startDate, Carbon $endDate): ?array
+    private function getTopLocation(string $kind, Carbon $startDate, Carbon $endDate): ?array
     {
         $topRegion = Booking::select('guests.region', DB::raw('count(*) as total'))
             ->join('guests', 'bookings.guest_id', '=', 'guests.id')
-            ->whereIn('bookings.status', $statusGroup)
+            ->when($kind === 'unpaid', function ($query): void {
+                $query->whereIn('bookings.payment_status', [
+                    Booking::PAYMENT_STATUS_UNPAID,
+                    Booking::PAYMENT_STATUS_PARTIAL,
+                ]);
+            })
+            ->when($kind === 'successful', function ($query): void {
+                $query->where(function ($q): void {
+                    $q->where('bookings.payment_status', Booking::PAYMENT_STATUS_PAID)
+                        ->orWhereIn('bookings.booking_status', [
+                            Booking::BOOKING_STATUS_OCCUPIED,
+                            Booking::BOOKING_STATUS_COMPLETED,
+                        ]);
+                });
+            })
             ->whereBetween('bookings.check_in', [$startDate->startOfDay(), $endDate->endOfDay()])
             ->whereNotNull('guests.region')
             ->where('guests.region', '!=', '')
@@ -204,7 +225,21 @@ class GuestDemographics extends Page
 
         $topProvince = Booking::select('guests.province', DB::raw('count(*) as total'))
             ->join('guests', 'bookings.guest_id', '=', 'guests.id')
-            ->whereIn('bookings.status', $statusGroup)
+            ->when($kind === 'unpaid', function ($query): void {
+                $query->whereIn('bookings.payment_status', [
+                    Booking::PAYMENT_STATUS_UNPAID,
+                    Booking::PAYMENT_STATUS_PARTIAL,
+                ]);
+            })
+            ->when($kind === 'successful', function ($query): void {
+                $query->where(function ($q): void {
+                    $q->where('bookings.payment_status', Booking::PAYMENT_STATUS_PAID)
+                        ->orWhereIn('bookings.booking_status', [
+                            Booking::BOOKING_STATUS_OCCUPIED,
+                            Booking::BOOKING_STATUS_COMPLETED,
+                        ]);
+                });
+            })
             ->whereBetween('bookings.check_in', [$startDate->startOfDay(), $endDate->endOfDay()])
             ->where('guests.region', $topRegion->region)
             ->whereNotNull('guests.province')
@@ -232,16 +267,26 @@ class GuestDemographics extends Page
                 $period = $arguments['period'] ?? 'today';
                 $type = $arguments['type'] ?? 'unpaid';
 
-                $statuses = $type === 'unpaid'
-                    ? [Booking::STATUS_UNPAID]
-                    : [Booking::STATUS_PAID, Booking::STATUS_COMPLETED, Booking::STATUS_OCCUPIED];
-
                 $dates = $this->getDateRangeForPeriod($period);
 
                 $bookings = Booking::with('guest')
                     ->join('guests', 'bookings.guest_id', '=', 'guests.id')
                     ->select('bookings.*')
-                    ->whereIn('bookings.status', $statuses)
+                    ->when($type === 'unpaid', function ($query): void {
+                        $query->whereIn('bookings.payment_status', [
+                            Booking::PAYMENT_STATUS_UNPAID,
+                            Booking::PAYMENT_STATUS_PARTIAL,
+                        ]);
+                    })
+                    ->when($type === 'successful', function ($query): void {
+                        $query->where(function ($q): void {
+                            $q->where('bookings.payment_status', Booking::PAYMENT_STATUS_PAID)
+                                ->orWhereIn('bookings.booking_status', [
+                                    Booking::BOOKING_STATUS_OCCUPIED,
+                                    Booking::BOOKING_STATUS_COMPLETED,
+                                ]);
+                        });
+                    })
                     ->whereBetween('bookings.check_in', [$dates[0]->startOfDay(), $dates[1]->endOfDay()])
                     ->orderByRaw("guests.region DESC, guests.province DESC, guests.municipality DESC, bookings.check_in ASC")
                     ->get();

@@ -21,7 +21,7 @@ $manila = 'Asia/Manila';
 /**
  * Complete check-outs: occupied → completed when check_out has passed.
  * Runs every 10 minutes 10:00–10:50 and once at 11:00. Testimonial feedback email is sent
- * immediately when status becomes completed (see Booking model updated hook).
+ * when booking becomes completed with payment Paid (see Booking model updated hook).
  */
 Schedule::command('bookings:complete-checkouts')
     ->cron('0,10,20,30,40,50 10 * * *')
@@ -37,22 +37,25 @@ Schedule::command('bookings:complete-checkouts')
 |--------------------------------------------------------------------------
 | Daily at 12:00 — Manila
 |--------------------------------------------------------------------------
-| bookings:activate-checkins  — paid/partial with check-in today → occupied
-| bookings:send-reminders     — reminder email one day before check-in
+| bookings:send-reminders — reminder email one day before check-in
 |
 | bookings:cancel-unpaid is scheduled separately every 15 minutes (9:00 PM Manila check-in-day rule).
 */
-foreach ([
-    'bookings:activate-checkins' => true,
-    'bookings:send-reminders' => true,
-] as $signature => $withoutOverlapping) {
-    $event = Schedule::command($signature)
-        ->dailyAt('12:00')
-        ->timezone($manila);
-    if ($withoutOverlapping) {
-        $event->withoutOverlapping();
-    }
-}
+Schedule::command('bookings:send-reminders')
+    ->dailyAt('12:00')
+    ->timezone($manila)
+    ->withoutOverlapping();
+
+/*
+|--------------------------------------------------------------------------
+| Every 15 minutes, 12:00–21:45 — Manila
+|--------------------------------------------------------------------------
+| bookings:activate-checkins — reserved + paid/partial with check-in today → occupied
+*/
+Schedule::command('bookings:activate-checkins')
+    ->cron('*/15 12-21 * * *')
+    ->timezone($manila)
+    ->withoutOverlapping();
 
 /*
 |--------------------------------------------------------------------------
@@ -65,18 +68,37 @@ Schedule::command('bookings:cancel-unpaid')
     ->timezone($manila)
     ->withoutOverlapping();
 
+Schedule::command('bookings:prune-pending-verification')
+    ->hourly()
+    ->timezone($manila)
+    ->withoutOverlapping();
+
 /*
 |--------------------------------------------------------------------------
-| Daily activity-log retention cleanup
+| Hourly full Google Sheets mirror refresh
 |--------------------------------------------------------------------------
-| Keep only the latest 60 days of audit records.
+| Rebuilds spreadsheet tabs from the DB to remove manual edits and guarantee
+| all booking rows are present in Sheets.
+*/
+Schedule::command('bookings:sync-google-sheet')
+    ->hourly()
+    ->timezone($manila)
+    ->withoutOverlapping();
+
+/*
+|--------------------------------------------------------------------------
+| Weekly activity-log retention cleanup
+|--------------------------------------------------------------------------
+| Runs every 7 days and keeps only the latest 7 days of audit records.
 */
 Schedule::call(function (): void {
     ActivityLog::query()
-        ->where('created_at', '<', now()->subDays(60))
+        ->where('created_at', '<', now()->subDays(7))
         ->delete();
 })
     ->name('activity-log-retention-cleanup')
-    ->daily()
+    ->weekly()
+    ->sundays()
+    ->at('01:00')
     ->timezone($manila)
     ->withoutOverlapping();

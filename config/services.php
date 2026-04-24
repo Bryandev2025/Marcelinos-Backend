@@ -45,6 +45,10 @@ return [
         'key' => env('API_KEY'),
     ],
 
+    'turnstile' => [
+        'secret_key' => env('TURNSTILE_SECRET_KEY'),
+    ],
+
     /*
      * Booking cancel/reschedule OTP is sent by email (see BookingActionOtpService).
      */
@@ -55,6 +59,7 @@ return [
 
     'semaphore' => [
         'api_key' => env('SEMAPHORE_API_KEY'),
+        'account_url' => env('SEMAPHORE_ACCOUNT_URL', 'https://api.semaphore.co/api/v4/account'),
         'otp_url' => env('SEMAPHORE_OTP_URL', 'https://api.semaphore.co/api/v4/otp'),
         'messages_url' => env('SEMAPHORE_MESSAGES_URL', 'https://api.semaphore.co/api/v4/messages'),
         'sender_name' => env('SEMAPHORE_SENDER_NAME'),
@@ -71,11 +76,10 @@ return [
         'spreadsheet_id' => env('GOOGLE_SHEETS_SPREADSHEET_ID'),
         'credentials_path' => storage_path('app/google-credentials.json'),
             'status_to_sheet' => [
-            'unpaid' => 'Unpaid',
-            'partial' => 'Partial',
-            'paid' => 'Paid',
-            'completed' => 'Complete',
+            'pending_verification' => 'Pending email',
+            'reserved' => 'Reserved',
             'occupied' => 'Checked in',
+            'completed' => 'Completed',
             'cancelled' => 'Cancelled',
             'rescheduled' => 'Rescheduled',
     ],

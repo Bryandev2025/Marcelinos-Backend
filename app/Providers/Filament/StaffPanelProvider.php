@@ -3,7 +3,10 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Livewire\DatabaseNotifications as AppDatabaseNotifications;
+use App\Filament\Pages\ActivityHistory;
 use App\Filament\Pages\AdminDashboard;
+use App\Filament\Pages\Profile;
+use App\Filament\Pages\Settings;
 use App\Filament\Widgets\SessionsByCountryChart;
 use App\Filament\Widgets\SessionsByDeviceChart;
 use App\Http\Middleware\LogStaffPanelActions;
@@ -11,9 +14,11 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\MenuItem;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -30,6 +35,7 @@ class StaffPanelProvider extends PanelProvider
         return $panel
             ->id('staff')
             ->path('staff')
+            ->passwordReset()
             ->databaseNotifications(true, AppDatabaseNotifications::class, false)
             ->databaseNotificationsPolling('1s')
             ->colors([
@@ -54,7 +60,27 @@ class StaffPanelProvider extends PanelProvider
                 // AccountWidget::class,
                 // FilamentInfoWidget::class,
             ])
+            ->userMenuItems([
+                MenuItem::make()
+                    ->label('Profile')
+                    ->icon('heroicon-o-user')
+                    ->url(fn (): string => Profile::getUrl(panel: 'staff')),
+                MenuItem::make()
+                    ->label('Settings')
+                    ->icon('heroicon-o-cog-6-tooth')
+                    ->url(fn (): string => Settings::getUrl(panel: 'staff'))
+                    ->visible(fn (): bool => Settings::canAccess()),
+                MenuItem::make()
+                    ->label('Activity History')
+                    ->icon('heroicon-o-clock')
+                    ->url(fn (): string => ActivityHistory::getUrl(panel: 'staff'))
+                    ->visible(fn (): bool => ActivityHistory::canAccess()),
+            ])
             ->viteTheme('resources/css/filament/admin/theme.css')
+            ->renderHook(
+                PanelsRenderHook::STYLES_AFTER,
+                fn (): string => view('filament.hooks.navigation-alert-badge-styles')->render(),
+            )
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

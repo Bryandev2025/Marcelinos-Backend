@@ -18,19 +18,16 @@ class GuestDemographicsExportController extends Controller
         $period = $request->query('period');
         $period = $period === 'null' ? null : $period;
 
-        $unpaidStatuses = [Booking::STATUS_UNPAID, Booking::STATUS_PARTIAL];
-        $successfulStatuses = [Booking::STATUS_PAID, Booking::STATUS_COMPLETED, Booking::STATUS_OCCUPIED];
-
         $now = Carbon::now();
 
-        [$start, $end, $title, $subtitle, $statuses] = match ($type) {
-            'unpaid' => $this->resolvePresetReport($period, $unpaidStatuses, 'Demographics Report: Unpaid Bookings (Pending)', $now),
-            'successful' => $this->resolvePresetReport($period, $successfulStatuses, 'Demographics Report: Successful Bookings (Paid/Confirmed)', $now),
-            'overview_selected' => $this->resolveOverviewReport($request, $successfulStatuses, $now),
-            default => $this->resolveOverviewReport($request, $successfulStatuses, $now),
+        [$start, $end, $title, $subtitle, $kind] = match ($type) {
+            'unpaid' => $this->resolvePresetReport($period, 'unpaid', 'Demographics Report: Unpaid Bookings (Pending)', $now),
+            'successful' => $this->resolvePresetReport($period, 'successful', 'Demographics Report: Successful Bookings (Paid/Confirmed)', $now),
+            'overview_selected' => $this->resolveOverviewReport($request, 'successful', $now),
+            default => $this->resolveOverviewReport($request, 'successful', $now),
         };
 
-        $rows = $this->getHierarchicalData($statuses, $start, $end);
+        $rows = $this->getHierarchicalData($kind, $start, $end);
         $localData = $rows->where('is_international', false)->values();
         $foreignData = $rows->where('is_international', true)->values();
 
@@ -54,7 +51,7 @@ class GuestDemographicsExportController extends Controller
         return $pdf->download($filename);
     }
 
-    private function resolvePresetReport($period, array $statuses, string $baseTitle, Carbon $now): array
+    private function resolvePresetReport($period, string $kind, string $baseTitle, Carbon $now): array
     {
         $period = (string) ($period ?: 'today');
 
@@ -69,10 +66,10 @@ class GuestDemographicsExportController extends Controller
 
         $subtitle = 'Period: ' . $label . '  ·  Generated: ' . $now->format('F j, Y, g:i a');
 
-        return [$start, $end, $baseTitle, $subtitle, $statuses];
+        return [$start, $end, $baseTitle, $subtitle, $kind];
     }
 
-    private function resolveOverviewReport(Request $request, array $statuses, Carbon $now): array
+    private function resolveOverviewReport(Request $request, string $kind, Carbon $now): array
     {
         $start = $request->query('start') ? Carbon::parse((string) $request->query('start')) : $now->copy()->startOfMonth();
         $end = $request->query('end') ? Carbon::parse((string) $request->query('end')) : $now->copy()->endOfMonth();
@@ -84,7 +81,7 @@ class GuestDemographicsExportController extends Controller
         $title = 'Comprehensive Demographics Report';
         $subtitle = $this->overviewLabel($start, $end) . '  ·  Generated: ' . $now->format('F j, Y, g:i a');
 
-        return [$start, $end, $title, $subtitle, $statuses];
+        return [$start, $end, $title, $subtitle, $kind];
     }
 
     private function overviewLabel(Carbon $start, Carbon $end): string
@@ -100,7 +97,7 @@ class GuestDemographicsExportController extends Controller
         return 'Dates: ' . $start->toDateString() . ' → ' . $end->toDateString();
     }
 
-    private function getHierarchicalData(array $statusGroup, Carbon $startDate, Carbon $endDate)
+    private function getHierarchicalData(string $kind, Carbon $startDate, Carbon $endDate)
     {
         return Booking::select(
             'guests.is_international',
@@ -112,7 +109,21 @@ class GuestDemographicsExportController extends Controller
             DB::raw('count(*) as total')
         )
             ->join('guests', 'bookings.guest_id', '=', 'guests.id')
-            ->whereIn('bookings.status', $statusGroup)
+            ->when($kind === 'unpaid', function ($query): void {
+                $query->whereIn('bookings.payment_status', [
+                    Booking::PAYMENT_STATUS_UNPAID,
+                    Booking::PAYMENT_STATUS_PARTIAL,
+                ]);
+            })
+            ->when($kind === 'successful', function ($query): void {
+                $query->where(function ($q): void {
+                    $q->where('bookings.payment_status', Booking::PAYMENT_STATUS_PAID)
+                        ->orWhereIn('bookings.booking_status', [
+                            Booking::BOOKING_STATUS_OCCUPIED,
+                            Booking::BOOKING_STATUS_COMPLETED,
+                        ]);
+                });
+            })
             ->whereBetween('bookings.check_in', [$startDate->copy()->startOfDay(), $endDate->copy()->endOfDay()])
             ->groupBy('guests.is_international', 'guests.country', 'guests.region', 'guests.province', 'guests.municipality', 'guests.barangay')
             ->orderByRaw('guests.is_international ASC, total DESC, guests.region ASC')

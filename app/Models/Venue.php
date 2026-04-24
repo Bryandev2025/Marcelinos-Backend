@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use App\Eloquent\Relations\VenueReviewsRelation;
+use App\Support\VenueWeddingPreparation;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -129,22 +132,36 @@ class Venue extends Model implements HasMedia
      * Scope: only venues available in the given date range.
      * Excludes maintenance, staff-blocked calendar days (venue_blocked_dates),
      * and non-cancelled bookings overlapping the range.
+     *
+     * @param  mixed  $checkIn
+     * @param  mixed  $checkOut
+     * @param  int|null  $excludeBookingId
+     * @param  string|null  $candidateVenueEventType  when the candidate has venues, used with {@see $candidateHasVenues} for one-day prep (wedding)
+     * @param  bool  $candidateHasVenues
+     * @return Builder
      */
-    public function scopeAvailableBetween($query, $checkIn, $checkOut, $excludeBookingId = null)
+    public function scopeAvailableBetween($query, $checkIn, $checkOut, $excludeBookingId = null, $candidateVenueEventType = null, $candidateHasVenues = false)
     {
         if (BlockedDate::overlapsRange($checkIn, $checkOut)) {
             return $query->whereRaw('0 = 1');
         }
 
-        return $query->where('status', '!=', self::STATUS_MAINTENANCE)
-            ->whereDoesntHave('bookings', function ($q) use ($checkIn, $checkOut, $excludeBookingId) {
-                $q->where('bookings.status', '!=', Booking::STATUS_CANCELLED)
-                    ->where('bookings.check_in', '<', $checkOut)
-                    ->where('bookings.check_out', '>', $checkIn);
+        $effClientStart = VenueWeddingPreparation::effectiveVenueBlockStart(
+            Carbon::parse($checkIn),
+            is_string($candidateVenueEventType) ? $candidateVenueEventType : null,
+            (bool) $candidateHasVenues,
+        );
+        $end = Carbon::parse($checkOut);
 
-                if ($excludeBookingId) {
-                    $q->where('bookings.id', '!=', $excludeBookingId);
-                }
+        return $query->where('status', '!=', self::STATUS_MAINTENANCE)
+            ->whereDoesntHave('bookings', function ($q) use ($effClientStart, $end, $excludeBookingId) {
+                $q->whereIn('bookings.booking_status', Booking::availabilityBlockingStatuses());
+                VenueWeddingPreparation::constrainToBookingsThatCollideWithVenueCandidateRange(
+                    $q,
+                    $effClientStart,
+                    $end,
+                    $excludeBookingId,
+                );
             })
             ->whereDoesntHave('venueBlockedDates', function ($q) use ($checkIn, $checkOut) {
                 $q->overlappingBookingRange($checkIn, $checkOut);

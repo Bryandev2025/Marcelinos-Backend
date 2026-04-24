@@ -34,7 +34,8 @@ class XenditWebhookTest extends TestCase
             'check_out' => now()->addDays(8)->startOfDay(),
             'no_of_days' => 1,
             'total_price' => 2000.00,
-            'status' => Booking::STATUS_UNPAID,
+            'booking_status' => Booking::BOOKING_STATUS_RESERVED,
+            'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
         ]);
 
         $reference = $booking->reference_number;
@@ -63,7 +64,7 @@ class XenditWebhookTest extends TestCase
         $response->assertOk()->assertJsonPath('success', true);
 
         $booking->refresh();
-        $this->assertSame(Booking::STATUS_PARTIAL, $booking->status);
+        $this->assertSame(Booking::PAYMENT_STATUS_PARTIAL, $booking->payment_status);
 
         /** @var Payment|null $payment */
         $payment = Payment::query()

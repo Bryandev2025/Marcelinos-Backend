@@ -28,6 +28,13 @@ class BookingCreated extends Mailable implements ShouldQueue
 
     public function build()
     {
+        $this->booking->loadMissing('guest');
+
+        $guestDisplayName = trim((string) ($this->booking->guest?->full_name ?? ''));
+        if ($guestDisplayName === '') {
+            $guestDisplayName = 'Guest';
+        }
+
         $bookingCcAddress = config('mail.booking_cc_address');
 
         if (filled($bookingCcAddress)) {
@@ -36,6 +43,8 @@ class BookingCreated extends Mailable implements ShouldQueue
 
         return $this
             ->subject('Marcelino\'s Resort Hotel - Booking Confirmation')
-            ->view('emails.booking-created');
+            ->view('emails.booking-created', [
+                'guestDisplayName' => $guestDisplayName,
+            ]);
     }
 }

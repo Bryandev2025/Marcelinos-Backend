@@ -31,7 +31,8 @@ final class BookingStatusUpdated extends BaseBroadcastEvent
         return [
             'booking_id' => $this->booking->id,
             'reference' => $this->booking->reference_number,
-            'status' => $this->booking->status,
+            'booking_status' => $this->booking->booking_status,
+            'payment_status' => $this->booking->payment_status,
             'check_in' => $this->booking->check_in?->toIso8601String(),
             'check_out' => $this->booking->check_out?->toIso8601String(),
             'updated_at' => $this->booking->updated_at?->toIso8601String(),

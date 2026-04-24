@@ -1,5 +1,32 @@
 <?php
 
+$parseMailers = static function (string $value): array {
+    return array_values(array_filter(array_map(
+        static fn (string $mailer): string => trim($mailer),
+        explode(',', $value),
+    )));
+};
+
+$backupSmtpConfigured = (string) env('MAIL_BACKUP_HOST', '') !== ''
+    && (string) env('MAIL_BACKUP_PORT', '') !== '';
+
+$defaultFailoverMailers = $backupSmtpConfigured
+    ? 'smtp,smtp_backup,log'
+    : 'smtp,log';
+
+$failoverMailers = $parseMailers((string) env('MAIL_FAILOVER_MAILERS', $defaultFailoverMailers));
+
+if (! $backupSmtpConfigured) {
+    $failoverMailers = array_values(array_filter(
+        $failoverMailers,
+        static fn (string $mailer): bool => $mailer !== 'smtp_backup',
+    ));
+}
+
+if ($failoverMailers === []) {
+    $failoverMailers = $parseMailers($defaultFailoverMailers);
+}
+
 return [
 
     /*
@@ -40,6 +67,7 @@ return [
         'smtp' => [
             'transport' => 'smtp',
             'scheme' => env('MAIL_SCHEME'),
+            'encryption' => env('MAIL_ENCRYPTION'),
             'url' => env('MAIL_URL'),
             'host' => env('MAIL_HOST', '127.0.0.1'),
             'port' => env('MAIL_PORT', 2525),
@@ -47,6 +75,19 @@ return [
             'password' => env('MAIL_PASSWORD'),
             'timeout' => null,
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
+        ],
+
+        'smtp_backup' => [
+            'transport' => 'smtp',
+            'scheme' => env('MAIL_BACKUP_SCHEME', env('MAIL_SCHEME')),
+            'encryption' => env('MAIL_BACKUP_ENCRYPTION', env('MAIL_ENCRYPTION')),
+            'url' => env('MAIL_BACKUP_URL'),
+            'host' => env('MAIL_BACKUP_HOST'),
+            'port' => env('MAIL_BACKUP_PORT'),
+            'username' => env('MAIL_BACKUP_USERNAME'),
+            'password' => env('MAIL_BACKUP_PASSWORD'),
+            'timeout' => null,
+            'local_domain' => env('MAIL_BACKUP_EHLO_DOMAIN', env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST))),
         ],
 
         'ses' => [
@@ -81,10 +122,7 @@ return [
 
         'failover' => [
             'transport' => 'failover',
-            'mailers' => [
-                'smtp',
-                'log',
-            ],
+            'mailers' => $failoverMailers,
             'retry_after' => 60,
         ],
 
@@ -116,5 +154,7 @@ return [
     ],
 
     'booking_cc_address' => env('MAIL_BOOKING_CC_ADDRESS'),
+
+    'daily_limit' => (int) env('MAIL_DAILY_LIMIT', 100),
 
 ];

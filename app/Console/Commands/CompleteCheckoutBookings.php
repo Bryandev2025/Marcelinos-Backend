@@ -54,12 +54,12 @@ class CompleteCheckoutBookings extends Command
 
         $bookings = Booking::query()
             ->where('check_out', '<=', $before)
-            ->where('status', Booking::STATUS_OCCUPIED)
+            ->where('booking_status', Booking::BOOKING_STATUS_OCCUPIED)
             ->get();
 
         $count = 0;
         foreach ($bookings as $booking) {
-            $booking->update(['status' => Booking::STATUS_COMPLETED]);
+            $booking->update(['booking_status' => Booking::BOOKING_STATUS_COMPLETED]);
             $count++;
         }
 

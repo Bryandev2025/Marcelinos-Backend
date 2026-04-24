@@ -2,74 +2,78 @@
     <div wire:poll.5s class="space-y-6">
         @forelse ($this->timelineGroups as $groupLabel => $logs)
             <section class="space-y-3">
-                <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <h3 class="order-2 md:order-1 text-base font-semibold text-gray-900 dark:text-white">
+                <div class="flex items-center justify-between gap-3">
+                    <h3 class="text-base font-semibold text-gray-900 dark:text-white">
                         {{ $groupLabel }}
                     </h3>
 
                     @if ($loop->first)
-                        <div class="order-1 md:order-2 flex w-full flex-wrap items-center gap-2 md:w-auto md:flex-nowrap md:justify-end">
-                            <div class="w-auto shrink-0 order-1 md:order-2">
-                                <div class="inline-flex w-full overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-white/20 dark:bg-white/5">
-                                    <button
-                                        type="button"
-                                        wire:click="$set('dateMode', 'all_time')"
-                                        @class([
-                                            'px-3 py-2 text-sm font-medium transition-colors rounded-lg duration-300 ease-out',
-                                            'bg-[#517645] text-white' => $this->dateMode === 'all_time',
-                                            'text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/10' => $this->dateMode !== 'all_time',
-                                        ])
-                                    >
-                                        All time
-                                    </button>
-                                    <button
-                                        type="button"
-                                        wire:click="$set('dateMode', 'custom_date')"
-                                        @class([
-                                            'px-3 py-2 text-sm font-medium transition-colors duration-300 ease-out',
-                                            'fi-btn text-white' => $this->dateMode === 'custom_date',
-                                            'text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/10' => $this->dateMode !== 'custom_date',
-                                        ])
-                                    >
-                                        Custom
-                                    </button>
-                                </div>
-                                
-                            </div>
-
-                            <div class="w-auto shrink-0 order-2 ml-auto md:ml-0 md:order-3">
-                                <label for="activity-date-filter" class="sr-only">Filter by specific date</label>
+                        <div class="flex shrink-0 items-center gap-2" x-data="{ searchOpen: false }">
+                            <div class="relative shrink-0" x-show="!searchOpen" x-transition.opacity>
                                 <button
                                     type="button"
-                                    wire:click="$set('dateMode', 'custom_date')"
-                                    onclick="document.getElementById('activity-date-filter')?.showPicker?.()"
-                                    @class([
-                                        'fi-input inline-flex items-center gap-2 rounded-lg border-none bg-white px-3 py-2 text-sm text-gray-900 ring-1 focus:ring-2 focus:ring-[#539302] dark:bg-white/5 dark:text-white',
-                                        'ring-[#539302] dark:ring-[#539302]' => $this->dateMode === 'custom_date',
-                                        'ring-gray-300 dark:ring-white/20' => $this->dateMode !== 'custom_date',
-                                    ])
+                                    @click="searchOpen = true; $nextTick(() => $refs.activitySearchInput?.focus())"
+                                    class="inline-flex h-9 w-9 items-center justify-center text-gray-500 transition hover:text-gray-700 dark:text-gray-300 dark:hover:text-white"
+                                    title="Search activity"
                                 >
-                                    <span >
-                                        {{ filled($this->selectedDate) ? \Illuminate\Support\Carbon::parse($this->selectedDate)->format('M j, Y') : 'Select date' }}
-                                    </span>
-                                    <x-filament::icon icon="heroicon-o-calendar-days" class="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                    <x-filament::icon icon="heroicon-o-magnifying-glass" class="h-5 w-5" />
                                 </button>
-                                <input
-                                    id="activity-date-filter"
-                                    type="date"
-                                    wire:model.live="selectedDate"
-                                    class="sr-only"
-                                />
                             </div>
-                            <div class="basis-full w-full order-3 md:order-1 md:basis-auto md:w-auto md:min-w-[15rem] sm:min-w-[12rem]">
+
+                            <div
+                                x-show="searchOpen"
+                                x-transition
+                                class="relative min-w-0 w-[260px] max-w-[70vw]"
+                            >
                                 <label for="activity-search" class="sr-only">Search activity</label>
                                 <input
                                     id="activity-search"
                                     type="search"
+                                    x-ref="activitySearchInput"
                                     wire:model.live.debounce.400ms="search"
                                     placeholder="Search user, event, message, device..."
                                     class="fi-input block h-9 w-full rounded-lg border-none bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-300 transition focus:ring-2 focus:ring-primary-500 dark:bg-white/5 dark:text-white dark:ring-white/20"
                                 />
+                            </div>
+
+                            <div class="relative shrink-0" x-data="{ open: false }" @click.away="open = false">
+                                <button
+                                    type="button"
+                                    @click="open = !open"
+                                    class="inline-flex h-9 w-9 items-center justify-center text-gray-500 transition hover:text-gray-700 dark:text-gray-300 dark:hover:text-white"
+                                    title="Filter by date range"
+                                >
+                                    <x-filament::icon icon="heroicon-o-funnel" class="h-5 w-5" />
+                                </button>
+
+                                <div
+                                    x-show="open"
+                                    x-transition
+                                    class="absolute right-0 z-20 mt-2 w-[340px] max-w-[90vw] rounded-xl border border-gray-200 bg-white p-4 shadow-lg dark:border-white/20 dark:bg-gray-900"
+                                >
+                                    <div class="space-y-2">
+                                        <div>
+                                            <label for="activity-date-filter-from" class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">From</label>
+                                            <input
+                                                id="activity-date-filter-from"
+                                                type="date"
+                                                max="{{ now()->toDateString() }}"
+                                                wire:model.live="fromDate"
+                                                class="fi-input block h-9 w-full rounded-lg border-none bg-white px-2 py-1 text-sm text-gray-900 ring-1 ring-gray-300 focus:ring-2 focus:ring-primary-500 dark:bg-white/5 dark:text-white dark:ring-white/20"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label for="activity-date-filter-to" class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">To</label>
+                                            <input
+                                                id="activity-date-filter-to"
+                                                type="date"
+                                                max="{{ now()->toDateString() }}"
+                                                wire:model.live="toDate"
+                                                class="fi-input block h-9 w-full rounded-lg border-none bg-white px-2 py-1 text-sm text-gray-900 ring-1 ring-gray-300 focus:ring-2 focus:ring-primary-500 dark:bg-white/5 dark:text-white dark:ring-white/20"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     @endif
@@ -100,19 +104,22 @@
                                     <span>{{ $this->getDisplayMessage($log) }}</span>
                                 </p>
 
-                                <div class="mt-2 flex items-center justify-between gap-3 text-xs text-gray-500 dark:text-gray-400">
+                                <div class="mt-2 flex flex-col gap-2 text-xs text-gray-500 dark:text-gray-400 sm:flex-row sm:items-center sm:justify-between">
                                     <div class="flex items-center gap-2">
                                         <span>{{ $log->created_at?->format('h:i A') }}</span>
                                         <span aria-hidden="true">•</span>
                                         <span>{{ $this->getCategoryLabel($log) }}</span>
                                     </div>
 
-                                    <div class="flex items-center gap-2">
+                                    <div class="flex flex-wrap items-center gap-2 sm:justify-end">
                                         <span class="inline-flex items-center rounded-full bg-yellow-50 px-2 py-0.5 font-medium text-gray-700 dark:bg-white/10 dark:text-gray-200">
                                             {{ $this->getDeviceName($log) }}
                                         </span>
                                         <span class="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 font-medium text-gray-700 dark:bg-white/10 dark:text-gray-200">
                                             {{ $this->getBrowserName($log) }}
+                                        </span>
+                                        <span class="inline-flex max-w-full items-center rounded-full bg-blue-50 px-2 py-0.5 font-medium text-gray-700 dark:bg-white/10 dark:text-gray-200">
+                                            {{ $log->ip_address ?: 'Unknown IP' }}
                                         </span>
                                     </div>
                                 </div>
@@ -122,72 +129,78 @@
                 </div>
             </section>
         @empty
-            <div class="space-y-3">
-                <div class="flex justify-end">
-                    <div class="flex w-full flex-wrap items-center gap-2 md:w-auto md:flex-nowrap md:justify-end">
-                        <div class="w-auto shrink-0 order-1 md:order-2">
-                            <div class="inline-flex w-full overflow-hidden rounded-lg border border-gray-300 bg-white dark:border-white/20 dark:bg-white/5">
-                                <button
-                                    type="button"
-                                    wire:click="$set('dateMode', 'all_time')"
-                                    @class([
-                                        'px-3 py-2 text-sm font-medium transition-colors duration-300 ease-out',
-                                        'fi-btn' => $this->dateMode === 'all_time',
-                                        'text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/10' => $this->dateMode !== 'all_time',
-                                    ])
-                                >
-                                    All time
-                                </button>
-                                <button
-                                    type="button"
-                                    wire:click="$set('dateMode', 'custom_date')"
-                                    @class([
-                                        'px-3 py-2 text-sm font-medium transition-colors duration-300 ease-out',
-                                        'fi-btn' => $this->dateMode === 'custom_date',
-                                        'text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/10' => $this->dateMode !== 'custom_date',
-                                    ])
-                                >
-                                    Custom
-                                </button>
-                            </div>
-                        </div>
+            <div class="space-y-2">
+                <div class="flex items-center justify-between gap-3">
+                    <h3 class="text-base font-semibold text-gray-900 dark:text-white">
+                        Today
+                    </h3>
 
-                        
-
-                        <div class="basis-full w-full order-3 md:order-1 md:basis-auto md:w-auto md:min-w-[15rem] sm:min-w-[12rem]">
-                            <label for="activity-search" class="sr-only">Search activity</label>
-                            <input
-                                id="activity-search"
-                                type="search"
-                                wire:model.live.debounce.400ms="search"
-                                placeholder="Search user, event, message, device..."
-                                class="fi-input block h-9 w-full border-none bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-300 transition focus:ring-2 focus:ring-primary-500 dark:bg-white/5 dark:text-white dark:ring-white/20"
-                            />
-                        </div>
-
-                        <div class="w-auto shrink-0 order-2 ml-auto md:ml-0 md:order-3">
-                            <label for="activity-date-filter-empty" class="sr-only">Filter by specific date</label>
+                    <div class="flex shrink-0 items-center gap-2" x-data="{ searchOpen: false }">
+                        <div class="relative shrink-0" x-show="!searchOpen" x-transition.opacity>
                             <button
                                 type="button"
-                                wire:click="$set('dateMode', 'custom_date')"
-                                onclick="document.getElementById('activity-date-filter-empty')?.showPicker?.()"
-                                @class([
-                                    'fi-input inline-flex items-center gap-2 rounded-lg border-none bg-white px-3 py-2 text-sm text-gray-900 ring-1 focus:ring-2 focus:ring-[#517645] dark:bg-white/5 dark:text-white',
-                                    'ring-[#539302] dark:ring-[#539302]' => $this->dateMode === 'custom_date',
-                                    'ring-gray-300 dark:ring-white/20' => $this->dateMode !== 'custom_date',
-                                ])
+                                @click="searchOpen = true; $nextTick(() => $refs.activitySearchInput?.focus())"
+                                class="inline-flex h-9 w-9 items-center justify-center text-gray-500 transition hover:text-gray-700 dark:text-gray-300 dark:hover:text-white"
+                                title="Search activity"
                             >
-                                <span>
-                                    {{ filled($this->selectedDate) ? \Illuminate\Support\Carbon::parse($this->selectedDate)->format('M j, Y') : 'Select date' }}
-                                </span>
-                                <x-filament::icon icon="heroicon-o-calendar-days" class="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                                <x-filament::icon icon="heroicon-o-magnifying-glass" class="h-5 w-5" />
                             </button>
+                        </div>
+
+                        <div
+                            x-show="searchOpen"
+                            x-transition
+                            class="relative min-w-0 w-[260px] max-w-[70vw]"
+                        >
+                            <label for="activity-search-empty" class="sr-only">Search activity</label>
                             <input
-                                id="activity-date-filter-empty"
-                                type="date"
-                                wire:model.live="selectedDate"
-                                class="sr-only"
+                                id="activity-search-empty"
+                                type="search"
+                                x-ref="activitySearchInput"
+                                wire:model.live.debounce.400ms="search"
+                                placeholder="Search user, event, message, device..."
+                                class="fi-input block h-9 w-full rounded-lg border-none bg-white px-3 py-2 text-sm text-gray-900 ring-1 ring-gray-300 transition focus:ring-2 focus:ring-primary-500 dark:bg-white/5 dark:text-white dark:ring-white/20"
                             />
+                        </div>
+
+                        <div class="relative shrink-0" x-data="{ open: false }" @click.away="open = false">
+                            <button
+                                type="button"
+                                @click="open = !open"
+                                class="inline-flex h-9 w-9 items-center justify-center text-gray-500 transition hover:text-gray-700 dark:text-gray-300 dark:hover:text-white"
+                                title="Filter by date range"
+                            >
+                                <x-filament::icon icon="heroicon-o-funnel" class="h-5 w-5" />
+                            </button>
+
+                            <div
+                                x-show="open"
+                                x-transition
+                                class="absolute right-0 z-20 mt-2 w-[340px] max-w-[90vw] rounded-xl border border-gray-200 bg-white p-4 shadow-lg dark:border-white/20 dark:bg-gray-900"
+                            >
+                                <div class="space-y-2">
+                                    <div>
+                                        <label for="activity-date-filter-from-empty" class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">From</label>
+                                        <input
+                                            id="activity-date-filter-from-empty"
+                                            type="date"
+                                            max="{{ now()->toDateString() }}"
+                                            wire:model.live="fromDate"
+                                            class="fi-input block h-9 w-full rounded-lg border-none bg-white px-2 py-1 text-sm text-gray-900 ring-1 ring-gray-300 focus:ring-2 focus:ring-primary-500 dark:bg-white/5 dark:text-white dark:ring-white/20"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label for="activity-date-filter-to-empty" class="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">To</label>
+                                        <input
+                                            id="activity-date-filter-to-empty"
+                                            type="date"
+                                            max="{{ now()->toDateString() }}"
+                                            wire:model.live="toDate"
+                                            class="fi-input block h-9 w-full rounded-lg border-none bg-white px-2 py-1 text-sm text-gray-900 ring-1 ring-gray-300 focus:ring-2 focus:ring-primary-500 dark:bg-white/5 dark:text-white dark:ring-white/20"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

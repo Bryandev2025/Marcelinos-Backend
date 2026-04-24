@@ -67,11 +67,28 @@ class RecycleBin extends Page
 
     public string $purgeTypedConfirm = '';
 
+    public bool $emptyTrashOpen = false;
+
+    public bool $emptyTrashConfirmed = false;
+
+    public string $emptyTrashTypedConfirm = '';
+
+    /**
+     * @var array<int, string>
+     */
+    public array $selectedTrashItems = [];
+
+    public bool $bulkDeleteOpen = false;
+
+    public bool $bulkDeleteConfirmed = false;
+
+    public string $bulkDeleteTypedConfirm = '';
+
     public static function canAccess(): bool
     {
-        $role = strtolower(trim((string) (auth()->user()?->role ?? '')));
+        $user = auth()->user();
 
-        return $role === 'admin';
+        return $user?->hasPrivilege('manage_recycle_bin') ?? false;
     }
 
     public static function primaryTrashedTotal(): int
@@ -185,9 +202,54 @@ class RecycleBin extends Page
         );
     }
 
+    /**
+     * @return list<string>
+     */
+    public function getCurrentPageSelectionKeysProperty(): array
+    {
+        /** @var list<array{type: string, id: int|string}> $rows */
+        $rows = $this->trashedPaginator->items();
+
+        return collect($rows)
+            ->map(fn (array $row): string => $row['type'].':'.$row['id'])
+            ->values()
+            ->all();
+    }
+
+    public function getAreAllCurrentPageSelectedProperty(): bool
+    {
+        $keys = $this->currentPageSelectionKeys;
+        if ($keys === []) {
+            return false;
+        }
+
+        return count(array_diff($keys, $this->selectedTrashItems)) === 0;
+    }
+
+    public function toggleSelectAllCurrentPage(): void
+    {
+        $keys = $this->currentPageSelectionKeys;
+        if ($keys === []) {
+            return;
+        }
+
+        if ($this->areAllCurrentPageSelected) {
+            $this->selectedTrashItems = array_values(array_diff($this->selectedTrashItems, $keys));
+
+            return;
+        }
+
+        $this->selectedTrashItems = array_values(array_unique([
+            ...$this->selectedTrashItems,
+            ...$keys,
+        ]));
+    }
+
     public function updatedTrashPage(): void
     {
         $this->closePurgeModal();
+        $this->closeBulkDeleteModal();
+        $this->selectedTrashItems = [];
     }
 
     public function restoreItem(string $type, int|string $id): void
@@ -204,6 +266,7 @@ class RecycleBin extends Page
                 ->body(__('“:name” was put back where it belongs.', ['name' => $this->rowLabel($type, $model)]))
                 ->success()
                 ->send();
+            $this->removeSelectedTrashItem($type, $id);
         } catch (AuthorizationException) {
             Notification::make()
                 ->title(__('Not allowed'))
@@ -282,6 +345,7 @@ class RecycleBin extends Page
                 ->body(__('“:name” was removed from the database.', ['name' => $name]))
                 ->success()
                 ->send();
+            $this->removeSelectedTrashItem($this->purgeType, $this->purgeId);
             $this->closePurgeModal();
         } catch (AuthorizationException) {
             Notification::make()
@@ -297,6 +361,185 @@ class RecycleBin extends Page
                 ->danger()
                 ->send();
         }
+    }
+
+    public function openEmptyTrashModal(): void
+    {
+        $this->assertRecycleAccess();
+        $this->emptyTrashOpen = true;
+        $this->emptyTrashConfirmed = false;
+        $this->emptyTrashTypedConfirm = '';
+    }
+
+    public function closeEmptyTrashModal(): void
+    {
+        $this->emptyTrashOpen = false;
+        $this->emptyTrashConfirmed = false;
+        $this->emptyTrashTypedConfirm = '';
+    }
+
+    public function confirmEmptyTrash(): void
+    {
+        $this->assertRecycleAccess();
+
+        if (! $this->emptyTrashConfirmed) {
+            Notification::make()
+                ->title(__('Please confirm using the checkbox'))
+                ->body(__('Tick the checkbox to acknowledge this will permanently remove all trashed items.'))
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if (trim($this->emptyTrashTypedConfirm) !== 'DELETE') {
+            Notification::make()
+                ->title(__('Type DELETE to confirm'))
+                ->body(__('Permanent removal requires typing DELETE in all capital letters.'))
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        try {
+            $deleted = 0;
+            $deleted += Booking::onlyTrashed()->forceDelete();
+            $deleted += Guest::onlyTrashed()->forceDelete();
+            $deleted += Room::onlyTrashed()->forceDelete();
+            $deleted += Venue::onlyTrashed()->forceDelete();
+            $deleted += User::onlyTrashed()->forceDelete();
+            $deleted += Review::onlyTrashed()->forceDelete();
+            $deleted += ContactUs::onlyTrashed()->forceDelete();
+            $deleted += Gallery::onlyTrashed()->forceDelete();
+            $deleted += BlogPost::onlyTrashed()->forceDelete();
+            $deleted += Amenity::onlyTrashed()->forceDelete();
+            $deleted += BedSpecification::onlyTrashed()->forceDelete();
+            $deleted += BlockedDate::onlyTrashed()->forceDelete();
+            $deleted += Payment::onlyTrashed()->forceDelete();
+            $deleted += RoomBlockedDate::onlyTrashed()->forceDelete();
+            $deleted += VenueBlockedDate::onlyTrashed()->forceDelete();
+
+            Notification::make()
+                ->title(__('Recycle Bin emptied'))
+                ->body(trans_choice(':count item permanently removed.|:count items permanently removed.', $deleted, ['count' => $deleted]))
+                ->success()
+                ->send();
+
+            $this->trashPage = 1;
+            $this->selectedTrashItems = [];
+            $this->closeEmptyTrashModal();
+            $this->closePurgeModal();
+            $this->closeBulkDeleteModal();
+        } catch (Throwable $e) {
+            report($e);
+            Notification::make()
+                ->title(__('Could not empty recycle bin'))
+                ->body(__('Something went wrong while deleting trashed records.'))
+                ->danger()
+                ->send();
+        }
+    }
+
+    public function openBulkDeleteModal(): void
+    {
+        $this->assertRecycleAccess();
+
+        if (count($this->selectedTrashItems) === 0) {
+            Notification::make()
+                ->title(__('No items selected'))
+                ->body(__('Select one or more deleted items first.'))
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $this->bulkDeleteOpen = true;
+        $this->bulkDeleteConfirmed = false;
+        $this->bulkDeleteTypedConfirm = '';
+    }
+
+    public function closeBulkDeleteModal(): void
+    {
+        $this->bulkDeleteOpen = false;
+        $this->bulkDeleteConfirmed = false;
+        $this->bulkDeleteTypedConfirm = '';
+    }
+
+    public function confirmBulkDelete(): void
+    {
+        $this->assertRecycleAccess();
+
+        if (count($this->selectedTrashItems) === 0) {
+            $this->closeBulkDeleteModal();
+
+            return;
+        }
+
+        if (! $this->bulkDeleteConfirmed) {
+            Notification::make()
+                ->title(__('Please confirm using the checkbox'))
+                ->body(__('Tick the checkbox to confirm permanent deletion of selected items.'))
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        if (trim($this->bulkDeleteTypedConfirm) !== 'DELETE') {
+            Notification::make()
+                ->title(__('Type DELETE to confirm'))
+                ->body(__('Permanent removal requires typing DELETE in all capital letters.'))
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        $deleted = 0;
+        $failed = 0;
+
+        foreach ($this->selectedTrashItems as $key) {
+            $parts = explode(':', (string) $key, 2);
+            if (count($parts) !== 2 || trim($parts[0]) === '' || trim($parts[1]) === '') {
+                $failed++;
+
+                continue;
+            }
+
+            [$type, $id] = $parts;
+
+            try {
+                $model = $this->resolveTrashedModel($type, $id);
+                Gate::authorize('forceDelete', $model);
+                $model->forceDelete();
+                $deleted++;
+            } catch (Throwable) {
+                $failed++;
+            }
+        }
+
+        $this->selectedTrashItems = [];
+        $this->closeBulkDeleteModal();
+        $this->closePurgeModal();
+
+        Notification::make()
+            ->title(__('Selected items processed'))
+            ->body(__('Deleted: :deleted · Skipped: :failed', ['deleted' => $deleted, 'failed' => $failed]))
+            ->success()
+            ->send();
+    }
+
+    protected function removeSelectedTrashItem(string $type, int|string $id): void
+    {
+        $needle = $type.':'.$id;
+        $this->selectedTrashItems = array_values(
+            array_filter(
+                $this->selectedTrashItems,
+                fn (string $item): bool => $item !== $needle
+            )
+        );
     }
 
     protected function buildEditUrl(string $type, Model $model): ?string

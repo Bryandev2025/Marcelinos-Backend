@@ -6,6 +6,7 @@ use App\Models\ContactUs;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
@@ -15,6 +16,7 @@ class ContactReply extends Mailable implements ShouldQueue
     use Queueable, SerializesModels;
 
     public ContactUs $contact;
+
     public string $replyMessage;
 
     /**
@@ -27,12 +29,26 @@ class ContactReply extends Mailable implements ShouldQueue
     }
 
     /**
+     * Guest link to the SPA contact section, resuming this thread.
+     */
+    public function continueConversationUrl(): string
+    {
+        $base = rtrim((string) config('app.frontend_url'), '/');
+        $query = http_build_query([
+            'contact' => $this->contact->getKey(),
+            'token' => (string) $this->contact->conversation_token,
+        ], '', '&', PHP_QUERY_RFC3986);
+
+        return $base.'/?'.$query.'#contact';
+    }
+
+    /**
      * Get the message envelope.
      */
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Re: ' . $this->contact->subject,
+            subject: 'Re: '.$this->contact->subject,
         );
     }
 
@@ -46,6 +62,7 @@ class ContactReply extends Mailable implements ShouldQueue
             with: [
                 'contact' => $this->contact,
                 'replyMessage' => $this->replyMessage,
+                'continueConversationUrl' => $this->continueConversationUrl(),
             ],
         );
     }
@@ -53,7 +70,7 @@ class ContactReply extends Mailable implements ShouldQueue
     /**
      * Get the attachments for the message.
      *
-     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
+     * @return array<int, Attachment>
      */
     public function attachments(): array
     {

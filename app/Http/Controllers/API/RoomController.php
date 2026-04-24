@@ -106,7 +106,7 @@ class RoomController extends Controller
                 $bookedRoomIds = Booking::query()
                     ->join('booking_room', 'bookings.id', '=', 'booking_room.booking_id')
                     ->whereIn('booking_room.room_id', $roomIds)
-                    ->where('bookings.status', '!=', Booking::STATUS_CANCELLED)
+                    ->whereIn('bookings.booking_status', Booking::availabilityBlockingStatuses())
                     ->where('bookings.check_in', '<', $checkOut)
                     ->where('bookings.check_out', '>', $checkIn)
                     ->distinct()

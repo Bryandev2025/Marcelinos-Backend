@@ -115,13 +115,23 @@ class BookingExporter extends Exporter
                     return number_format($num, 2, '.', ',');
                 }),
 
-            ExportColumn::make('status')
-                ->label('Status')
+            ExportColumn::make('booking_status')
+                ->label('Stay status')
                 ->formatStateUsing(function (?string $state): string {
                     if ($state === null || $state === '') {
                         return '—';
                     }
-                    return (string) (Booking::statusOptions()[$state] ?? $state);
+
+                    return (string) (Booking::bookingStatusOptions()[$state] ?? $state);
+                }),
+            ExportColumn::make('payment_status')
+                ->label('Payment status')
+                ->formatStateUsing(function (?string $state): string {
+                    if ($state === null || $state === '') {
+                        return '—';
+                    }
+
+                    return (string) (Booking::paymentStatusOptions()[$state] ?? $state);
                 }),
 
             ExportColumn::make('created_at')

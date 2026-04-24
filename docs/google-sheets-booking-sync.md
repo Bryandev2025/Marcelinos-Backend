@@ -77,6 +77,19 @@ Updated `app/Observers/BookingObserver.php` to dispatch sync job on:
 
 This ensures Filament status updates are reflected in Google Sheets automatically.
 
+### 7) Added full mirror sync command
+
+Created `bookings:sync-google-sheet` to rebuild all spreadsheet tabs from the database.
+
+Responsibilities:
+
+- Re-read every booking row from DB.
+- Rebuild each status tab from scratch (header + DB rows only).
+- Remove any manual/extra rows that are not in DB.
+- Guarantee spreadsheet content mirrors the database snapshot.
+
+This command is also scheduled hourly in `routes/console.php`.
+
 ## Status Mapping
 
 Internal booking status to sheet/tab label:
@@ -101,6 +114,7 @@ Internal booking status to sheet/tab label:
 5. Run:
    - `php artisan config:clear`
    - `php artisan queue:work`
+   - `php artisan bookings:sync-google-sheet` (initial full backfill)
 
 ## How To Get Spreadsheet ID
 

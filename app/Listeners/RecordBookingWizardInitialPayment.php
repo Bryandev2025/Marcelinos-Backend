@@ -39,18 +39,18 @@ class RecordBookingWizardInitialPayment
             'is_fullypaid' => $totalInt > 0 && $paid >= $totalInt,
         ]);
 
-        if (in_array($record->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true)) {
+        if (in_array($record->booking_status, [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED], true)) {
             return;
         }
 
         if ($totalInt > 0 && $paid >= $totalInt) {
-            $record->update(['status' => Booking::STATUS_PAID]);
+            $record->update(['payment_status' => Booking::PAYMENT_STATUS_PAID]);
 
             return;
         }
 
         if ($paid > 0 && $totalInt > 0 && $paid < $totalInt) {
-            $record->update(['status' => Booking::STATUS_PARTIAL]);
+            $record->update(['payment_status' => Booking::PAYMENT_STATUS_PARTIAL]);
         }
     }
 }

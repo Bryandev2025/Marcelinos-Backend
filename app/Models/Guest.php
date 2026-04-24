@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rules\RequiredIf;
 
 class Guest extends Model
 {
@@ -106,7 +107,12 @@ class Guest extends Model
             'middle_name' => 'nullable|string|max:100',
             'last_name' => 'required|string|max:100',
             'email' => 'required|email',
-            'contact_num' => 'required|string|max:20',
+            'contact_num' => [
+                'nullable',
+                'string',
+                'max:20',
+                new RequiredIf(fn () => ! ((bool) ($normalized['is_international'] ?? false))),
+            ],
             'gender' => 'nullable|in:'.implode(',', [Guest::GENDER_MALE, Guest::GENDER_FEMALE, Guest::GENDER_OTHER]),
             'is_international' => 'required|boolean',
             'country' => 'nullable|string|max:100',
@@ -118,6 +124,13 @@ class Guest extends Model
 
         if (! $validated['is_international']) {
             $validated['country'] = 'Philippines';
+        } elseif (isset($validated['country']) && strcasecmp((string) $validated['country'], 'Philippines') === 0) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'country' => ['Foreign guests cannot use Philippines as country.'],
+            ]);
+        } elseif (($validated['contact_num'] ?? null) === null) {
+            // DB column is non-nullable; foreign guests may legitimately skip phone.
+            $validated['contact_num'] = '';
         }
 
         return self::create($validated);

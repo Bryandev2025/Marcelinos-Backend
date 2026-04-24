@@ -69,6 +69,7 @@ class StaffForm
                         ->label('Allowed actions')
                         ->options(User::staffPrivilegeOptions())
                         ->default([])
+                        ->bulkToggleable()
                         ->rules([
                             'array',
                             fn (): \Closure => function ($attribute, $value, $fail): void {

@@ -248,7 +248,10 @@ class ExportRevenue extends Page
                 'rooms:id,name',
                 'venues:id,name',
             ])
-            ->whereIn('status', [Booking::STATUS_PAID, Booking::STATUS_COMPLETED])
+            ->where(function (Builder $q): void {
+                $q->where('payment_status', Booking::PAYMENT_STATUS_PAID)
+                    ->orWhere('booking_status', Booking::BOOKING_STATUS_COMPLETED);
+            })
             ->where(function (Builder $q) use ($from, $to): void {
                 $q->whereBetween('check_in', [$from, $to])
                     ->orWhereBetween('check_out', [$from, $to])
@@ -274,7 +277,8 @@ class ExportRevenue extends Page
             'Rooms',
             'Venues',
             'Revenue (₱)',
-            'Status',
+            'Booking status',
+            'Payment status',
             'Created At',
         ];
 
@@ -296,7 +300,8 @@ class ExportRevenue extends Page
                         $booking->rooms?->pluck('name')->filter()->implode(', ') ?: '—',
                         $booking->venues?->pluck('name')->filter()->implode(', ') ?: '—',
                         number_format((float) ($booking->total_price ?? 0), 2, '.', ','),
-                        (string) (Booking::statusOptions()[$booking->status ?? ''] ?? $booking->status ?? '—'),
+                        (string) (Booking::bookingStatusOptions()[$booking->booking_status ?? ''] ?? $booking->booking_status ?? '—'),
+                        (string) (Booking::paymentStatusOptions()[$booking->payment_status ?? ''] ?? $booking->payment_status ?? '—'),
                         $booking->created_at?->format('d/m/y H:i') ?? '—',
                     ]);
                 }

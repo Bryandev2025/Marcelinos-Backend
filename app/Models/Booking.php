@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Mail\BookingCreated;
+use App\Mail\VerifyBookingEmail;
 use App\Mail\TestimonialFeedbackEmail;
 use App\Support\RoomInventoryGroupKey;
 use Illuminate\Database\Eloquent\Builder;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
@@ -31,7 +33,18 @@ class Booking extends Model
         'check_in',
         'check_out',
         'total_price',
-        'status',
+        'special_discount_type',
+        'special_discount_value',
+        'special_discount_reason_code',
+        'special_discount_note',
+        'special_discount_original_total_price',
+        'special_discount_amount_applied',
+        'special_discounted_by_user_id',
+        'special_discounted_at',
+        'special_discount_last_modified_by_user_id',
+        'special_discount_last_modified_at',
+        'booking_status',
+        'payment_status',
         'payment_method',
         'online_payment_plan',
         'xendit_invoice_id',
@@ -44,18 +57,31 @@ class Booking extends Model
         'reminder_sms_sent_at',
         'reminder_sms_error',
         'testimonial_feedback_sent_at',
+        'refund_alert_sent_at',
+        'refund_guest_notice_sent_at',
+        'refund_guest_confirmation_sent_at',
+        'email_verified_at',
     ];
 
     protected $casts = [
         'check_in' => 'datetime',
         'check_out' => 'datetime',
         'total_price' => 'decimal:2',
+        'special_discount_value' => 'decimal:2',
+        'special_discount_original_total_price' => 'decimal:2',
+        'special_discount_amount_applied' => 'decimal:2',
+        'special_discounted_at' => 'datetime',
+        'special_discount_last_modified_at' => 'datetime',
         'no_of_days' => 'integer',
         'reminder_sent' => 'boolean',
         'reminder_sent_at' => 'datetime',
         'reminder_sms_sent' => 'boolean',
         'reminder_sms_sent_at' => 'datetime',
         'testimonial_feedback_sent_at' => 'datetime',
+        'refund_alert_sent_at' => 'datetime',
+        'refund_guest_notice_sent_at' => 'datetime',
+        'refund_guest_confirmation_sent_at' => 'datetime',
+        'email_verified_at' => 'datetime',
     ];
 
     protected static function booted()
@@ -69,12 +95,34 @@ class Booking extends Model
             if (! Str::isUuid((string) $booking->receipt_token)) {
                 $booking->receipt_token = (string) Str::uuid();
             }
+            if (empty($booking->booking_status)) {
+                $booking->booking_status = self::BOOKING_STATUS_RESERVED;
+            }
+            if (empty($booking->payment_status)) {
+                $booking->payment_status = self::PAYMENT_STATUS_UNPAID;
+            }
         });
 
         /**
          * Handle actions AFTER booking is created
          */
         static::created(function (Booking $booking) {
+            if ($booking->booking_status === self::BOOKING_STATUS_PENDING_VERIFICATION) {
+                $booking->loadMissing('guest');
+                $email = $booking->guest?->email;
+                if ($email) {
+                    $hours = max(1, (int) config('booking.pending_verification_url_ttl_hours', 72));
+                    $verifyUrl = URL::temporarySignedRoute(
+                        'bookings.verify-email',
+                        now()->addHours($hours),
+                        ['booking' => $booking->id],
+                    );
+                    Mail::to($email)->send(new VerifyBookingEmail($booking, $verifyUrl));
+                }
+
+                return;
+            }
+
             $booking->generateQrCode();
 
             $booking->loadMissing('guest');
@@ -91,13 +139,19 @@ class Booking extends Model
         });
 
         /**
-         * Send testimonial feedback email when status transitions to completed (scheduler or admin).
+         * Send testimonial feedback email when stay is completed and fully paid (paid + completed).
          */
         static::updated(function (Booking $booking) {
-            if (! $booking->wasChanged('status') || $booking->status !== Booking::STATUS_COMPLETED) {
+            if ($booking->testimonial_feedback_sent_at !== null) {
                 return;
             }
-            if ($booking->testimonial_feedback_sent_at !== null) {
+
+            $origBooking = $booking->getOriginal('booking_status');
+            $origPayment = $booking->getOriginal('payment_status');
+            $wasEligible = $origBooking === self::BOOKING_STATUS_COMPLETED
+                && $origPayment === self::PAYMENT_STATUS_PAID;
+
+            if (! $booking->isEligibleForTestimonialFeedback() || $wasEligible) {
                 return;
             }
 
@@ -219,7 +273,7 @@ class Booking extends Model
     }
 
     /**
-     * Whether rooms (if required) and venues (if required) satisfy rules for transitioning to {@see STATUS_OCCUPIED}.
+     * Whether rooms (if required) and venues (if required) satisfy rules for transitioning to occupied.
      */
     public function assignmentsSatisfiedForOccupied(): bool
     {
@@ -286,21 +340,41 @@ class Booking extends Model
         return $this->hasMany(Payment::class);
     }
 
-    /* ================= STATUSES ================= */
+    /* ================= BOOKING (STAY) STATUS ================= */
 
-    const STATUS_UNPAID = 'unpaid';
+    /** Awaiting guest email confirmation; does not block public availability (see {@see availabilityBlockingStatuses()}). */
+    const BOOKING_STATUS_PENDING_VERIFICATION = 'pending_verification';
 
-    const STATUS_PARTIAL = 'partial';
+    const BOOKING_STATUS_RESERVED = 'reserved';
 
-    const STATUS_OCCUPIED = 'occupied';
+    const BOOKING_STATUS_OCCUPIED = 'occupied';
 
-    const STATUS_COMPLETED = 'completed';
+    const BOOKING_STATUS_COMPLETED = 'completed';
 
-    const STATUS_PAID = 'paid';
+    const BOOKING_STATUS_CANCELLED = 'cancelled';
 
-    const STATUS_CANCELLED = 'cancelled';
+    const BOOKING_STATUS_RESCHEDULED = 'rescheduled';
 
-    const STATUS_RESCHEDULED = 'rescheduled';
+    /* ================= PAYMENT STATUS ================= */
+
+    const PAYMENT_STATUS_UNPAID = 'unpaid';
+
+    const PAYMENT_STATUS_PARTIAL = 'partial';
+
+    const PAYMENT_STATUS_PAID = 'paid';
+
+    const PAYMENT_STATUS_REFUND_PENDING = 'refund_pending';
+
+    const PAYMENT_STATUS_REFUNDED = 'refunded';
+
+    /**
+     * Testimonial email / review eligibility: fully paid stay marked completed.
+     */
+    public function isEligibleForTestimonialFeedback(): bool
+    {
+        return $this->booking_status === self::BOOKING_STATUS_COMPLETED
+            && $this->payment_status === self::PAYMENT_STATUS_PAID;
+    }
 
     const UNPAID_EXPIRY_DAYS = 3;
 
@@ -317,6 +391,23 @@ class Booking extends Model
     public static function timezoneManila(): string
     {
         return 'Asia/Manila';
+    }
+
+    /**
+     * Whether the booking check-in date is today in Asia/Manila.
+     */
+    public function isCheckInTodayManila(?Carbon $at = null): bool
+    {
+        if (! $this->check_in) {
+            return false;
+        }
+
+        $at = $at ?? now();
+        $tz = self::timezoneManila();
+        $checkInDay = $this->check_in->copy()->timezone($tz)->startOfDay();
+        $today = $at->copy()->timezone($tz)->startOfDay();
+
+        return $checkInDay->equalTo($today);
     }
 
     /**
@@ -347,32 +438,65 @@ class Booking extends Model
     }
 
     /**
-     * 9:00 PM Asia/Manila on the check-in calendar day (unpaid settlement, receipt, and auto-cancel).
+     * 9:00 PM Asia/Manila unpaid settlement deadline:
+     * - check-in is on/earlier than booking day: 9:00 PM on check-in day
+     * - check-in is after booking day: 9:00 PM on the day after booking day
      */
-    public function checkInDayUnpaidSettlementDeadlineManila(): ?Carbon
+    public function unpaidSettlementDeadlineManila(?Carbon $at = null): ?Carbon
     {
         if (! $this->check_in) {
             return null;
         }
         $tz = self::timezoneManila();
+        $anchor = ($this->created_at ?? $at ?? now())->copy()->timezone($tz);
+        $checkInDay = $this->check_in->copy()->timezone($tz)->startOfDay();
+        $bookingDay = $anchor->copy()->startOfDay();
+        $targetDay = $checkInDay->gt($bookingDay)
+            ? $bookingDay->copy()->addDay()
+            : $checkInDay;
 
-        return $this->check_in->copy()->timezone($tz)->setTime(
+        return $targetDay->setTime(
             self::CHECK_IN_UNPAID_SETTLEMENT_HOUR,
             0,
             0,
         );
     }
 
-    public static function statusOptions(): array
+    /**
+     * Stay statuses that consume inventory in public availability (rooms/venues/capacity).
+     *
+     * @return list<string>
+     */
+    public static function availabilityBlockingStatuses(): array
     {
         return [
-            self::STATUS_UNPAID => 'Unpaid',
-            self::STATUS_PARTIAL => 'Partial',
-            self::STATUS_OCCUPIED => 'Occupied',
-            self::STATUS_PAID => 'Paid',
-            self::STATUS_COMPLETED => 'Completed',
-            self::STATUS_CANCELLED => 'Cancelled',
-            self::STATUS_RESCHEDULED => 'Rescheduled',
+            self::BOOKING_STATUS_RESERVED,
+            self::BOOKING_STATUS_OCCUPIED,
+            self::BOOKING_STATUS_COMPLETED,
+            self::BOOKING_STATUS_RESCHEDULED,
+        ];
+    }
+
+    public static function bookingStatusOptions(): array
+    {
+        return [
+            self::BOOKING_STATUS_PENDING_VERIFICATION => 'Pending email verification',
+            self::BOOKING_STATUS_RESERVED => 'Reserved',
+            self::BOOKING_STATUS_OCCUPIED => 'Occupied',
+            self::BOOKING_STATUS_COMPLETED => 'Completed',
+            self::BOOKING_STATUS_CANCELLED => 'Cancelled',
+            self::BOOKING_STATUS_RESCHEDULED => 'Rescheduled',
+        ];
+    }
+
+    public static function paymentStatusOptions(): array
+    {
+        return [
+            self::PAYMENT_STATUS_UNPAID => 'Unpaid',
+            self::PAYMENT_STATUS_PARTIAL => 'Partial',
+            self::PAYMENT_STATUS_PAID => 'Paid',
+            self::PAYMENT_STATUS_REFUND_PENDING => 'Refund Pending',
+            self::PAYMENT_STATUS_REFUNDED => 'Refunded',
         ];
     }
 
@@ -384,7 +508,7 @@ class Booking extends Model
      */
     public function unpaidExpiresAt(?int $days = null): ?Carbon
     {
-        return $this->checkInDayUnpaidSettlementDeadlineManila();
+        return $this->unpaidSettlementDeadlineManila();
     }
 
     /**
@@ -417,7 +541,8 @@ class Booking extends Model
      */
     public function isExpiredUnpaid(?Carbon $at = null, ?int $days = null): bool
     {
-        if ($this->status !== self::STATUS_UNPAID) {
+        if ($this->payment_status !== self::PAYMENT_STATUS_UNPAID
+            || $this->booking_status !== self::BOOKING_STATUS_RESERVED) {
             return false;
         }
 
@@ -426,7 +551,7 @@ class Booking extends Model
         }
 
         $at = $at ?? now();
-        $deadline = $this->checkInDayUnpaidSettlementDeadlineManila();
+        $deadline = $this->unpaidSettlementDeadlineManila($at);
 
         return $deadline !== null && $at->gte($deadline);
     }
@@ -447,24 +572,63 @@ class Booking extends Model
                 return false;
             }
 
-            $fresh->update(['status' => self::STATUS_CANCELLED]);
+            $fresh->update(['booking_status' => self::BOOKING_STATUS_CANCELLED]);
             $this->refresh();
 
             return true;
         });
     }
 
-    public static function statusColors(): array
+    /**
+     * @return array<string, string> color => booking_status value
+     */
+    public static function bookingStatusColors(): array
     {
         return [
-            'primary' => self::STATUS_UNPAID,
-            'info' => self::STATUS_PARTIAL,
-            'success' => self::STATUS_PAID,
-            'warning' => self::STATUS_OCCUPIED,
-            'secondary' => self::STATUS_COMPLETED,
-            'danger' => self::STATUS_CANCELLED,
-            'default' => self::STATUS_RESCHEDULED,
+            'info' => self::BOOKING_STATUS_PENDING_VERIFICATION,
+            'primary' => self::BOOKING_STATUS_RESERVED,
+            'warning' => self::BOOKING_STATUS_OCCUPIED,
+            'secondary' => self::BOOKING_STATUS_COMPLETED,
+            'danger' => self::BOOKING_STATUS_CANCELLED,
+            'default' => self::BOOKING_STATUS_RESCHEDULED,
         ];
+    }
+
+    /**
+     * @return array<string, string> color => payment_status value
+     */
+    public static function paymentStatusColors(): array
+    {
+        return [
+            'primary' => self::PAYMENT_STATUS_UNPAID,
+            'info' => self::PAYMENT_STATUS_PARTIAL,
+            'success' => self::PAYMENT_STATUS_PAID,
+            'warning' => self::PAYMENT_STATUS_REFUND_PENDING,
+            'gray' => self::PAYMENT_STATUS_REFUNDED,
+        ];
+    }
+
+    /**
+     * Resolve payment status from recorded payments versus current booking total.
+     */
+    public static function paymentStatusFromAmounts(float $totalPrice, float $totalPaid): string
+    {
+        $totalPrice = max(0, $totalPrice);
+        $totalPaid = max(0, $totalPaid);
+
+        if ($totalPaid <= 0.009) {
+            return self::PAYMENT_STATUS_UNPAID;
+        }
+
+        if ($totalPaid > ($totalPrice + 0.009)) {
+            return self::PAYMENT_STATUS_REFUND_PENDING;
+        }
+
+        if ($totalPaid < ($totalPrice - 0.009)) {
+            return self::PAYMENT_STATUS_PARTIAL;
+        }
+
+        return self::PAYMENT_STATUS_PAID;
     }
 
     /* ================= BLOCKED DATE CONFLICTS ================= */
@@ -480,7 +644,7 @@ class Booking extends Model
         $dateEnd = $date->copy()->endOfDay();
 
         return $query
-            ->whereNotIn('status', [self::STATUS_CANCELLED])
+            ->whereNotIn('booking_status', [self::BOOKING_STATUS_CANCELLED])
             ->where('check_in', '<=', $dateEnd)
             ->where('check_out', '>', $dateStart);
     }
@@ -494,16 +658,31 @@ class Booking extends Model
         $d = Carbon::parse($date)->toDateString();
 
         return $query
-            ->whereNotIn('status', [self::STATUS_CANCELLED])
+            ->whereNotIn('booking_status', [self::BOOKING_STATUS_CANCELLED])
             ->whereDate('check_in', '<=', $d)
             ->whereDate('check_out', '>', $d);
+    }
+
+    /**
+     * Scope: bookings whose calendar span includes this date (check-in date through check-out date, inclusive).
+     * Used by the staff booking calendar grid and day-detail modal so the check-out day is included in the range
+     * (distinct from {@see scopeOverlappingLodgingNight}, which excludes the check-out night).
+     */
+    public function scopeOverlappingCalendarInclusiveDisplay($query, $date): Builder
+    {
+        $d = Carbon::parse($date)->toDateString();
+
+        return $query
+            ->whereNotIn('booking_status', [self::BOOKING_STATUS_CANCELLED])
+            ->whereDate('check_in', '<=', $d)
+            ->whereDate('check_out', '>=', $d);
     }
 
     /**
      * Get bookings overlapping a date, with guest and assignable names for display.
      * Used by blocked-dates flow to show "contact customer first" info.
      *
-     * @return array<int, array{id: int, reference_number: string, guest_name: string, email: string, contact_num: string, rooms: string, venues: string, check_in: string, check_out: string, status: string}>
+     * @return array<int, array{id: int, reference_number: string, guest_name: string, email: string, contact_num: string, rooms: string, venues: string, check_in: string, check_out: string, booking_status: string, payment_status: string}>
      */
     public static function getConflictsForDate($date): array
     {
@@ -523,7 +702,8 @@ class Booking extends Model
                 'venues' => $b->venues->pluck('name')->join(', ') ?: '—',
                 'check_in' => $b->check_in?->format('M j, Y g:i A') ?? '—',
                 'check_out' => $b->check_out?->format('M j, Y g:i A') ?? '—',
-                'status' => $b->status,
+                'booking_status' => $b->booking_status,
+                'payment_status' => $b->payment_status,
             ];
         })->values()->all();
     }
@@ -531,7 +711,7 @@ class Booking extends Model
     /**
      * Bookings overlapping a calendar day that include a given room (for staff block warnings).
      *
-     * @return array<int, array{id: int, reference_number: string, guest_name: string, email: string, contact_num: string, rooms: string, venues: string, check_in: string, check_out: string, status: string}>
+     * @return array<int, array{id: int, reference_number: string, guest_name: string, email: string, contact_num: string, rooms: string, venues: string, check_in: string, check_out: string, booking_status: string, payment_status: string}>
      */
     public static function getConflictsForRoomOnDate(int $roomId, $date): array
     {
@@ -552,7 +732,8 @@ class Booking extends Model
                 'venues' => $b->venues->pluck('name')->join(', ') ?: '—',
                 'check_in' => $b->check_in?->format('M j, Y g:i A') ?? '—',
                 'check_out' => $b->check_out?->format('M j, Y g:i A') ?? '—',
-                'status' => $b->status,
+                'booking_status' => $b->booking_status,
+                'payment_status' => $b->payment_status,
             ];
         })->values()->all();
     }
@@ -560,7 +741,7 @@ class Booking extends Model
     /**
      * Bookings overlapping a calendar day that include a given venue (for staff block warnings).
      *
-     * @return array<int, array{id: int, reference_number: string, guest_name: string, email: string, contact_num: string, rooms: string, venues: string, check_in: string, check_out: string, status: string}>
+     * @return array<int, array{id: int, reference_number: string, guest_name: string, email: string, contact_num: string, rooms: string, venues: string, check_in: string, check_out: string, booking_status: string, payment_status: string}>
      */
     public static function getConflictsForVenueOnDate(int $venueId, $date): array
     {
@@ -581,7 +762,8 @@ class Booking extends Model
                 'venues' => $b->venues->pluck('name')->join(', ') ?: '—',
                 'check_in' => $b->check_in?->format('M j, Y g:i A') ?? '—',
                 'check_out' => $b->check_out?->format('M j, Y g:i A') ?? '—',
-                'status' => $b->status,
+                'booking_status' => $b->booking_status,
+                'payment_status' => $b->payment_status,
             ];
         })->values()->all();
     }
@@ -640,5 +822,22 @@ class Booking extends Model
         $this->updateQuietly([
             'qr_code' => $path,
         ]);
+    }
+
+    /**
+     * Whether the booking check-out date is today in Asia/Manila.
+     */
+    public function isCheckOutTodayManila(?Carbon $at = null): bool
+    {
+        if (! $this->check_out) {
+            return false;
+        }
+
+        $at = $at ?? now();
+        $tz = self::timezoneManila();
+        $checkOutDay = $this->check_out->copy()->timezone($tz)->startOfDay();
+        $today = $at->copy()->timezone($tz)->startOfDay();
+
+        return $checkOutDay->equalTo($today);
     }
 }

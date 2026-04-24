@@ -7,15 +7,20 @@ use App\Events\BookingRescheduled;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\API\StoreBookingRequest;
 use App\Models\Booking;
+use App\Models\BookingRoomLine;
 use App\Models\Guest;
 use App\Models\Payment;
 use App\Models\Room;
 use App\Models\Venue;
 use App\Services\BookingActionOtpService;
+use App\Support\BookingDuplicateGuard;
 use App\Support\BookingPricing;
+use App\Support\CancellationPolicy;
 use App\Support\RoomInventoryGroupAvailability;
 use App\Support\RoomInventoryGroupKey;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -31,6 +36,7 @@ class BookingController extends Controller
 {
     public function __construct(
         private BookingActionOtpService $bookingActionOtpService,
+        private BookingDuplicateGuard $bookingDuplicateGuard,
     ) {}
 
     /**
@@ -51,22 +57,32 @@ class BookingController extends Controller
         $purpose = (string) $request->input('purpose');
 
         if ($purpose === BookingActionOtpService::PURPOSE_CANCEL) {
-            $allowedStatuses = [
-                Booking::STATUS_UNPAID,
-                Booking::STATUS_PAID,
-            ];
+            $canCancel = $booking->booking_status === Booking::BOOKING_STATUS_PENDING_VERIFICATION
+                || $booking->booking_status === Booking::BOOKING_STATUS_RESCHEDULED
+                || (
+                    $booking->booking_status === Booking::BOOKING_STATUS_RESERVED
+                    && in_array($booking->payment_status, [
+                        Booking::PAYMENT_STATUS_UNPAID,
+                        Booking::PAYMENT_STATUS_PARTIAL,
+                        Booking::PAYMENT_STATUS_PAID,
+                        Booking::PAYMENT_STATUS_REFUND_PENDING,
+                        Booking::PAYMENT_STATUS_REFUNDED,
+                    ], true)
+                );
 
-            if (defined(Booking::class.'::STATUS_RESCHEDULED')) {
-                $allowedStatuses[] = Booking::STATUS_RESCHEDULED;
-            }
-
-            if (! in_array($booking->status, $allowedStatuses, true)) {
+            if (! $canCancel) {
                 return response()->json([
                     'message' => 'Booking cannot be cancelled in its current state.',
                 ], 422);
             }
         } else {
-            if (in_array($booking->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true)) {
+            if ($booking->booking_status === Booking::BOOKING_STATUS_PENDING_VERIFICATION) {
+                return response()->json([
+                    'message' => 'Confirm your booking by email before rescheduling.',
+                ], 422);
+            }
+
+            if (in_array($booking->booking_status, [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED], true)) {
                 return response()->json([
                     'message' => 'Cannot reschedule this booking.',
                 ], 422);
@@ -148,6 +164,41 @@ class BookingController extends Controller
         }
     }
 
+    public function downloadBillingStatementPdf(string $token)
+    {
+        try {
+            $booking = $this->findReceiptBooking($token);
+
+            if (! $booking) {
+                return response()->json([
+                    'message' => 'Booking not found',
+                ], 404);
+            }
+
+            if ($response = $this->rejectIfPendingVerification($booking)) {
+                return $response;
+            }
+
+            $statement = $this->buildBillingStatementData($booking);
+
+            $pdf = Pdf::loadView('billing-statements.step5', $statement)
+                ->setPaper('a4', 'portrait');
+
+            $filename = sprintf(
+                'marcelinos-billing-statement-%s-%s.pdf',
+                Str::slug((string) $booking->reference_number),
+                now()->format('Ymd-His'),
+            );
+
+            return $pdf->download($filename);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Error generating billing statement PDF',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     /**
      * Confirm a successful online payment from receipt return flow.
      * Uses opaque receipt token only and updates booking status to paid/partial.
@@ -170,11 +221,15 @@ class BookingController extends Controller
             ], 404);
         }
 
+        if ($response = $this->rejectIfPendingVerification($booking)) {
+            return $response;
+        }
+
         $validated = $request->validate([
             'payment_mode' => ['nullable', 'string', 'regex:/^(full|partial_([1-9]|[1-9][0-9]))$/'],
         ]);
 
-        if (in_array($booking->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true)) {
+        if (in_array($booking->booking_status, [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED], true)) {
             return response()->json([
                 'message' => 'Booking cannot be updated for payment in its current state.',
             ], 422);
@@ -199,12 +254,12 @@ class BookingController extends Controller
         $chargeAmount = $this->plannedPaymentAmountForMode($booking, $paymentMode);
         $this->upsertConfirmedPaymentRecord($booking, $invoiceId, $chargeAmount);
 
-        $nextStatus = $this->extractPartialPercentage($paymentMode) !== null
-            ? Booking::STATUS_PARTIAL
-            : Booking::STATUS_PAID;
+        $nextPayment = $this->extractPartialPercentage($paymentMode) !== null
+            ? Booking::PAYMENT_STATUS_PARTIAL
+            : Booking::PAYMENT_STATUS_PAID;
 
-        if ($booking->status !== $nextStatus) {
-            $booking->update(['status' => $nextStatus]);
+        if ($booking->payment_status !== $nextPayment) {
+            $booking->update(['payment_status' => $nextPayment]);
         }
         Cache::forget($this->pendingOnlinePaymentCacheKey((int) $booking->id));
 
@@ -220,7 +275,11 @@ class BookingController extends Controller
 
         $hasTestimonial = $booking->reviews()->exists();
 
-        $this->ensureBookingQrExists($booking);
+        $pendingVerification = $booking->booking_status === Booking::BOOKING_STATUS_PENDING_VERIFICATION;
+
+        if (! $pendingVerification) {
+            $this->ensureBookingQrExists($booking);
+        }
 
         $filename = $booking->qr_code ? basename($booking->qr_code) : null;
 
@@ -245,6 +304,10 @@ class BookingController extends Controller
                 'balance' => $balance,
                 'amount_due_now' => $amountDueNow,
             ],
+            'cancellation_policy' => [
+                'fee_percent' => CancellationPolicy::feePercent(),
+            ],
+            'cancellation_refund' => CancellationPolicy::cancelledBookingRefundTransparency($bookingPayload),
             'unpaid_expires_at' => $bookingPayload->unpaidExpiresAt()?->toIso8601String(),
             'unpaid_expiry_days' => Booking::UNPAID_EXPIRY_DAYS,
             'use_messenger_deposit_instructions' => $bookingPayload->useMessengerDepositInstructions(),
@@ -253,7 +316,251 @@ class BookingController extends Controller
             'down_payment_percent' => $downPaymentPercent,
             'qr_code_url' => $filename ? url("/qr-image/{$filename}") : null,
             'has_testimonial' => $hasTestimonial,
+            'email_verification_required' => $pendingVerification,
         ], 200);
+    }
+
+    /**
+     * Build the data array used by the billing statement PDF.
+     * The PDF should always reflect server-side booking state, not editable DOM state.
+     */
+    private function buildBillingStatementData(Booking $booking): array
+    {
+        $booking->loadMissing(['guest', 'rooms.bedSpecifications', 'venues', 'roomLines', 'payments']);
+
+        $logoPath = public_path('brand-logo.webp');
+        $logoSrc = null;
+        if (is_file($logoPath)) {
+            $logoSrc = 'data:image/webp;base64,'.base64_encode((string) file_get_contents($logoPath));
+        }
+
+        $guest = $booking->guest;
+        $guestName = $guest
+            ? trim(implode(' ', array_filter([
+                $guest->first_name,
+                $guest->middle_name,
+                $guest->last_name,
+            ])))
+            : '—';
+
+        $guestAddressParts = $guest
+            ? array_filter([
+                $guest->street,
+                $guest->barangay,
+                $guest->municipality,
+                $guest->province,
+                $guest->region,
+                $guest->country,
+            ])
+            : [];
+        $guestAddress = ! empty($guestAddressParts) ? implode(', ', $guestAddressParts) : '—';
+
+        $billingUnits = max(
+            1,
+            (int) ($booking->no_of_days ?: ($booking->check_in && $booking->check_out
+                ? $booking->check_in->diffInDays($booking->check_out)
+                : 1))
+        );
+        $billingUnitLabel = $billingUnits === 1 ? 'night/day' : 'nights/days';
+
+        $roomItems = $booking->roomLines->isNotEmpty()
+            ? $booking->roomLines->map(function (BookingRoomLine $line) use ($billingUnits): array {
+                $unitPrice = (float) $line->unit_price_per_night;
+
+                return [
+                    'label' => $line->displayLabel(),
+                    'quantity' => (int) $line->quantity,
+                    'unit_price' => $unitPrice,
+                    'line_total' => $unitPrice * max(1, (int) $line->quantity) * $billingUnits,
+                ];
+            })->values()->all()
+            : $booking->rooms->map(function (Room $room) use ($billingUnits): array {
+                $room->loadMissing(['bedSpecifications']);
+                $unitPrice = (float) $room->price;
+
+                return [
+                    'label' => trim($room->name).' ('.$room->typeDashBedSummary().')',
+                    'quantity' => 1,
+                    'unit_price' => $unitPrice,
+                    'line_total' => $unitPrice * $billingUnits,
+                ];
+            })->values()->all();
+
+        $venueEventType = $this->normalizeVenueEventType((string) ($booking->venue_event_type ?? 'wedding'));
+        $venueItems = $booking->venues->map(function (Venue $venue) use ($billingUnits, $venueEventType): array {
+            $unitPrice = $this->venueUnitPrice($venue, $venueEventType);
+
+            return [
+                'label' => $venue->name,
+                'event_type' => $this->venueEventTypeLabel($venueEventType),
+                'capacity' => (int) $venue->capacity,
+                'unit_price' => $unitPrice,
+                'line_total' => $unitPrice * $billingUnits,
+            ];
+        })->values()->all();
+
+        $roomSubtotal = array_reduce($roomItems, fn (float $sum, array $item): float => $sum + (float) $item['line_total'], 0.0);
+        $venueSubtotal = array_reduce($venueItems, fn (float $sum, array $item): float => $sum + (float) $item['line_total'], 0.0);
+        $computedSubtotal = $roomSubtotal + $venueSubtotal;
+
+        $grandTotal = (float) $booking->total_price;
+        $originalTotal = (float) ($booking->special_discount_original_total_price ?? 0);
+        if ($originalTotal <= 0) {
+            $originalTotal = max($computedSubtotal, $grandTotal);
+        }
+
+        $discountApplied = (float) ($booking->special_discount_amount_applied ?? max(0, $originalTotal - $grandTotal));
+        $amountPaid = (float) $booking->total_paid;
+        $balance = (float) $booking->balance;
+
+        $paymentSettings = $this->paymentSettingsConfig();
+        $partialOptions = $paymentSettings['partial_payment_options'] ?? [];
+        $downPaymentPercent = isset($partialOptions[0]) ? (int) $partialOptions[0] : 30;
+        $downPaymentAmount = max(0.0, (float) round($grandTotal * ($downPaymentPercent / 100), 2));
+        $unpaidExpiresAt = $booking->unpaidExpiresAt();
+        $depositDueLabel = $unpaidExpiresAt
+            ? $unpaidExpiresAt->timezone('Asia/Manila')->format('F j, Y g:i A')
+            : '—';
+
+        $messengerBase = $this->messengerChatUrl();
+        $messengerMessage = implode("\n", [
+            "Hello Marcelino's Resort Hotel!",
+            '',
+            "I would like to settle my {$downPaymentPercent}% deposit for this booking.",
+            'Reference No.: '.((string) $booking->reference_number ?: '—'),
+            'Guest Name: '.($guestName !== '' ? $guestName : '—'),
+            'Check-in: '.($booking->check_in ? $booking->check_in->timezone('Asia/Manila')->format('F j, Y g:i A') : '—'),
+            'Check-out: '.($booking->check_out ? $booking->check_out->timezone('Asia/Manila')->format('F j, Y g:i A') : '—'),
+            'Reservation Total: ₱'.number_format($grandTotal, 2),
+            "Deposit Amount ({$downPaymentPercent}%): ₱".number_format($downPaymentAmount, 2),
+            '',
+            'Thank you!',
+        ]);
+        $messengerLink = $messengerBase !== ''
+            ? $messengerBase.(str_contains($messengerBase, '?') ? '&' : '?').'text='.rawurlencode($messengerMessage)
+            : null;
+
+        $bookingStatusLower = strtolower((string) $booking->booking_status);
+        $paymentStatusLower = strtolower((string) $booking->payment_status);
+        $showMessengerDepositBlock = in_array($bookingStatusLower, ['reserved', 'rescheduled'], true)
+            && $paymentStatusLower === Booking::PAYMENT_STATUS_UNPAID;
+
+        $qrCodeDataUri = null;
+        if ($booking->qr_code && Storage::disk('public')->exists($booking->qr_code)) {
+            $qrCodePath = $booking->qr_code;
+            $mimeType = Storage::disk('public')->mimeType($qrCodePath) ?: 'image/svg+xml';
+            $qrCodeDataUri = 'data:'.$mimeType.';base64,'.base64_encode((string) Storage::disk('public')->get($qrCodePath));
+        }
+
+        return [
+            'booking' => $booking,
+            'guestName' => $guestName,
+            'guestAddress' => $guestAddress,
+            'bookingTypeLabel' => $this->bookingTypeLabel($booking),
+            'bookingStatusLabel' => Booking::bookingStatusOptions()[(string) $booking->booking_status] ?? ucfirst((string) $booking->booking_status),
+            'paymentStatusLabel' => Booking::paymentStatusOptions()[(string) $booking->payment_status] ?? ucfirst((string) $booking->payment_status),
+            'paymentMethodLabel' => $this->paymentMethodLabel((string) ($booking->payment_method ?? 'cash'), (string) ($booking->online_payment_plan ?? '')),
+            'venueEventTypeLabel' => $this->venueEventTypeLabel($venueEventType),
+            'billingUnits' => $billingUnits,
+            'billingUnitLabel' => $billingUnitLabel,
+            'roomItems' => $roomItems,
+            'venueItems' => $venueItems,
+            'roomSubtotal' => $roomSubtotal,
+            'venueSubtotal' => $venueSubtotal,
+            'computedSubtotal' => $computedSubtotal,
+            'originalTotal' => $originalTotal,
+            'discountApplied' => $discountApplied,
+            'grandTotal' => $grandTotal,
+            'amountPaid' => $amountPaid,
+            'balance' => $balance,
+            'issuedAt' => $booking->created_at?->timezone('Asia/Manila') ?? now(),
+            'checkIn' => $booking->check_in,
+            'checkOut' => $booking->check_out,
+            'qrCodeDataUri' => $qrCodeDataUri,
+            'logoSrc' => $logoSrc,
+            'downPaymentPercent' => $downPaymentPercent,
+            'downPaymentAmount' => $downPaymentAmount,
+            'depositDueLabel' => $depositDueLabel,
+            'showMessengerDepositBlock' => $showMessengerDepositBlock,
+            'messengerLink' => $messengerLink,
+            'cancellationRefund' => CancellationPolicy::cancelledBookingRefundTransparency($booking),
+        ];
+    }
+
+    private function messengerChatUrl(): string
+    {
+        $configured = trim((string) env('FRONTEND_MESSENGER_CHAT_URL', ''));
+
+        return $configured !== ''
+            ? $configured
+            : 'https://m.me/61557457680496';
+    }
+
+    private function bookingTypeLabel(Booking $booking): string
+    {
+        $hasRooms = $booking->rooms->isNotEmpty() || $booking->roomLines->isNotEmpty();
+        $hasVenues = $booking->venues->isNotEmpty();
+
+        if ($hasRooms && $hasVenues) {
+            return 'Room + Venue';
+        }
+
+        if ($hasVenues) {
+            return 'Venue Booking';
+        }
+
+        if ($hasRooms) {
+            return 'Room Booking';
+        }
+
+        return 'Booking';
+    }
+
+    private function paymentMethodLabel(string $method, string $plan): string
+    {
+        $normalizedMethod = strtolower(trim($method));
+
+        if ($normalizedMethod === 'online') {
+            if (preg_match('/^partial_(\d+)$/', $plan, $matches)) {
+                return 'Online (Partial '.$matches[1].'%)';
+            }
+
+            return 'Online (Full)';
+        }
+
+        return $normalizedMethod !== ''
+            ? ucwords(str_replace('_', ' ', $normalizedMethod))
+            : 'Cash';
+    }
+
+    private function normalizeVenueEventType(string $eventType): string
+    {
+        $normalized = strtolower(trim($eventType));
+
+        return match ($normalized) {
+            'seminar', 'meeting', 'meeting_staff' => 'meeting_staff',
+            'birthday' => 'birthday',
+            'wedding' => 'wedding',
+            default => 'wedding',
+        };
+    }
+
+    private function venueEventTypeLabel(string $eventType): string
+    {
+        return match ($this->normalizeVenueEventType($eventType)) {
+            'birthday' => 'Birthday',
+            'meeting_staff' => 'Meeting / Staff',
+            default => 'Wedding',
+        };
+    }
+
+    private function venueUnitPrice(Venue $venue, string $eventType): float
+    {
+        return match ($this->normalizeVenueEventType($eventType)) {
+            'birthday' => (float) $venue->birthday_price,
+            'meeting_staff' => (float) $venue->meeting_staff_price,
+            default => (float) $venue->wedding_price,
+        };
     }
 
     /**
@@ -266,6 +573,168 @@ class BookingController extends Controller
             ->where('receipt_token', $identifier)
             ->orWhere('reference_number', $identifier)
             ->first();
+    }
+
+    private function rejectIfPendingVerification(Booking $booking): ?JsonResponse
+    {
+        if ($booking->booking_status === Booking::BOOKING_STATUS_PENDING_VERIFICATION) {
+            return response()->json([
+                'message' => 'Please confirm your booking using the link sent to your email.',
+                'error' => 'email_verification_required',
+            ], 403);
+        }
+
+        return null;
+    }
+
+    /**
+     * Signed link from {@see VerifyBookingEmail}: activate hold, optional Xendit invoice.
+     */
+    public function verifyEmail(Request $request, Booking $booking): JsonResponse|RedirectResponse
+    {
+        if ($booking->booking_status === Booking::BOOKING_STATUS_CANCELLED) {
+            return response()->json([
+                'message' => 'This booking is no longer active.',
+            ], 410);
+        }
+
+        if ($booking->booking_status === Booking::BOOKING_STATUS_RESERVED && $booking->email_verified_at !== null) {
+            $paymentUrl = (string) ($booking->xendit_invoice_url ?? '');
+
+            return $this->verificationSuccessResponse(
+                $booking->fresh(['guest', 'rooms', 'venues', 'roomLines']),
+                is_string($paymentUrl) && $paymentUrl !== '' ? $paymentUrl : null,
+            );
+        }
+
+        if ($booking->booking_status !== Booking::BOOKING_STATUS_PENDING_VERIFICATION) {
+            return response()->json([
+                'message' => 'This booking does not require email verification.',
+            ], 422);
+        }
+
+        $booking->load(['guest', 'roomLines', 'venues']);
+        $guest = $booking->guest;
+        if (! $guest) {
+            return response()->json([
+                'message' => 'Guest record missing.',
+            ], 422);
+        }
+
+        $checkIn = $booking->check_in;
+        $checkOut = $booking->check_out;
+        $hasRoomLines = $booking->roomLines->isNotEmpty();
+        $venueIds = $booking->venues->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+
+        if ($hasRoomLines) {
+            $roomLinesPayload = $booking->roomLines->map(fn ($line) => [
+                'room_type' => $line->room_type,
+                'inventory_group_key' => $line->inventory_group_key,
+                'quantity' => (int) $line->quantity,
+                'unit_price' => (float) $line->unit_price_per_night,
+            ])->all();
+            $roomLineError = $this->validateGuestRoomLines($roomLinesPayload, $checkIn, $checkOut, $booking->id);
+            if ($roomLineError !== null) {
+                $booking->delete();
+
+                return response()->json([
+                    'message' => 'These dates are no longer available for your selected rooms. Please start a new booking.',
+                    'error' => 'availability_lost',
+                ], 409);
+            }
+        }
+
+        if ($venueIds !== []) {
+            $availableVenueIds = Venue::whereIn('id', $venueIds)
+                ->availableBetween(
+                    $checkIn,
+                    $checkOut,
+                    $booking->id,
+                    $booking->venue_event_type,
+                    $booking->venues->isNotEmpty(),
+                )
+                ->pluck('id')
+                ->all();
+
+            if (count(array_diff($venueIds, $availableVenueIds)) > 0) {
+                $booking->delete();
+
+                return response()->json([
+                    'message' => 'These dates are no longer available for your selected venues. Please start a new booking.',
+                    'error' => 'availability_lost',
+                ], 409);
+            }
+        }
+
+        $booking->update([
+            'booking_status' => Booking::BOOKING_STATUS_RESERVED,
+            'email_verified_at' => now(),
+        ]);
+
+        $booking->refresh();
+        $booking->generateQrCode();
+
+        $fresh = $booking->fresh(['guest', 'rooms', 'venues', 'roomLines']);
+
+        $paymentUrl = $this->provisionOnlineInvoiceForPublicBooking($booking->fresh(['guest']), $guest);
+
+        return $this->verificationSuccessResponse(
+            $booking->fresh(['guest', 'rooms', 'venues', 'roomLines']),
+            $paymentUrl,
+        );
+    }
+
+    private function verificationSuccessResponse(Booking $booking, ?string $paymentUrl = null): JsonResponse|RedirectResponse
+    {
+        if (request()->expectsJson()) {
+            return response()->json([
+                'message' => 'Email verified. Your booking is confirmed.',
+                'booking' => $booking,
+                'payment_url' => $paymentUrl,
+                'email_verification_required' => false,
+            ]);
+        }
+
+        if (is_string($paymentUrl) && trim($paymentUrl) !== '') {
+            return redirect()->away($paymentUrl);
+        }
+
+        $base = rtrim((string) config('app.frontend_url'), '/');
+        $token = (string) $booking->receipt_token;
+
+        return redirect()->away("{$base}/booking-receipt/{$token}?verified=1");
+    }
+
+    private function provisionOnlineInvoiceForPublicBooking(Booking $booking, Guest $guest): ?string
+    {
+        if ((string) ($booking->payment_method ?? '') !== 'online') {
+            return null;
+        }
+
+        $plan = (string) ($booking->online_payment_plan ?? 'full');
+        if ($plan !== 'full' && ! $this->isAllowedPartialPlan($plan)) {
+            return null;
+        }
+
+        if (! filter_var(env('PAYMENT_ONLINE_ENABLED', false), FILTER_VALIDATE_BOOLEAN)) {
+            return null;
+        }
+
+        $invoice = $this->createXenditInvoiceForBooking($booking, $guest, $plan);
+        $paymentUrl = $invoice['invoice_url'] ?? null;
+
+        if (! is_string($paymentUrl) || trim($paymentUrl) === '') {
+            return null;
+        }
+
+        $booking->update([
+            'xendit_invoice_id' => (string) ($invoice['id'] ?? ''),
+            'xendit_invoice_url' => $paymentUrl,
+        ]);
+
+        Cache::put($this->pendingOnlinePaymentCacheKey((int) $booking->id), true, now()->addHours(2));
+
+        return $paymentUrl;
     }
 
     public function store(StoreBookingRequest $request)
@@ -299,6 +768,12 @@ class BookingController extends Controller
             $hasRoomComponent = $hasRoomLines;
             [$checkIn, $checkOut] = $this->bookingWindowForStorage($hasRoomComponent, $checkInDate, $checkOutDate);
 
+            $this->bookingDuplicateGuard->assertNoOverlappingActiveBooking(
+                (string) $request->input('email', ''),
+                $checkIn,
+                $checkOut,
+            );
+
             $guest = Guest::store($request);
 
             $venueIds = $hasVenues
@@ -317,8 +792,9 @@ class BookingController extends Controller
             }
 
             if ($hasVenues) {
+                $venueEventForAvailability = BookingPricing::normalizeVenueEventType($validated['venue_event_type'] ?? null);
                 $availableVenueIds = Venue::whereIn('id', $venueIds)
-                    ->availableBetween($checkIn, $checkOut)
+                    ->availableBetween($checkIn, $checkOut, null, $venueEventForAvailability, true)
                     ->pluck('id')
                     ->all();
 
@@ -359,6 +835,26 @@ class BookingController extends Controller
                 ], 422);
             }
 
+            $paymentMethod = (string) ($validated['payment_method'] ?? 'cash');
+            $onlinePaymentPlan = (string) ($validated['online_payment_plan'] ?? 'full');
+
+            if ($paymentMethod === 'online') {
+                if ($onlinePaymentPlan !== 'full' && ! $this->isAllowedPartialPlan($onlinePaymentPlan)) {
+                    return response()->json([
+                        'message' => 'Selected partial payment option is not allowed by admin settings.',
+                        'error' => 'invalid_partial_payment_plan',
+                    ], 422);
+                }
+
+                $paymentConfigEnabled = filter_var(env('PAYMENT_ONLINE_ENABLED', false), FILTER_VALIDATE_BOOLEAN);
+                if (! $paymentConfigEnabled) {
+                    return response()->json([
+                        'message' => 'Online payment is currently disabled by admin settings.',
+                        'error' => 'online_payment_disabled',
+                    ], 422);
+                }
+            }
+
             $booking = DB::transaction(function () use (
                 $guest,
                 $validated,
@@ -377,12 +873,11 @@ class BookingController extends Controller
                     'no_of_days' => $validated['days'],
                     'venue_event_type' => $venueEventType,
                     'total_price' => $expectedTotal,
-                    'status' => Booking::STATUS_UNPAID,
+                    'booking_status' => Booking::BOOKING_STATUS_PENDING_VERIFICATION,
+                    'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
                     'payment_method' => (string) ($validated['payment_method'] ?? 'cash'),
                     'online_payment_plan' => (string) ($validated['online_payment_plan'] ?? ''),
                 ]);
-
-                $this->generateBookingQr($booking);
 
                 foreach ($roomLines as $line) {
                     $booking->roomLines()->create([
@@ -400,57 +895,16 @@ class BookingController extends Controller
                 return $booking->fresh(['guest', 'rooms', 'venues', 'roomLines']);
             });
 
-            $paymentMethod = (string) ($validated['payment_method'] ?? 'cash');
-            $onlinePaymentPlan = (string) ($validated['online_payment_plan'] ?? 'full');
-            $paymentUrl = null;
-
-            if ($paymentMethod === 'online') {
-                if ($onlinePaymentPlan !== 'full' && ! $this->isAllowedPartialPlan($onlinePaymentPlan)) {
-                    $booking->delete();
-
-                    return response()->json([
-                        'message' => 'Selected partial payment option is not allowed by admin settings.',
-                        'error' => 'invalid_partial_payment_plan',
-                    ], 422);
-                }
-
-                $paymentConfigEnabled = filter_var(env('PAYMENT_ONLINE_ENABLED', false), FILTER_VALIDATE_BOOLEAN);
-                if (! $paymentConfigEnabled) {
-                    $booking->delete();
-
-                    return response()->json([
-                        'message' => 'Online payment is currently disabled by admin settings.',
-                        'error' => 'online_payment_disabled',
-                    ], 422);
-                }
-
-                $invoice = $this->createXenditInvoiceForBooking($booking, $guest, $onlinePaymentPlan);
-                $paymentUrl = $invoice['invoice_url'] ?? null;
-
-                if (! is_string($paymentUrl) || trim($paymentUrl) === '') {
-                    $booking->delete();
-
-                    return response()->json([
-                        'message' => 'Unable to create Xendit payment invoice.',
-                        'error' => 'xendit_invoice_failed',
-                    ], 502);
-                }
-
-                $booking->update([
-                    'xendit_invoice_id' => (string) ($invoice['id'] ?? ''),
-                    'xendit_invoice_url' => $paymentUrl,
-                ]);
-
-                Cache::put($this->pendingOnlinePaymentCacheKey((int) $booking->id), true, now()->addHours(2));
-            }
-
             return response()->json([
-                'message' => 'Booking created successfully',
+                'message' => 'Booking created successfully. Please check your email to confirm.',
                 'guest' => $guest,
                 'booking' => $booking,
                 'total_price' => $expectedTotal,
-                'payment_url' => $paymentUrl,
+                'payment_url' => null,
+                'email_verification_required' => true,
             ], 201);
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             return response()->json([
                 'message' => 'Failed to create booking',
@@ -633,23 +1087,37 @@ class BookingController extends Controller
             }
 
             $validated = $request->validate([
-                'status' => 'sometimes|string|in:'.implode(',', [
-                    Booking::STATUS_UNPAID,
-                    Booking::STATUS_PAID,
-                    Booking::STATUS_COMPLETED,
-                    Booking::STATUS_OCCUPIED,
-                    Booking::STATUS_CANCELLED,
+                'booking_status' => 'sometimes|string|in:'.implode(',', [
+                    Booking::BOOKING_STATUS_PENDING_VERIFICATION,
+                    Booking::BOOKING_STATUS_RESERVED,
+                    Booking::BOOKING_STATUS_OCCUPIED,
+                    Booking::BOOKING_STATUS_COMPLETED,
+                    Booking::BOOKING_STATUS_CANCELLED,
+                    Booking::BOOKING_STATUS_RESCHEDULED,
+                ]),
+                'payment_status' => 'sometimes|string|in:'.implode(',', [
+                    Booking::PAYMENT_STATUS_UNPAID,
+                    Booking::PAYMENT_STATUS_PARTIAL,
+                    Booking::PAYMENT_STATUS_PAID,
+                    Booking::PAYMENT_STATUS_REFUND_PENDING,
+                    Booking::PAYMENT_STATUS_REFUNDED,
                 ]),
             ]);
 
-            if (! empty($validated['status'])) {
-                if ($validated['status'] === Booking::STATUS_OCCUPIED) {
+            if (! empty($validated['booking_status'])) {
+                if ($validated['booking_status'] === Booking::BOOKING_STATUS_OCCUPIED) {
                     $booking->loadMissing(['rooms.bedSpecifications', 'venues', 'roomLines']);
                     $booking->assertAssignmentsSatisfiedForOccupied();
                 }
-                $booking->update([
-                    'status' => $validated['status'],
-                ]);
+            }
+
+            $updates = array_filter([
+                'booking_status' => $validated['booking_status'] ?? null,
+                'payment_status' => $validated['payment_status'] ?? null,
+            ], fn ($v) => $v !== null);
+
+            if ($updates !== []) {
+                $booking->update($updates);
             }
 
             $booking->refresh()->load(['guest', 'rooms', 'venues']);
@@ -710,16 +1178,20 @@ class BookingController extends Controller
         ]);
 
         try {
-            $allowedStatuses = [
-                Booking::STATUS_UNPAID,
-                Booking::STATUS_PAID,
-            ];
+            $canCancel = $booking->booking_status === Booking::BOOKING_STATUS_PENDING_VERIFICATION
+                || $booking->booking_status === Booking::BOOKING_STATUS_RESCHEDULED
+                || (
+                    $booking->booking_status === Booking::BOOKING_STATUS_RESERVED
+                    && in_array($booking->payment_status, [
+                        Booking::PAYMENT_STATUS_UNPAID,
+                        Booking::PAYMENT_STATUS_PARTIAL,
+                        Booking::PAYMENT_STATUS_PAID,
+                        Booking::PAYMENT_STATUS_REFUND_PENDING,
+                        Booking::PAYMENT_STATUS_REFUNDED,
+                    ], true)
+                );
 
-            if (defined(Booking::class.'::STATUS_RESCHEDULED')) {
-                $allowedStatuses[] = Booking::STATUS_RESCHEDULED;
-            }
-
-            if (! in_array($booking->status, $allowedStatuses, true)) {
+            if (! $canCancel) {
                 return response()->json([
                     'message' => 'Booking cannot be cancelled in its current state.',
                 ], 422);
@@ -735,15 +1207,31 @@ class BookingController extends Controller
                 ], 422);
             }
 
-            $booking->update([
-                'status' => Booking::STATUS_CANCELLED,
-            ]);
+            $cancellation = CancellationPolicy::breakdown(
+                (float) $booking->total_price,
+                (float) $booking->total_paid
+            );
+
+            $updates = [
+                'booking_status' => Booking::BOOKING_STATUS_CANCELLED,
+            ];
+
+            $paymentStatus = (string) $booking->payment_status;
+            if (in_array($paymentStatus, [
+                Booking::PAYMENT_STATUS_PARTIAL,
+                Booking::PAYMENT_STATUS_PAID,
+            ], true)) {
+                $updates['payment_status'] = Booking::PAYMENT_STATUS_REFUND_PENDING;
+            }
+
+            $booking->update($updates);
 
             broadcast(new BookingCancelled($booking))->toOthers();
 
             return response()->json([
                 'message' => 'Booking cancelled successfully.',
                 'booking' => $booking,
+                'cancellation' => $cancellation,
             ], 200);
         } catch (\Throwable $e) {
             return response()->json([
@@ -769,7 +1257,13 @@ class BookingController extends Controller
             ], 422);
         }
 
-        if (in_array($booking->status, ['cancelled', 'completed'], true)) {
+        if ($booking->booking_status === Booking::BOOKING_STATUS_PENDING_VERIFICATION) {
+            return response()->json([
+                'message' => 'Confirm your booking by email before rescheduling.',
+            ], 422);
+        }
+
+        if (in_array($booking->booking_status, [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED], true)) {
             return response()->json([
                 'message' => 'Cannot reschedule this booking',
             ], 422);
@@ -815,7 +1309,13 @@ class BookingController extends Controller
         $venueIds = $booking->venues->pluck('id')->toArray();
         if (! empty($venueIds)) {
             $availableVenueIds = Venue::whereIn('id', $venueIds)
-                ->availableBetween($checkIn, $checkOut, $booking->id)
+                ->availableBetween(
+                    $checkIn,
+                    $checkOut,
+                    $booking->id,
+                    $booking->venue_event_type,
+                    $booking->venues->isNotEmpty(),
+                )
                 ->pluck('id')
                 ->toArray();
 
@@ -839,12 +1339,15 @@ class BookingController extends Controller
         $nights = max(1, (int) $checkInDate->diffInDays($checkOutDate));
 
         $newTotal = $this->expectedTotalForBooking($booking, $nights);
+        $amountPaid = (float) $booking->total_paid;
+        $nextPaymentStatus = Booking::paymentStatusFromAmounts($newTotal, $amountPaid);
 
         $booking->update([
             'check_in' => $checkIn,
             'check_out' => $checkOut,
             'total_price' => $newTotal,
-            'status' => 'rescheduled',
+            'payment_status' => $nextPaymentStatus,
+            'booking_status' => Booking::BOOKING_STATUS_RESCHEDULED,
         ]);
 
         broadcast(new BookingRescheduled($booking))->toOthers();
@@ -871,10 +1374,15 @@ class BookingController extends Controller
             ], 404);
         }
 
+        if ($response = $this->rejectIfPendingVerification($booking)) {
+            return $response;
+        }
+
         return response()->json([
             'success' => true,
             'data' => [
-                'status' => (string) $booking->status,
+                'booking_status' => (string) $booking->booking_status,
+                'payment_status' => (string) $booking->payment_status,
                 'payment_method' => (string) ($booking->payment_method ?? 'cash'),
                 'online_payment_plan' => (string) ($booking->online_payment_plan ?? ''),
                 'invoice_id' => (string) ($booking->xendit_invoice_id ?? ''),
@@ -900,6 +1408,10 @@ class BookingController extends Controller
             ], 404);
         }
 
+        if ($response = $this->rejectIfPendingVerification($booking)) {
+            return $response;
+        }
+
         if (! $this->canRetryOnlinePayment($booking)) {
             return response()->json([
                 'message' => 'Payment retry is not allowed for this booking state.',
@@ -915,7 +1427,7 @@ class BookingController extends Controller
         }
 
         $overrideAmount = null;
-        if ((string) $booking->status === Booking::STATUS_PARTIAL) {
+        if ((string) $booking->payment_status === Booking::PAYMENT_STATUS_PARTIAL) {
             $overrideAmount = max(1, (float) $booking->balance);
         }
 
@@ -998,9 +1510,9 @@ class BookingController extends Controller
             return false;
         }
 
-        return in_array((string) $booking->status, [
-            Booking::STATUS_UNPAID,
-            Booking::STATUS_PARTIAL,
+        return in_array((string) $booking->payment_status, [
+            Booking::PAYMENT_STATUS_UNPAID,
+            Booking::PAYMENT_STATUS_PARTIAL,
         ], true);
     }
 
@@ -1086,10 +1598,10 @@ class BookingController extends Controller
         $totalAmount = (float) $booking->total_price;
         $balance = max(0, (float) $booking->balance);
         $plan = (string) ($booking->online_payment_plan ?? '');
-        $status = (string) ($booking->status ?? '');
+        $paymentStatus = (string) ($booking->payment_status ?? '');
         $partialPercent = $this->extractPartialPercentage($plan);
 
-        if ($status === Booking::STATUS_PARTIAL) {
+        if ($paymentStatus === Booking::PAYMENT_STATUS_PARTIAL) {
             return $balance;
         }
 
@@ -1106,7 +1618,7 @@ class BookingController extends Controller
         $balance = max(0, (float) $booking->balance);
         $partialPercent = $this->extractPartialPercentage($paymentMode);
 
-        if ((string) $booking->status === Booking::STATUS_PARTIAL) {
+        if ((string) $booking->payment_status === Booking::PAYMENT_STATUS_PARTIAL) {
             return $balance;
         }
 

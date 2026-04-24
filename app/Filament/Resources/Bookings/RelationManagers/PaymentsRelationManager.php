@@ -81,7 +81,9 @@ class PaymentsRelationManager extends RelationManager
                     ->visible(fn (): bool => ! $this->getOwnerRecord()->trashed())
                     ->label('Record cash payment')
                     ->modalHeading('Record cash payment')
+                    ->modalSubmitActionLabel('Submit')
                     ->modalDescription('Enter a partial or full cash amount. To settle only the remaining balance in one step and mark Paid, use Settle remaining balance on the booking instead.')
+                    ->createAnother(false)
                     ->mutateFormDataUsing(function (array $data, RelationManager $livewire): array {
                         $booking = $livewire->getOwnerRecord();
                         $totalPaidSoFar = collect($livewire->getRelationship()->get())->sum('partial_amount');
@@ -99,11 +101,14 @@ class PaymentsRelationManager extends RelationManager
 
                         $booking->refresh();
 
-                        if (! in_array($booking->status, [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true)) {
-                            if ($booking->total_paid >= $booking->total_price) {
-                                $booking->update(['status' => Booking::STATUS_PAID]);
-                            } elseif ($booking->total_paid > 0 && $booking->total_paid < $booking->total_price) {
-                                $booking->update(['status' => Booking::STATUS_PARTIAL]);
+                        if (! in_array($booking->booking_status, [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED], true)) {
+                            $nextPaymentStatus = Booking::paymentStatusFromAmounts(
+                                (float) $booking->total_price,
+                                (float) $booking->total_paid,
+                            );
+
+                            if ((string) $booking->payment_status !== $nextPaymentStatus) {
+                                $booking->update(['payment_status' => $nextPaymentStatus]);
                             }
                         }
 

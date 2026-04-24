@@ -19,10 +19,16 @@ class BookingStatsOverview extends StatsOverviewWidget
         $todayDelta = $todayCount - $yesterdayCount;
 
         $currentRevenue = Booking::where('created_at', '>=', now()->subDays(30))
-            ->whereIn('status', [Booking::STATUS_PAID, Booking::STATUS_COMPLETED])
+            ->where(function ($q): void {
+                $q->where('payment_status', Booking::PAYMENT_STATUS_PAID)
+                    ->orWhere('booking_status', Booking::BOOKING_STATUS_COMPLETED);
+            })
             ->sum('total_price');
         $previousRevenue = Booking::whereBetween('created_at', [now()->subDays(60), now()->subDays(30)])
-            ->whereIn('status', [Booking::STATUS_PAID, Booking::STATUS_COMPLETED])
+            ->where(function ($q): void {
+                $q->where('payment_status', Booking::PAYMENT_STATUS_PAID)
+                    ->orWhere('booking_status', Booking::BOOKING_STATUS_COMPLETED);
+            })
             ->sum('total_price');
         $revenueDelta = $currentRevenue - $previousRevenue;
 
@@ -39,8 +45,12 @@ class BookingStatsOverview extends StatsOverviewWidget
                 ->icon('heroicon-o-banknotes')
                 ->color($revenueDelta >= 0 ? 'success' : 'danger'),
 
-            Stat::make('Active Reservations', Booking::whereIn('status', [Booking::STATUS_UNPAID, Booking::STATUS_PARTIAL, Booking::STATUS_PAID, Booking::STATUS_OCCUPIED])->count())
-                ->description('Unpaid, partial, paid, or occupied')
+            Stat::make('Active Reservations', Booking::whereNotIn('booking_status', [
+                Booking::BOOKING_STATUS_COMPLETED,
+                Booking::BOOKING_STATUS_CANCELLED,
+                Booking::BOOKING_STATUS_RESCHEDULED,
+            ])->count())
+                ->description('Not completed, cancelled, or rescheduled')
                 ->icon('heroicon-o-clock')
                 ->color('warning'),
         ];

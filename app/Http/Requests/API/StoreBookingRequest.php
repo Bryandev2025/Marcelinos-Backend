@@ -45,6 +45,8 @@ class StoreBookingRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'website' => ['nullable', 'string', 'max:0'],
+            'captcha_token' => ['nullable', 'string'],
             'reference_number' => 'nullable|string',
             'room_lines' => 'nullable|array|max:32',
             'room_lines.*.room_type' => ['required', 'string', Rule::in(['standard', 'family', 'deluxe'])],

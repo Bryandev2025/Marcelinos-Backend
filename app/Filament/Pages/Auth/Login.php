@@ -3,18 +3,84 @@
 namespace App\Filament\Pages\Auth;
 
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
+use Filament\Actions\Action;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Auth\MultiFactor\Contracts\HasBeforeChallengeHook;
 use Filament\Auth\Pages\Login as BaseLogin;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\TextInput;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\Component;
+use Filament\Schemas\Components\EmbeddedSchema;
+use Filament\Schemas\Components\Form;
+use Filament\Schemas\Schema;
+use Filament\Support\Enums\Alignment;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\RateLimiter;
 
 class Login extends BaseLogin
 {
+    public function form(Schema $schema): Schema
+    {
+        return $schema->components([
+            $this->getEmailFormComponent(),
+            $this->getPasswordFormComponent(),
+            $this->getRememberFormComponent(),
+        ]);
+    }
+
+    protected function getFormActions(): array
+    {
+        return [
+            $this->getAuthenticateFormAction(),
+        ];
+    }
+
+    public function getFormContentComponent(): Component
+    {
+        $footer = [
+            Actions::make($this->getFormActions())
+                ->alignment($this->getFormActionsAlignment())
+                ->fullWidth($this->hasFullWidthFormActions())
+                ->key('form-actions'),
+        ];
+
+        if (filament()->hasPasswordReset()) {
+            $footer[] = Actions::make([
+                $this->getRequestPasswordResetFormAction(),
+            ])
+                ->alignment(Alignment::Center)
+                ->key('request-password-reset-action');
+        }
+
+        return Form::make([EmbeddedSchema::make('form')])
+            ->id('form')
+            ->livewireSubmitHandler('authenticate')
+            ->footer($footer)
+            ->visible(fn (): bool => blank($this->userUndertakingMultiFactorAuthentication));
+    }
+
+    protected function getRequestPasswordResetFormAction(): Action
+    {
+        return Action::make('requestPasswordReset')
+            ->link()
+            ->label(__('filament-panels::auth/pages/login.actions.request_password_reset.label'))
+            ->url(filament()->getRequestPasswordResetUrl());
+    }
+
+    protected function getPasswordFormComponent(): Component
+    {
+        return TextInput::make('password')
+            ->label(__('filament-panels::auth/pages/login.form.password.label'))
+            ->password()
+            ->revealable(filament()->arePasswordsRevealable())
+            ->autocomplete('current-password')
+            ->required();
+    }
+
     public function authenticate(): ?LoginResponse
     {
         try {

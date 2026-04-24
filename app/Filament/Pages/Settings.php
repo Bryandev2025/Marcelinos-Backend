@@ -5,7 +5,6 @@ namespace App\Filament\Pages;
 use App\Support\EnvEditor;
 use App\Support\MaintenancePageVariant;
 use Carbon\Carbon;
-use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Cache;
@@ -36,7 +35,9 @@ class Settings extends Page
 
     public static function canAccess(): bool
     {
-        return Filament::getCurrentPanel()?->getId() !== 'staff';
+        $user = auth()->user();
+
+        return $user?->hasPrivilege('manage_settings') ?? false;
     }
 
     public string $mailHost = '';
@@ -49,15 +50,29 @@ class Settings extends Page
 
     public string $mailEncryption = '';
 
+    public string $mailBackupHost = '';
+
+    public string $mailBackupPort = '';
+
+    public string $mailBackupUsername = '';
+
+    public string $mailBackupPassword = '';
+
+    public string $mailBackupEncryption = '';
+
     public string $mailFromAddress = '';
 
     public string $mailFromName = '';
 
-    public int $mailDailyLimit = 1000;
+    public int $mailDailyLimit = 100;
 
     public string $semaphoreApiKey = '';
 
     public string $semaphoreOtpUrl = 'https://api.semaphore.co/api/v4/otp';
+
+    public string $semaphoreAccountUrl = 'https://api.semaphore.co/api/v4/account';
+
+    public string $semaphoreMessagesUrl = 'https://api.semaphore.co/api/v4/messages';
 
     public string $semaphoreSenderName = '';
 
@@ -85,6 +100,8 @@ class Settings extends Page
 
     public bool $showMailPassword = false;
 
+    public bool $showMailBackupPassword = false;
+
     public bool $showSmsApiKey = false;
 
     public bool $maintenanceModeEnabled = false;
@@ -107,6 +124,8 @@ class Settings extends Page
 
     public bool $allowCustomPartialPayment = false;
 
+    public int $cancellationFeePercent = 30;
+
     public string $xenditSecretKey = '';
 
     public string $xenditPublicKey = '';
@@ -114,6 +133,8 @@ class Settings extends Page
     public string $xenditWebhookToken = '';
 
     public ?array $lastXenditWebhookEvent = null;
+
+    public string $hostingerPlanExpiresAt = '';
 
     public function mount(): void
     {
@@ -141,6 +162,7 @@ class Settings extends Page
     {
         $this->editingMail = false;
         $this->showMailPassword = false;
+        $this->showMailBackupPassword = false;
         $this->loadFromEnv();
     }
 
@@ -161,6 +183,11 @@ class Settings extends Page
         $this->showMailPassword = ! $this->showMailPassword;
     }
 
+    public function toggleMailBackupPasswordVisibility(): void
+    {
+        $this->showMailBackupPassword = ! $this->showMailBackupPassword;
+    }
+
     public function toggleSmsApiKeyVisibility(): void
     {
         $this->showSmsApiKey = ! $this->showSmsApiKey;
@@ -178,9 +205,14 @@ class Settings extends Page
             'mailUsername' => ['required', 'email'],
             'mailPassword' => ['required', 'string'],
             'mailEncryption' => ['nullable', 'string'],
+            'mailBackupHost' => ['nullable', 'string', 'required_with:mailBackupPort,mailBackupUsername,mailBackupPassword'],
+            'mailBackupPort' => ['nullable', 'string', 'required_with:mailBackupHost,mailBackupUsername,mailBackupPassword'],
+            'mailBackupUsername' => ['nullable', 'email', 'required_with:mailBackupHost,mailBackupPort,mailBackupPassword'],
+            'mailBackupPassword' => ['nullable', 'string', 'required_with:mailBackupHost,mailBackupPort,mailBackupUsername'],
+            'mailBackupEncryption' => ['nullable', 'string'],
             'mailFromAddress' => ['required', 'email'],
             'mailFromName' => ['required', 'string'],
-            'mailDailyLimit' => ['required', 'integer', 'min:1', 'max:100000'],
+            'mailDailyLimit' => ['required', 'integer', 'min:0', 'max:100000'],
         ]);
 
         EnvEditor::updateMany([
@@ -189,19 +221,34 @@ class Settings extends Page
             'MAIL_USERNAME' => $this->mailUsername,
             'MAIL_PASSWORD' => $this->mailPassword,
             'MAIL_ENCRYPTION' => $this->mailEncryption,
+            'MAIL_BACKUP_HOST' => $this->mailBackupHost,
+            'MAIL_BACKUP_PORT' => $this->mailBackupPort,
+            'MAIL_BACKUP_USERNAME' => $this->mailBackupUsername,
+            'MAIL_BACKUP_PASSWORD' => $this->mailBackupPassword,
+            'MAIL_BACKUP_ENCRYPTION' => $this->mailBackupEncryption,
             'MAIL_FROM_ADDRESS' => $this->mailFromAddress,
             'MAIL_FROM_NAME' => $this->mailFromName,
             'MAIL_DAILY_LIMIT' => $this->mailDailyLimit,
+            'MAIL_MAILER' => 'failover',
+            'MAIL_FAILOVER_MAILERS' => 'smtp,smtp_backup,log',
         ]);
 
         config([
+            'mail.default' => 'failover',
             'mail.mailers.smtp.host' => $this->mailHost,
             'mail.mailers.smtp.port' => (int) $this->mailPort,
             'mail.mailers.smtp.username' => $this->mailUsername,
             'mail.mailers.smtp.password' => $this->mailPassword,
             'mail.mailers.smtp.encryption' => $this->mailEncryption,
+            'mail.mailers.smtp_backup.host' => $this->mailBackupHost,
+            'mail.mailers.smtp_backup.port' => $this->mailBackupPort !== '' ? (int) $this->mailBackupPort : null,
+            'mail.mailers.smtp_backup.username' => $this->mailBackupUsername,
+            'mail.mailers.smtp_backup.password' => $this->mailBackupPassword,
+            'mail.mailers.smtp_backup.encryption' => $this->mailBackupEncryption,
+            'mail.mailers.failover.mailers' => ['smtp', 'smtp_backup', 'log'],
             'mail.from.address' => $this->mailFromAddress,
             'mail.from.name' => $this->mailFromName,
+            'mail.daily_limit' => $this->mailDailyLimit,
         ]);
 
         $this->editingMail = false;
@@ -209,11 +256,12 @@ class Settings extends Page
 
         Notification::make()
             ->title('Email settings saved')
-            ->body('SMTP and sender settings were updated successfully.')
+            ->body('Primary/backup SMTP and sender settings were updated successfully.')
             ->success()
             ->send();
 
         $this->showMailPassword = false;
+        $this->showMailBackupPassword = false;
     }
 
     public function saveSmsSettings(): void
@@ -232,6 +280,12 @@ class Settings extends Page
             'SEMAPHORE_API_KEY' => $this->semaphoreApiKey,
             'SEMAPHORE_OTP_URL' => $this->semaphoreOtpUrl,
             'SEMAPHORE_SENDER_NAME' => $this->semaphoreSenderName,
+        ]);
+
+        config([
+            'services.semaphore.api_key' => $this->semaphoreApiKey,
+            'services.semaphore.otp_url' => $this->semaphoreOtpUrl,
+            'services.semaphore.sender_name' => $this->semaphoreSenderName,
         ]);
 
         $this->editingSms = false;
@@ -320,6 +374,7 @@ class Settings extends Page
             'onlinePaymentEnabled' => ['required', 'boolean'],
             'partialPaymentSelection' => $this->partialPaymentRules(),
             'allowCustomPartialPayment' => ['required', 'boolean'],
+            'cancellationFeePercent' => ['required', 'integer', 'min:0', 'max:100'],
             'xenditSecretKey' => ['nullable', 'string', 'max:255'],
             'xenditPublicKey' => ['nullable', 'string', 'max:255'],
             'xenditWebhookToken' => ['nullable', 'string', 'max:255'],
@@ -334,6 +389,7 @@ class Settings extends Page
             'PAYMENT_ONLINE_ENABLED' => $this->onlinePaymentEnabled ? 'true' : 'false',
             'PAYMENT_PARTIAL_OPTIONS' => (string) $normalizedPartialOption,
             'PAYMENT_PARTIAL_ALLOW_CUSTOM' => $this->allowCustomPartialPayment ? 'true' : 'false',
+            'PAYMENT_CANCELLATION_FEE_PERCENT' => (string) $this->cancellationFeePercent,
             'XENDIT_SECRET_KEY' => $this->xenditSecretKey,
             'XENDIT_PUBLIC_KEY' => $this->xenditPublicKey,
             'XENDIT_WEBHOOK_TOKEN' => $this->xenditWebhookToken,
@@ -343,6 +399,7 @@ class Settings extends Page
             'online_payment_enabled' => $this->onlinePaymentEnabled,
             'partial_payment_options' => [$normalizedPartialOption],
             'allow_custom_partial_payment' => $this->allowCustomPartialPayment,
+            'cancellation_fee_percent' => $this->cancellationFeePercent,
         ]);
 
         $this->partialPaymentOptions = (string) $normalizedPartialOption;
@@ -418,7 +475,9 @@ class Settings extends Page
         $this->emailHealth = $this->checkEmailHealth();
         $this->smsHealth = $this->checkSmsHealth();
         $this->emailsSentToday = $this->resolveEmailsSentToday();
-        $this->emailsLeftToday = max(0, $this->mailDailyLimit - $this->emailsSentToday);
+        $this->emailsLeftToday = $this->mailDailyLimit > 0
+            ? max(0, $this->mailDailyLimit - $this->emailsSentToday)
+            : 0;
         $this->lastCheckedAt = now()->format('Y-m-d H:i:s');
     }
 
@@ -493,7 +552,7 @@ class Settings extends Page
         }
 
         try {
-            $response = Http::timeout(10)->get('https://api.semaphore.co/api/v4/account', [
+            $response = Http::timeout(10)->get($this->semaphoreAccountUrl, [
                 'apikey' => $this->semaphoreApiKey,
             ]);
 
@@ -565,7 +624,7 @@ class Settings extends Page
             ? (int) round(($this->emailsSentToday / $this->mailDailyLimit) * 100)
             : 0;
 
-        if ($emailUsagePercent >= $this->emailAlertThresholdValue()) {
+        if ($this->mailDailyLimit > 0 && $emailUsagePercent >= $this->emailAlertThresholdValue()) {
             $alerts[] = [
                 'title' => 'Email quota is high',
                 'detail' => "Usage is at {$emailUsagePercent}% today.",
@@ -577,6 +636,17 @@ class Settings extends Page
             $alerts[] = [
                 'title' => 'SMS credits are low',
                 'detail' => 'Current credits: '.number_format($this->smsCredits, 2),
+                'level' => 'warning',
+            ];
+        }
+
+        $hostingerDaysLeft = $this->hostingerPlanDaysLeft();
+        if ($hostingerDaysLeft !== null && $hostingerDaysLeft <= 30) {
+            $alerts[] = [
+                'title' => 'Hosting plan is nearing expiry',
+                'detail' => $hostingerDaysLeft <= 0
+                    ? 'Your Hostinger plan expiry date has passed. Please renew immediately.'
+                    : "Hostinger plan expires in {$hostingerDaysLeft} day(s).",
                 'level' => 'warning',
             ];
         }
@@ -600,8 +670,19 @@ class Settings extends Page
             $items[] = 'Email quota is nearing limit. Consider spreading sends or increasing mailbox tier.';
         }
 
+        if (trim($this->mailBackupHost) === '' || trim($this->mailBackupUsername) === '' || trim($this->mailBackupPassword) === '') {
+            $items[] = 'Configure backup SMTP credentials so failover can continue sending after primary quota or transport failures.';
+        }
+
         if ($this->smsCredits !== null && $this->smsCredits <= $this->smsLowCreditThresholdValue()) {
             $items[] = 'SMS credits are low. Top up Semaphore credits to avoid delivery failures.';
+        }
+
+        $hostingerDaysLeft = $this->hostingerPlanDaysLeft();
+        if ($hostingerDaysLeft !== null && $hostingerDaysLeft <= 30) {
+            $items[] = $hostingerDaysLeft <= 0
+                ? 'Hostinger plan appears expired. Renew now to avoid downtime.'
+                : "Hostinger plan expires in {$hostingerDaysLeft} day(s). Plan a renewal early.";
         }
 
         if ($items === []) {
@@ -613,18 +694,25 @@ class Settings extends Page
 
     private function loadFromEnv(): void
     {
-        $this->mailHost = (string) env('MAIL_HOST', 'smtp.hostinger.com');
-        $this->mailPort = (string) env('MAIL_PORT', '465');
-        $this->mailUsername = (string) env('MAIL_USERNAME', '');
-        $this->mailPassword = (string) env('MAIL_PASSWORD', '');
-        $this->mailEncryption = (string) env('MAIL_ENCRYPTION', 'ssl');
-        $this->mailFromAddress = (string) env('MAIL_FROM_ADDRESS', '');
-        $this->mailFromName = (string) env('MAIL_FROM_NAME', '');
-        $this->mailDailyLimit = (int) env('MAIL_DAILY_LIMIT', 1000);
+        $this->mailHost = (string) config('mail.mailers.smtp.host', 'smtp.hostinger.com');
+        $this->mailPort = (string) config('mail.mailers.smtp.port', '465');
+        $this->mailUsername = (string) config('mail.mailers.smtp.username', '');
+        $this->mailPassword = (string) config('mail.mailers.smtp.password', '');
+        $this->mailEncryption = (string) config('mail.mailers.smtp.encryption', 'ssl');
+        $this->mailBackupHost = (string) config('mail.mailers.smtp_backup.host', '');
+        $this->mailBackupPort = (string) config('mail.mailers.smtp_backup.port', '');
+        $this->mailBackupUsername = (string) config('mail.mailers.smtp_backup.username', '');
+        $this->mailBackupPassword = (string) config('mail.mailers.smtp_backup.password', '');
+        $this->mailBackupEncryption = (string) config('mail.mailers.smtp_backup.encryption', $this->mailEncryption);
+        $this->mailFromAddress = (string) config('mail.from.address', '');
+        $this->mailFromName = (string) config('mail.from.name', '');
+        $this->mailDailyLimit = max(0, (int) config('mail.daily_limit', 100));
 
-        $this->semaphoreApiKey = (string) env('SEMAPHORE_API_KEY', '');
-        $this->semaphoreOtpUrl = (string) env('SEMAPHORE_OTP_URL', 'https://api.semaphore.co/api/v4/otp');
-        $this->semaphoreSenderName = (string) env('SEMAPHORE_SENDER_NAME', '');
+        $this->semaphoreApiKey = (string) config('services.semaphore.api_key', '');
+        $this->semaphoreAccountUrl = (string) config('services.semaphore.account_url', 'https://api.semaphore.co/api/v4/account');
+        $this->semaphoreOtpUrl = (string) config('services.semaphore.otp_url', 'https://api.semaphore.co/api/v4/otp');
+        $this->semaphoreMessagesUrl = (string) config('services.semaphore.messages_url', 'https://api.semaphore.co/api/v4/messages');
+        $this->semaphoreSenderName = (string) config('services.semaphore.sender_name', '');
 
         $this->maintenanceModeEnabled = filter_var(env('MAINTENANCE_MODE_ENABLED', false), FILTER_VALIDATE_BOOLEAN);
         $this->maintenanceVariant = MaintenancePageVariant::normalize((string) env('MAINTENANCE_MODE_VARIANT', MaintenancePageVariant::DEFAULT));
@@ -634,6 +722,7 @@ class Settings extends Page
         $this->maintenanceEta = (string) env('MAINTENANCE_MODE_ETA', '');
         $this->onlinePaymentEnabled = filter_var(env('PAYMENT_ONLINE_ENABLED', false), FILTER_VALIDATE_BOOLEAN);
         $this->allowCustomPartialPayment = filter_var(env('PAYMENT_PARTIAL_ALLOW_CUSTOM', false), FILTER_VALIDATE_BOOLEAN);
+        $this->cancellationFeePercent = max(0, min(100, (int) env('PAYMENT_CANCELLATION_FEE_PERCENT', 30)));
         $this->partialPaymentOptions = (string) env('PAYMENT_PARTIAL_OPTIONS', '30');
         $this->partialPaymentSelection = $this->normalizePartialPaymentSelection(
             $this->partialPaymentOptions,
@@ -645,6 +734,33 @@ class Settings extends Page
         $this->xenditWebhookToken = (string) env('XENDIT_WEBHOOK_TOKEN', '');
         $webhookEvent = Cache::get('xendit_webhook_last_event');
         $this->lastXenditWebhookEvent = is_array($webhookEvent) ? $webhookEvent : null;
+        $this->hostingerPlanExpiresAt = (string) env('HOSTINGER_PLAN_EXPIRES_AT', '');
+    }
+
+    public function hostingerPlanExpiryDisplay(): string
+    {
+        if (trim($this->hostingerPlanExpiresAt) === '') {
+            return 'Not set';
+        }
+
+        try {
+            return Carbon::parse($this->hostingerPlanExpiresAt)->format('M d, Y');
+        } catch (\Throwable) {
+            return 'Invalid date format';
+        }
+    }
+
+    public function hostingerPlanDaysLeft(): ?int
+    {
+        if (trim($this->hostingerPlanExpiresAt) === '') {
+            return null;
+        }
+
+        try {
+            return now()->startOfDay()->diffInDays(Carbon::parse($this->hostingerPlanExpiresAt)->startOfDay(), false);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private function checkEmailHealth(): string
@@ -698,7 +814,7 @@ class Settings extends Page
                 now()->addMinutes(5),
                 function (): array {
                     $response = Http::timeout(10)
-                        ->get('https://api.semaphore.co/api/v4/account', [
+                        ->get($this->semaphoreAccountUrl, [
                             'apikey' => $this->semaphoreApiKey,
                         ]);
 
@@ -737,7 +853,7 @@ class Settings extends Page
                 now()->addMinutes(2),
                 function () use ($today): array {
                     $response = Http::timeout(10)
-                        ->get('https://api.semaphore.co/api/v4/messages', [
+                        ->get($this->semaphoreMessagesUrl, [
                             'apikey' => $this->semaphoreApiKey,
                             'startDate' => $today,
                             'endDate' => $today,

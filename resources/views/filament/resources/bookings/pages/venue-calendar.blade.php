@@ -2,18 +2,17 @@
     use App\Models\Booking;
 
     $statusPill = [
-        Booking::STATUS_UNPAID => 'bg-violet-100 text-violet-800 ring-1 ring-inset ring-violet-600/15 dark:bg-violet-500/15 dark:text-violet-200 dark:ring-violet-400/25',
-        Booking::STATUS_PAID => 'bg-emerald-100 text-emerald-800 ring-1 ring-inset ring-emerald-600/15 dark:bg-emerald-500/15 dark:text-emerald-200 dark:ring-emerald-400/25',
-        Booking::STATUS_OCCUPIED => 'bg-amber-100 text-amber-900 ring-1 ring-inset ring-amber-600/15 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-400/25',
-        Booking::STATUS_COMPLETED => 'bg-gray-100 text-gray-800 ring-1 ring-inset ring-gray-600/15 dark:bg-white/10 dark:text-gray-200 dark:ring-white/15',
-        Booking::STATUS_CANCELLED => 'bg-rose-100 text-rose-800 ring-1 ring-inset ring-rose-600/15 dark:bg-rose-500/15 dark:text-rose-200 dark:ring-rose-400/25',
-        Booking::STATUS_RESCHEDULED => 'bg-blue-100 text-blue-800 ring-1 ring-inset ring-blue-600/15 dark:bg-blue-500/15 dark:text-blue-200 dark:ring-blue-400/25',
+        Booking::BOOKING_STATUS_RESERVED => 'bg-violet-100 text-violet-800 ring-1 ring-inset ring-violet-600/15 dark:bg-violet-500/15 dark:text-violet-200 dark:ring-violet-400/25',
+        Booking::BOOKING_STATUS_OCCUPIED => 'bg-amber-100 text-amber-900 ring-1 ring-inset ring-amber-600/15 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-400/25',
+        Booking::BOOKING_STATUS_COMPLETED => 'bg-gray-100 text-gray-800 ring-1 ring-inset ring-gray-600/15 dark:bg-white/10 dark:text-gray-200 dark:ring-white/15',
+        Booking::BOOKING_STATUS_CANCELLED => 'bg-rose-100 text-rose-800 ring-1 ring-inset ring-rose-600/15 dark:bg-rose-500/15 dark:text-rose-200 dark:ring-rose-400/25',
+        Booking::BOOKING_STATUS_RESCHEDULED => 'bg-blue-100 text-blue-800 ring-1 ring-inset ring-blue-600/15 dark:bg-blue-500/15 dark:text-blue-200 dark:ring-blue-400/25',
     ];
 @endphp
 
 <x-filament-panels::page>
     <div
-        class="mx-auto max-w-6xl space-y-5 px-1 pb-8 transition-opacity duration-200 sm:space-y-8 sm:px-0 sm:pb-10"
+        class="booking-cal-page mx-auto w-full min-w-0 max-w-6xl space-y-5 pb-8 transition-opacity duration-200 sm:space-y-8 sm:px-0 sm:pb-10"
         wire:loading.class="pointer-events-none opacity-60"
         wire:target="previousMonth,nextMonth,month,year"
     >
@@ -28,9 +27,9 @@
                 class="pointer-events-none absolute -bottom-20 -left-20 h-56 w-56 rounded-full bg-sky-400/10 blur-3xl dark:bg-sky-500/10"
             ></div>
 
-            <div class="relative flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
-                <div class="min-w-0 space-y-2">
-                    <div class="flex items-center gap-3">
+            <div class="relative flex min-w-0 flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
+                <div class="min-w-0 flex-1 space-y-2">
+                    <div class="flex min-w-0 items-start gap-3 sm:items-center">
                         <span
                             class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white shadow-md shadow-primary-900/20 ring-1 ring-white/20 dark:bg-primary-500 dark:ring-white/10"
                         >
@@ -39,13 +38,13 @@
                                 class="h-6 w-6"
                             />
                         </span>
-                        <div>
+                        <div class="min-w-0 flex-1">
                             <h1
                                 class="text-xl font-semibold tracking-tight text-gray-950 sm:text-2xl dark:text-white"
                             >
                                 {{ __('Venue Calendar') }}
                             </h1>
-                            <p class="text-sm text-gray-600 dark:text-gray-400">
+                            <p class="text-pretty break-words text-sm leading-relaxed text-gray-600 dark:text-gray-400">
                                 {{ __('Overlapping stays by venue. Cancelled reservations are excluded.') }}
                             </p>
                         </div>
@@ -53,7 +52,7 @@
                 </div>
 
                 <div
-                    class="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200/90 bg-gray-50/90 px-3 py-2 text-xs text-gray-600 shadow-inner dark:border-white/10 dark:bg-white/5 dark:text-gray-300"
+                    class="flex w-full min-w-0 max-w-full flex-wrap items-center gap-2 rounded-xl border border-gray-200/90 bg-gray-50/90 px-3 py-2 text-xs text-gray-600 shadow-inner sm:w-auto sm:max-w-none dark:border-white/10 dark:bg-white/5 dark:text-gray-300"
                 >
                     <x-filament::icon
                         icon="heroicon-m-sparkles"
@@ -73,6 +72,7 @@
 
         {{-- Calendar card --}}
         <x-filament::section
+            class="min-w-0 max-w-full"
             icon="heroicon-o-squares-2x2"
             icon-color="primary"
             :heading="$this->currentPeriodLabel()"
@@ -353,7 +353,7 @@
                                         </div>
                                         <div class="flex shrink-0 items-start justify-between gap-2 sm:justify-start">
                                             @php
-                                                $pill = $statusPill[$row['status']] ?? 'bg-gray-100 text-gray-800 ring-1 ring-inset ring-gray-600/15 dark:bg-white/10 dark:text-gray-200';
+                                                $pill = $statusPill[$row['booking_status'] ?? ''] ?? 'bg-gray-100 text-gray-800 ring-1 ring-inset ring-gray-600/15 dark:bg-white/10 dark:text-gray-200';
                                             @endphp
                                             <span
                                                 @class([
@@ -361,7 +361,7 @@
                                                     $pill,
                                                 ])
                                             >
-                                                {{ Booking::statusOptions()[$row['status']] ?? $row['status'] }}
+                                                {{ $row['status_display'] ?? '—' }}
                                             </span>
 
                                             <div
@@ -426,7 +426,7 @@
                                                         </button>
                                                     @endif
 
-                                                    @if (($row['status'] ?? null) === Booking::STATUS_PAID && (($row['can_check_in'] ?? false) === true))
+                                                    @if (($row['payment_status'] ?? null) === Booking::PAYMENT_STATUS_PAID && (($row['can_check_in'] ?? false) === true))
                                                         <button
                                                             type="button"
                                                             wire:click="checkInBooking({{ $row['id'] }})"
@@ -437,7 +437,7 @@
                                                         </button>
                                                     @endif
 
-                                                    @if (($row['status'] ?? null) === Booking::STATUS_OCCUPIED)
+                                                    @if (($row['can_complete'] ?? false) === true)
                                                         <button
                                                             type="button"
                                                             wire:click="completeBooking({{ $row['id'] }})"
@@ -448,7 +448,7 @@
                                                         </button>
                                                     @endif
 
-                                                    @if (! in_array(($row['status'] ?? null), [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true))
+                                                    @if (! in_array(($row['booking_status'] ?? null), [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED], true))
                                                         <button
                                                             type="button"
                                                             wire:click="cancelBooking({{ $row['id'] }})"

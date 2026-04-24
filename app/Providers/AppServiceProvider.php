@@ -17,6 +17,7 @@ use App\Models\BlockedDate;
 use App\Models\Booking;
 use App\Models\Gallery;
 use App\Models\Guest;
+use App\Models\Payment;
 use App\Models\Review;
 use App\Models\Room;
 use App\Models\RoomBlockedDate;
@@ -39,6 +40,7 @@ use Filament\Resources\Events\RecordCreated;
 use Filament\Support\Facades\FilamentView;
 use Filament\Tables\View\TablesRenderHook;
 use Filament\View\PanelsRenderHook;
+use DateTimeInterface;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -82,6 +84,7 @@ class AppServiceProvider extends ServiceProvider
 
         $this->configureRateLimiting();
         $this->registerTableTotalsHooks();
+        $this->registerPwaHooks();
         $this->registerFilamentNotificationSoundHook();
 
         Booking::observe(BookingObserver::class);
@@ -169,6 +172,19 @@ class AppServiceProvider extends ServiceProvider
         );
     }
 
+    protected function registerPwaHooks(): void
+    {
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::HEAD_END,
+            fn (): string => view('filament.hooks.pwa-meta')->render(),
+        );
+
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::BODY_END,
+            fn (): string => view('filament.hooks.pwa-register-sw')->render(),
+        );
+    }
+
     protected function registerAuthActivityListeners(): void
     {
         Event::listen(Login::class, function (Login $event): void {
@@ -240,8 +256,9 @@ class AppServiceProvider extends ServiceProvider
             return;
         }
 
-        if ($model instanceof Booking && $lifecycle === 'updated' && $model->wasChanged('status')) {
-            // Booking status has a dedicated, clearer audit event.
+        if ($model instanceof Booking && $lifecycle === 'updated'
+            && ($model->wasChanged('booking_status') || $model->wasChanged('payment_status'))) {
+            // Booking stay/payment status has a dedicated, clearer audit event.
             return;
         }
 
@@ -349,13 +366,40 @@ class AppServiceProvider extends ServiceProvider
             return $value ? 'Yes' : 'No';
         }
 
+        if ($value instanceof DateTimeInterface) {
+            return $value->format('F d, Y');
+        }
+
         if (is_scalar($value)) {
             $stringValue = trim((string) $value);
 
-            return $stringValue === '' ? 'empty' : $stringValue;
+            if ($stringValue === '') {
+                return 'empty';
+            }
+
+            $normalizedValue = trim($stringValue, "\"'");
+            $formattedDate = $this->formatHumanDate($normalizedValue);
+
+            return $formattedDate ?? $normalizedValue;
         }
 
         return json_encode($value) ?: 'value';
+    }
+
+    protected function formatHumanDate(string $value): ?string
+    {
+        // Only parse known date-like values to avoid mutating regular text.
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}(?:[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?)?Z?$/', $value)) {
+            return null;
+        }
+
+        $timestamp = strtotime($value);
+
+        if ($timestamp === false) {
+            return null;
+        }
+
+        return date('F d, Y', $timestamp);
     }
 
     protected function humanizeFieldName(string $field): string
@@ -372,13 +416,43 @@ class AppServiceProvider extends ServiceProvider
 
     protected function resolveSubjectLabel(Model $model): string
     {
-        $candidates = ['name', 'title', 'reference_number', 'email', 'full_name', 'date'];
+        if ($model instanceof Payment) {
+            $bookingReference = trim((string) data_get($model, 'booking.reference_number', ''));
+            $recordedAmount = (float) ($model->partial_amount ?? 0);
+            $targetAmount = (float) ($model->total_amount ?? 0);
+
+            if ($bookingReference !== '' && $recordedAmount > 0) {
+                return sprintf(
+                    'Booking %s payment of PHP %s',
+                    $bookingReference,
+                    number_format($recordedAmount, 2)
+                );
+            }
+
+            if ($bookingReference !== '' && $targetAmount > 0) {
+                return sprintf(
+                    'Booking %s payment target PHP %s',
+                    $bookingReference,
+                    number_format($targetAmount, 2)
+                );
+            }
+
+            if ($bookingReference !== '') {
+                return sprintf('Booking %s payment', $bookingReference);
+            }
+        }
+
+        $candidates = ['name', 'title', 'specification', 'reference_number', 'email', 'full_name', 'date'];
 
         foreach ($candidates as $attribute) {
             $value = $model->getAttribute($attribute);
 
             if (is_string($value) && trim($value) !== '') {
                 return trim($value);
+            }
+
+            if ($value instanceof DateTimeInterface) {
+                return $value->format('F d, Y');
             }
         }
 
@@ -404,7 +478,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('bookings', function (Request $request) use ($jsonTooManyRequests) {
-            return Limit::perMinute(10)
+            return Limit::perMinute(5)
                 ->by($request->ip())
                 ->response($jsonTooManyRequests);
         });
@@ -443,6 +517,21 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('catalog_reads', function (Request $request) use ($jsonTooManyRequests) {
             return Limit::perMinute(45)
                 ->by($request->ip())
+                ->response($jsonTooManyRequests);
+        });
+
+        RateLimiter::for('password_reset', function (Request $request) use ($jsonTooManyRequests) {
+            $email = strtolower(trim((string) $request->input('email', '')));
+            $key = $email !== '' ? "{$request->ip()}|{$email}" : $request->ip();
+
+            return Limit::perMinute(5)
+                ->by($key)
+                ->response($jsonTooManyRequests);
+        });
+
+        RateLimiter::for('password_change', function (Request $request) use ($jsonTooManyRequests) {
+            return Limit::perMinute(10)
+                ->by($request->user()?->id ?: $request->ip())
                 ->response($jsonTooManyRequests);
         });
     }

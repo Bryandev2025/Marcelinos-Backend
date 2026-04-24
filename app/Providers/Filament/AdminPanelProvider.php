@@ -3,8 +3,10 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Livewire\DatabaseNotifications as AppDatabaseNotifications;
+use App\Filament\Pages\ActivityHistory;
 use App\Filament\Pages\AdminDashboard;
 use App\Filament\Pages\Auth\Login;
+use App\Filament\Pages\Profile;
 use App\Filament\Pages\RecycleBin;
 use App\Filament\Pages\Settings;
 use App\Http\Middleware\EnsureAdminUser;
@@ -34,13 +36,14 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login(Login::class)
+            ->passwordReset()
             ->databaseNotifications(true, AppDatabaseNotifications::class, false)
             ->databaseNotificationsPolling('1s')
             ->colors([
                 'primary' => Color::hex('#83A070'),
                 'gray' => Color::Slate,
                 'success' => Color::Emerald,
-                'danger' => Color::Rose,
+                'danger' => Color::hex('#EF4444'),
                 'warning' => Color::Amber,
                 'info' => Color::Sky,            ])
             ->font('Inter')
@@ -55,9 +58,18 @@ class AdminPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->userMenuItems([
                 MenuItem::make()
+                    ->label('Profile')
+                    ->icon('heroicon-o-user')
+                    ->url(fn (): string => Profile::getUrl(panel: 'admin')),
+                MenuItem::make()
                     ->label('Settings')
                     ->icon('heroicon-o-cog-6-tooth')
                     ->url(fn (): string => Settings::getUrl(panel: 'admin')),
+                MenuItem::make()
+                    ->label('Activity History')
+                    ->icon('heroicon-o-clock')
+                    ->url(fn (): string => ActivityHistory::getUrl(panel: 'admin'))
+                    ->visible(fn (): bool => ActivityHistory::canAccess()),
             ])
             ->middleware([
                 EncryptCookies::class,
@@ -79,6 +91,10 @@ class AdminPanelProvider extends PanelProvider
                         'trashedCount' => RecycleBin::allTrashedTotal(),
                     ])->render()
                     : '',
+            )
+            ->renderHook(
+                PanelsRenderHook::STYLES_AFTER,
+                fn (): string => view('filament.hooks.navigation-alert-badge-styles')->render(),
             )
             ->resourceCreatePageRedirect('index')
             ->resourceEditPageRedirect('index')

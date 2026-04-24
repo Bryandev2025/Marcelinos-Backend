@@ -9,7 +9,6 @@ use App\Filament\Resources\Bookings\Pages\RoomCalendar;
 use App\Filament\Resources\Bookings\Pages\VenueCalendar;
 use App\Filament\Resources\Bookings\Pages\ViewBooking;
 use App\Filament\Resources\Bookings\RelationManagers\PaymentsRelationManager;
-use App\Filament\Resources\Bookings\RelationManagers\ReviewsRelationManager;
 use App\Filament\Resources\Bookings\RelationManagers\RoomLinesRelationManager;
 use App\Filament\Resources\Bookings\Schemas\BookingForm;
 use App\Filament\Resources\Bookings\Tables\BookingsTable;
@@ -18,6 +17,8 @@ use App\Filament\Widgets\BookingStatsOverview;
 use App\Models\Booking;
 use BackedEnum;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
+use Filament\Navigation\NavigationItem;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
@@ -39,6 +40,100 @@ class BookingResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'reference_number';
 
+    /**
+     * Show a sidebar badge for bookings created today.
+     */
+    public static function getNavigationBadge(): ?string
+    {
+        $viewedBookingIds = static::getViewedBookingIdsForToday();
+
+        $count = Booking::query()
+            ->whereDate('created_at', today())
+            ->when($viewedBookingIds !== [], fn (Builder $query): Builder => $query->whereNotIn('id', $viewedBookingIds))
+            ->count();
+
+        return $count > 0 ? (string) $count : null;
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'danger';
+    }
+
+    /**
+     * Add a custom class so we can style this nav badge via Blade/CSS.
+     *
+     * @return array<NavigationItem>
+     */
+    public static function getNavigationItems(): array
+    {
+        return array_map(
+            fn (NavigationItem $item): NavigationItem => $item->extraAttributes(['class' => 'fi-nav-item-alert-badge']),
+            parent::getNavigationItems(),
+        );
+    }
+
+    public static function markBookingAsViewed(int $bookingId): void
+    {
+        $key = static::viewedBookingsSessionKey();
+        $ids = session()->get($key, []);
+
+        if (! is_array($ids)) {
+            $ids = [];
+        }
+
+        $ids[] = $bookingId;
+        $ids = array_values(array_unique(array_map('intval', $ids)));
+
+        session()->put($key, $ids);
+    }
+
+    /**
+     * Mark every booking created today as seen (e.g. staff opened calendar or list).
+     */
+    public static function markTodaysBookingsAsViewed(): void
+    {
+        $key = static::viewedBookingsSessionKey();
+        $ids = session()->get($key, []);
+
+        if (! is_array($ids)) {
+            $ids = [];
+        }
+
+        $ids = array_map('intval', $ids);
+
+        $todaysIds = Booking::query()
+            ->whereDate('created_at', today())
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+
+        $merged = array_values(array_unique(array_merge($ids, $todaysIds)));
+
+        session()->put($key, $merged);
+    }
+
+    /**
+     * @return array<int>
+     */
+    protected static function getViewedBookingIdsForToday(): array
+    {
+        $ids = session()->get(static::viewedBookingsSessionKey(), []);
+
+        if (! is_array($ids)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_map('intval', $ids)));
+    }
+
+    protected static function viewedBookingsSessionKey(): string
+    {
+        $userId = auth()->id() ?? 'guest';
+
+        return 'filament.bookings.viewed.'.today()->toDateString().'.'.$userId;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return BookingForm::configure($schema);
@@ -53,7 +148,7 @@ class BookingResource extends Resource
     {
         return parent::getEloquentQuery()
             ->with([
-                'guest:id,first_name,middle_name,last_name,email',
+                'guest:id,first_name,middle_name,last_name,email,contact_num,gender,is_international,country,region,province,municipality,barangay',
                 'rooms' => fn ($q) => $q->with(['bedSpecifications']),
                 'roomLines',
                 'venues:id,name',
@@ -63,7 +158,6 @@ class BookingResource extends Resource
     public static function getRelations(): array
     {
         return [
-            ReviewsRelationManager::class,
             PaymentsRelationManager::class,
             RoomLinesRelationManager::class,
         ];
@@ -93,7 +187,7 @@ class BookingResource extends Resource
     {
         $booking->loadMissing(['rooms:id,type', 'roomLines', 'venues:id']);
 
-        $checkIn = $booking->check_in instanceof \Carbon\CarbonInterface
+        $checkIn = $booking->check_in instanceof CarbonInterface
             ? $booking->check_in->copy()
             : Carbon::parse($booking->check_in);
 
@@ -101,21 +195,29 @@ class BookingResource extends Resource
         $year = (int) $checkIn->year;
         $modalDate = $checkIn->toDateString();
 
-        $inventory = RoomCalendar::INVENTORY_ROOMS;
+        $reservationFilter = RoomCalendar::RESERVATION_ROOM;
         $modalType = null;
 
+        $hasRooms = $booking->rooms->isNotEmpty() || $booking->roomLines->isNotEmpty();
+        $hasVenues = $booking->venues->isNotEmpty();
+
+        if ($hasRooms && $hasVenues) {
+            $reservationFilter = RoomCalendar::RESERVATION_BOTH;
+        } elseif ($hasVenues) {
+            $reservationFilter = RoomCalendar::RESERVATION_VENUE;
+        }
+
         $roomType = $booking->rooms->first()?->type ?: $booking->roomLines->first()?->room_type;
-        if (is_string($roomType) && trim($roomType) !== '') {
+        if ($reservationFilter !== RoomCalendar::RESERVATION_VENUE && is_string($roomType) && trim($roomType) !== '') {
             $modalType = $roomType;
-        } elseif ($booking->venues->isNotEmpty()) {
-            $inventory = RoomCalendar::INVENTORY_VENUES;
+        } elseif ($hasVenues) {
             $modalType = (string) $booking->venues->first()->id;
         }
 
         return static::getUrl('index', array_filter([
             'month' => $month,
             'year' => $year,
-            'inventory' => $inventory,
+            'reservationFilter' => $reservationFilter,
             'modalDate' => $modalDate,
             'modalType' => $modalType,
         ], fn ($v) => $v !== null && $v !== ''));

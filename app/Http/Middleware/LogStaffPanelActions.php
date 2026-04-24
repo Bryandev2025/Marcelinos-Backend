@@ -24,11 +24,11 @@ class LogStaffPanelActions
             return $response;
         }
 
-        if ($request->isMethod('GET')) {
+        if (! $this->isPanelRequest($request)) {
             return $response;
         }
 
-        if (! $this->isPanelRequest($request)) {
+        if ($request->isMethod('GET')) {
             return $response;
         }
 

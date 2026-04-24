@@ -18,7 +18,7 @@ trait HasBookingPayBalanceHeaderAction
             ->color('info')
             ->requiresConfirmation()
             ->modalHeading(__('Mark booking as fully paid?'))
-            ->modalDescription(__('Records one payment for the full remaining balance and sets status to Paid. For partial cash amounts, use Payments instead.'))
+            ->modalDescription(__('Records one payment for the full remaining balance and sets payment to Paid. For partial cash amounts, use Payments instead.'))
             ->modalSubmitActionLabel(__('Yes, mark as paid'))
             ->successNotificationTitle(__('Remaining balance recorded. Booking is now paid.'))
             ->visible(fn (): bool => $this->shouldOfferPayBalanceAction())
@@ -51,7 +51,8 @@ trait HasBookingPayBalanceHeaderAction
             return false;
         }
 
-        if (in_array($record->status, [Booking::STATUS_PAID, Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true)) {
+        if ($record->payment_status === Booking::PAYMENT_STATUS_PAID
+            || in_array($record->booking_status, [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED], true)) {
             return false;
         }
 

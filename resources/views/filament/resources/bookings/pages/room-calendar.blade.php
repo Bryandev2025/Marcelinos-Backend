@@ -1,21 +1,34 @@
 @php
     use App\Models\Booking;
     $legendItems = $this->calendarLegendItems;
-    $statusPill = [
-        Booking::STATUS_UNPAID => 'bg-violet-100 text-violet-800 ring-1 ring-inset ring-violet-600/15 dark:bg-violet-500/15 dark:text-violet-200 dark:ring-violet-400/25',
-        Booking::STATUS_PAID => 'bg-emerald-100 text-emerald-800 ring-1 ring-inset ring-emerald-600/15 dark:bg-emerald-500/15 dark:text-emerald-200 dark:ring-emerald-400/25',
-        Booking::STATUS_OCCUPIED => 'bg-amber-100 text-amber-900 ring-1 ring-inset ring-amber-600/15 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-400/25',
-        Booking::STATUS_COMPLETED => 'bg-gray-100 text-gray-800 ring-1 ring-inset ring-gray-600/15 dark:bg-white/10 dark:text-gray-200 dark:ring-white/15',
-        Booking::STATUS_CANCELLED => 'bg-rose-100 text-rose-800 ring-1 ring-inset ring-rose-600/15 dark:bg-rose-500/15 dark:text-rose-200 dark:ring-rose-400/25',
-        Booking::STATUS_RESCHEDULED => 'bg-blue-100 text-blue-800 ring-1 ring-inset ring-blue-600/15 dark:bg-blue-500/15 dark:text-blue-200 dark:ring-blue-400/25',
+    $spreadsheetId = trim((string) config('services.google_sheets.spreadsheet_id', ''));
+    $spreadsheetUrl = $spreadsheetId !== '' ? "https://docs.google.com/spreadsheets/d/{$spreadsheetId}/preview" : null;
+    $reservationFilterLabels = [
+        'room' => __('Rooms only'),
+        'venue' => __('Venue only'),
+        'both' => __('Room + Venue'),
+    ];
+    $referenceLinkClassByPayment = [
+        Booking::PAYMENT_STATUS_PAID => 'text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300',
+        Booking::PAYMENT_STATUS_PARTIAL => 'text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300',
+        Booking::PAYMENT_STATUS_UNPAID => 'text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300',
+        Booking::PAYMENT_STATUS_REFUND_PENDING => 'text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300',
+        Booking::PAYMENT_STATUS_REFUNDED => 'text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300',
+    ];
+    $statusDisplayPillByPayment = [
+        Booking::PAYMENT_STATUS_PARTIAL => 'bg-amber-100 text-amber-500 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-500/15 dark:text-amber-100 dark:ring-amber-400/25',
+        Booking::PAYMENT_STATUS_PAID => 'bg-emerald-100 text-emerald-900 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/15 dark:text-emerald-100 dark:ring-emerald-400/25',
+        Booking::PAYMENT_STATUS_UNPAID => 'bg-gray-100 text-gray-700 ring-1 ring-inset ring-gray-600/15 dark:bg-white/10 dark:text-gray-200 dark:ring-white/15',
+        Booking::PAYMENT_STATUS_REFUND_PENDING => 'bg-orange-100 text-orange-900 ring-1 ring-inset ring-orange-600/20 dark:bg-orange-500/15 dark:text-orange-100 dark:ring-orange-400/25',
+        Booking::PAYMENT_STATUS_REFUNDED => 'bg-rose-100 text-rose-900 ring-1 ring-inset ring-rose-600/20 dark:bg-rose-500/15 dark:text-rose-100 dark:ring-rose-400/25',
     ];
 @endphp
 
 <x-filament-panels::page>
     <div
-        class="mx-auto max-w-6xl space-y-5 px-1 pb-8 transition-opacity duration-200 sm:space-y-8 sm:px-0 sm:pb-10"
+        class="booking-cal-page mx-auto w-full min-w-0 max-w-6xl space-y-5 b-8 transition-opacity duration-200 sm:space-y-8 sm:px-0 sm:pb-10"
         wire:loading.class="pointer-events-none opacity-60"
-        wire:target="previousMonth,nextMonth,month,year"
+        wire:target="previousMonth,nextMonth,month,year,reservationFilter"
     >
         {{-- Page hero --}}
         <div
@@ -28,9 +41,9 @@
                 class="pointer-events-none absolute -bottom-20 -left-20 h-56 w-56 rounded-full bg-sky-400/10 blur-3xl dark:bg-sky-500/10"
             ></div>
 
-            <div class="relative flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
-                <div class="min-w-0 space-y-2">
-                    <div class="flex items-center gap-3">
+            <div class="relative flex min-w-0 flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
+                <div class="min-w-0 flex-1 space-y-2">
+                    <div class="flex min-w-0 items-start gap-3 sm:items-center">
                         <span
                             class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white shadow-md shadow-primary-900/20 ring-1 ring-white/20 dark:bg-primary-500 dark:ring-white/10"
                         >
@@ -39,25 +52,21 @@
                                 class="h-6 w-6"
                             />
                         </span>
-                        <div>
+                        <div class="min-w-0 flex-1">
                             <h1
                                 class="text-xl font-semibold tracking-tight text-gray-950 sm:text-2xl dark:text-white"
                             >
                                 {{ __('Booking Calendar') }}
                             </h1>
-                            <p class="text-sm text-gray-600 dark:text-gray-400">
-                                @if ($this->isVenueMode())
-                                    {{ __('Overlapping bookings by venue. Cancelled reservations are excluded.') }}
-                                @else
-                                    {{ __('Overlapping stays by room category (assigned rooms, or guest selection until rooms are assigned). Cancelled reservations are excluded.') }}
-                                @endif
+                            <p class="text-pretty break-words text-sm leading-relaxed text-gray-600 dark:text-gray-400">
+                                {{ __('Each calendar day from check-in through check-out is included. Use reservation type to separate Rooms only, Venue only, and Room + Venue bookings.') }}
                             </p>
                         </div>
                     </div>
                 </div>
 
                 <div
-                    class="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200/90 bg-gray-50/90 px-3 py-2 text-xs text-gray-600 shadow-inner dark:border-white/10 dark:bg-white/5 dark:text-gray-300"
+                    class="flex w-full min-w-0 max-w-full flex-wrap items-center gap-2 rounded-xl border border-gray-200/90 bg-gray-50/90 px-3 py-2 text-xs text-gray-600 shadow-inner sm:w-auto sm:max-w-none dark:border-white/10 dark:bg-white/5 dark:text-gray-300"
                 >
                     <x-filament::icon
                         icon="heroicon-m-sparkles"
@@ -71,18 +80,28 @@
                         {{ __('Today:') }}
                         <time datetime="{{ now()->toDateString() }}">{{ now()->format('M j, Y') }}</time>
                     </span>
+
+                    @if ($spreadsheetUrl)
+                        <a
+                            href="{{ $spreadsheetUrl }}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="inline-flex w-full items-center justify-center rounded-md border border-primary-600 px-2 py-1 text-xs font-semibold text-primary-700 transition hover:bg-primary-50 dark:border-primary-400 dark:text-primary-300 dark:hover:bg-primary-500/10"
+                        >
+                            {{ __('View Data Backup') }}
+                        </a>
+                    @endif
                 </div>
             </div>
         </div>
 
         {{-- Calendar card --}}
         <x-filament::section
+            class="min-w-0 max-w-full"
             icon="heroicon-o-squares-2x2"
             icon-color="primary"
             :heading="$this->currentPeriodLabel()"
-            :description="$this->isVenueMode()
-                ? __('Use the controls to change month. Each badge is a venue; the number is how many bookings overlap that day.')
-                : __('Use the controls to change month. Each badge is a room category; the number is how many bookings overlap that day.')"
+            :description="__('Use the controls to change month and reservation type. Each badge count shows how many bookings overlap that day for the selected reservation type.')"
         >
             <div class="space-y-6">
                 {{-- Toolbar: prev/next aligned with select controls (bottom edge) --}}
@@ -97,7 +116,7 @@
                             wire:loading.attr="disabled"
                             wire:target="previousMonth"
                             :label="__('Previous month')"
-                            class="!rounded-lg"
+                            class="rounded-lg!"
                         />
                         <x-filament::icon-button
                             color="gray"
@@ -153,35 +172,31 @@
                         </div>
                     </div>
 
-                    <div class="grid w-full grid-cols-2 gap-2 sm:w-auto sm:min-w-[14rem]">
-                        <button
-                            type="button"
-                            wire:click="switchInventory('rooms')"
-                            @class([
-                                'inline-flex items-center justify-center rounded-lg px-3 py-2 text-xs font-semibold transition',
-                                'bg-primary-600 text-white shadow-sm dark:bg-primary-500' => ! $this->isVenueMode(),
-                                'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-white/5' => $this->isVenueMode(),
-                            ])
+                    <div class="min-w-0 sm:w-[14rem]">
+                        <label
+                            class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400"
+                            for="room-cal-reservation-filter"
                         >
-                            {{ __('Rooms') }}
-                        </button>
-                        <button
-                            type="button"
-                            wire:click="switchInventory('venues')"
-                            @class([
-                                'inline-flex items-center justify-center rounded-lg px-3 py-2 text-xs font-semibold transition',
-                                'bg-primary-600 text-white shadow-sm dark:bg-primary-500' => $this->isVenueMode(),
-                                'border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:bg-gray-900 dark:text-gray-200 dark:hover:bg-white/5' => ! $this->isVenueMode(),
-                            ])
-                        >
-                            {{ __('Venues') }}
-                        </button>
+                            {{ __('Reservation type') }}
+                        </label>
+                        <x-filament::input.wrapper>
+                            <x-filament::input.select
+                                id="room-cal-reservation-filter"
+                                wire:model.live="reservationFilter"
+                                class="w-full"
+                            >
+                                <option value="room">{{ __('Rooms only') }}</option>
+                                <option value="venue">{{ __('Venue only') }}</option>
+                                <option value="both">{{ __('Room + Venue') }}</option>
+                            </x-filament::input.select>
+                        </x-filament::input.wrapper>
                     </div>
                 </div>
 
                 {{-- Legend: wrap on narrow screens --}}
                 <div
                     class="legend-strip rounded-xl border border-dashed border-gray-200/90 bg-gray-50/50 px-3 py-3 dark:border-white/10 dark:bg-white/[0.03] sm:px-4"
+                    wire:key="calendar-legend-{{ $this->reservationFilter }}-{{ $this->month }}-{{ $this->year }}"
                 >
                     <div
                         class="flex w-full flex-wrap items-center gap-2 sm:min-w-0 sm:gap-x-4 sm:gap-y-2"
@@ -192,7 +207,7 @@
                             {{ __('Legend') }}
                         </span>
                         @foreach ($legendItems as $type => $label)
-                            @if ($this->isVenueMode())
+                            @if ($this->reservationFilter === 'venue')
                                 <span
                                     class="inline-flex w-[calc(50%-0.3rem)] flex-none items-center gap-1.5 rounded-full bg-gradient-to-r from-sky-100 to-cyan-100 px-2.5 py-1 text-[11px] font-semibold text-sky-800 ring-1 ring-inset ring-sky-600/20 dark:from-sky-500/15 dark:to-cyan-400/10 dark:text-sky-200 dark:ring-sky-400/25 sm:w-auto sm:max-w-[14rem]"
                                 >
@@ -228,7 +243,10 @@
                         </div>
 
                         {{-- Days --}}
-                        <div class="grid grid-cols-1 gap-2 sm:grid-cols-7">
+                        <div
+                            class="grid grid-cols-1 gap-2 sm:grid-cols-7"
+                            wire:key="calendar-grid-{{ $this->reservationFilter }}-{{ $this->month }}-{{ $this->year }}"
+                        >
                     @foreach ($this->calendarWeeks as $week)
                         @foreach ($week as $cell)
                             @php
@@ -264,39 +282,29 @@
                                             </span>
                                         </div>
                                     </div>
-                                    <div class="grid grid-cols-3 gap-1.5 sm:flex sm:min-h-0 sm:flex-1 sm:flex-col sm:gap-1">
+                                    <div class="flex flex-wrap content-start gap-1.5 sm:min-h-0 sm:flex-1 sm:flex-col sm:gap-1">
                                         @foreach ($legendItems as $type => $label)
                                             @php $cnt = $cell['typeCounts'][$type] ?? 0; @endphp
+                                            @if ($cnt === 0)
+                                                @continue
+                                            @endif
                                             <button
                                                 type="button"
                                                 wire:click="openDayType('{{ $cell['dateStr'] }}', '{{ $type }}')"
                                                 class="group w-full cursor-pointer appearance-none rounded-lg border-0 bg-transparent p-0 text-left shadow-none transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-gray-900"
                                             >
-                                                @if ($this->isVenueMode())
+                                                @if ($this->reservationFilter === 'venue')
                                                     <span
                                                         @class([
                                                             'inline-flex w-full items-center justify-between rounded-lg px-2 py-1 text-[11px] font-medium ring-1 ring-inset transition',
-                                                            'bg-gray-100 text-gray-500 ring-gray-300/50 dark:bg-white/[0.06] dark:text-gray-400 dark:ring-white/10' => $cnt === 0,
                                                             'bg-gradient-to-r from-sky-100 to-cyan-100 text-sky-900 ring-sky-600/25 shadow-sm dark:from-sky-500/20 dark:to-cyan-400/10 dark:text-sky-100 dark:ring-sky-400/30' => $cnt > 0,
                                                         ])
                                                     >
                                                         <span class="inline-flex min-w-0 items-center gap-1.5 pe-2">
-                                                            <span
-                                                                @class([
-                                                                    'h-1.5 w-1.5 rounded-full',
-                                                                    'bg-gray-400 dark:bg-gray-500' => $cnt === 0,
-                                                                    'bg-sky-500 dark:bg-sky-300' => $cnt > 0,
-                                                                ])
-                                                            ></span>
+                                                            <span class="h-1.5 w-1.5 rounded-full bg-sky-500 dark:bg-sky-300"></span>
                                                             <span class="truncate">{{ $label }}</span>
                                                         </span>
-                                                        <span
-                                                            @class([
-                                                                'inline-flex h-4 min-w-[1.1rem] items-center justify-center rounded-full px-1 text-[10px] font-semibold tabular-nums',
-                                                                'bg-gray-200 text-gray-600 dark:bg-white/10 dark:text-gray-400' => $cnt === 0,
-                                                                'bg-white/80 text-sky-800 ring-1 ring-sky-700/10 dark:bg-sky-900/50 dark:text-sky-100 dark:ring-sky-300/20' => $cnt > 0,
-                                                            ])
-                                                        >
+                                                        <span class="inline-flex h-4 min-w-[1.1rem] items-center justify-center rounded-full bg-white/80 px-1 text-[10px] font-semibold tabular-nums text-sky-800 ring-1 ring-sky-700/10 dark:bg-sky-900/50 dark:text-sky-100 dark:ring-sky-300/20">
                                                             {{ $cnt }}
                                                         </span>
                                                     </span>
@@ -319,6 +327,59 @@
                         </div>
                     </div>
                 </div>
+            </div>
+        </x-filament::section>
+
+        <x-filament::section
+            class="min-w-0 max-w-full"
+            icon="heroicon-o-clock"
+            icon-color="success"
+            :heading="__('Current active bookings')"
+            :description="__('Bookings overlapping today, excluding cancelled and completed. Includes Room, Venue, and Room + Venue bookings.')"
+        >
+            @php
+                $activeRows = $this->activeBookingRows;
+                $activeCount = count($activeRows);
+            @endphp
+            <div class="space-y-3">
+                <div class="inline-flex w-fit items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 ring-1 ring-gray-950/5 dark:bg-white/10 dark:text-gray-200 dark:ring-white/10">
+                    <span class="tabular-nums">{{ $activeCount }}</span>
+                    <span class="ms-1">{{ $activeCount === 1 ? __('active booking') : __('active bookings') }}</span>
+                </div>
+                @if ($activeCount === 0)
+                    <p class="rounded-xl border border-dashed border-gray-200 bg-gray-50/70 px-4 py-6 text-sm text-gray-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-300">
+                        {{ __('No active bookings for today.') }}
+                    </p>
+                @else
+                    <ul class="space-y-3">
+                        @foreach ($activeRows as $row)
+                            <li class="rounded-xl border border-gray-200/90 bg-white px-4 py-3 text-sm shadow-sm dark:border-white/10 dark:bg-gray-950/50">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <a
+                                            href="{{ \App\Filament\Resources\Bookings\BookingResource::getUrl('view', ['record' => $row['id']]) }}"
+                                            class="inline-block break-words font-mono text-sm font-semibold hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-gray-900 {{ $referenceLinkClassByPayment[$row['payment_status']] ?? $referenceLinkClassByPayment[Booking::PAYMENT_STATUS_UNPAID] }}"
+                                        >
+                                            {{ $row['reference_number'] }}
+                                        </a>
+                                        <p class="truncate text-gray-700 dark:text-gray-200">{{ $row['guest_name'] }}</p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                                            {{ __('Active for :range', ['range' => $row['active_date_range'] ?? '—']) }}
+                                        </p>
+                                    </div>
+                                    <span
+                                        @class([
+                                            'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                                            $statusDisplayPillByPayment[$row['payment_status'] ?? ''] ?? $statusDisplayPillByPayment[Booking::PAYMENT_STATUS_UNPAID],
+                                        ])
+                                    >
+                                        {{ $row['status_display'] ?? '—' }}
+                                    </span>
+                                </div>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
             </div>
         </x-filament::section>
     </div>
@@ -360,11 +421,7 @@
                                 </p>
                             </div>
                             <p class="text-xs text-gray-500 dark:text-gray-400">
-                                @if ($this->isVenueMode())
-                                    {{ __('Bookings that include this venue on the selected night.') }}
-                                @else
-                                    {{ __('Bookings that include this room type on the selected night.') }}
-                                @endif
+                                {{ __('Bookings for this reservation type on the selected day.') }}
                             </p>
                         </div>
                         <x-filament::icon-button
@@ -384,7 +441,7 @@
 
                     <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                         <div class="min-w-0 max-w-full sm:max-w-md">
-                            @if ($this->isVenueMode())
+                            @if ($this->reservationFilter === 'venue')
                                 <span
                                     @class([
                                         'inline-flex w-full items-center justify-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 ring-inset sm:w-auto sm:min-w-[14rem]',
@@ -392,13 +449,6 @@
                                         'bg-gradient-to-r from-sky-100 to-cyan-100 text-sky-900 ring-sky-600/25 dark:from-sky-500/20 dark:to-cyan-400/10 dark:text-sky-100 dark:ring-sky-400/30' => $count > 0,
                                     ])
                                 >
-                                    <span
-                                        @class([
-                                            'h-2 w-2 rounded-full',
-                                            'bg-gray-400 dark:bg-gray-500' => $count === 0,
-                                            'bg-sky-500 dark:bg-sky-300' => $count > 0,
-                                        ])
-                                    ></span>
                                     {{ $this->modalTypeLabel() }}
                                 </span>
                             @else
@@ -434,7 +484,7 @@
                                     {{ __('No bookings for this date') }}
                                 </p>
                                 <p class="max-w-xs text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-                                    {{ __('This room type is available for the selected night.') }}
+                                    {{ __('No bookings found for this reservation type on the selected day.') }}
                                 </p>
                             </div>
                         </div>
@@ -458,19 +508,52 @@
                                             <p class="mt-0.5 break-words text-sm text-gray-700 dark:text-gray-200">
                                                 {{ $row['guest_name'] }}
                                             </p>
+                                            @php
+                                                $badgeKind = $row['booking_badge_kind'] ?? 'room';
+                                            @endphp
+                                            <p class="mt-2">
+                                                @if ($badgeKind === 'both')
+                                                    <span
+                                                        class="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-500/15 dark:text-amber-100 dark:ring-amber-400/25"
+                                                    >
+                                                        {{ __('Room + Venue') }}
+                                                    </span>
+                                                @elseif ($badgeKind === 'venue')
+                                                    <span
+                                                        class="inline-flex items-center rounded-full bg-sky-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-900 ring-1 ring-inset ring-sky-600/20 dark:bg-sky-500/15 dark:text-sky-100 dark:ring-sky-400/25"
+                                                    >
+                                                        {{ __('Venue') }}
+                                                    </span>
+                                                @else
+                                                    <span
+                                                        class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-900 ring-1 ring-inset ring-emerald-600/20 dark:bg-emerald-500/15 dark:text-emerald-100 dark:ring-emerald-400/25"
+                                                    >
+                                                        {{ __('Room') }}
+                                                    </span>
+                                                @endif
+                                            </p>
                                         </div>
                                         <div class="flex shrink-0 items-start justify-between gap-2 sm:justify-start">
-                                            @php
-                                                $pill = $statusPill[$row['status']] ?? 'bg-gray-100 text-gray-800 ring-1 ring-inset ring-gray-600/15 dark:bg-white/10 dark:text-gray-200';
-                                            @endphp
-                                            <span
-                                                @class([
-                                                    'rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                                                    $pill,
-                                                ])
-                                            >
-                                                {{ Booking::statusOptions()[$row['status']] ?? $row['status'] }}
-                                            </span>
+                                            <div class="flex items-center gap-1.5">
+                                                <span
+                                                    @class([
+                                                        'rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                                                        $statusDisplayPillByPayment[$row['payment_status'] ?? ''] ?? $statusDisplayPillByPayment[Booking::PAYMENT_STATUS_UNPAID],
+                                                    ])
+                                                >
+                                                    {{ $row['status_display'] ?? '—' }}
+                                                </span>
+                                                @if (($row['has_special_discount'] ?? false) === true)
+                                                    <span
+                                                        class="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-950 px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-amber-200 shadow-sm dark:border-amber-300/35 dark:bg-amber-900 dark:text-amber-100"
+                                                        title="{{ $row['discount_tooltip'] ?? __('Special discount applied') }}"
+                                                        aria-label="{{ $row['discount_tooltip'] ?? __('Special discount applied') }}"
+                                                    >
+                                                        <span class="h-1 w-1 rounded-full bg-amber-300/90 dark:bg-amber-200/90"></span>
+                                                        <span>{{ $row['discount_badge_text'] ?? __('Discount') }}</span>
+                                                    </span>
+                                                @endif
+                                            </div>
 
                                             <div
                                                 class="relative"
@@ -482,6 +565,7 @@
                                                     cancelId: {{ (int) $row['id'] }},
                                                     delOpen: false,
                                                     delVal: '',
+                                                    delConfirm: false,
                                                     delRef: @js($row['reference_number']),
                                                     delId: {{ (int) $row['id'] }},
                                                     submitPayBalance() {
@@ -496,6 +580,7 @@
                                                         $wire.deleteBooking(this.delId, this.delVal);
                                                         this.delOpen = false;
                                                         this.delVal = '';
+                                                        this.delConfirm = false;
                                                     },
                                                 }"
                                                 @click.outside="open = false"
@@ -540,7 +625,18 @@
                                                         </button>
                                                     @endif
 
-                                                    @if (($row['status'] ?? null) === Booking::STATUS_PAID && (($row['can_check_in'] ?? false) === true))
+                                                    @if (($row['can_mark_refund_completed'] ?? false) === true)
+                                                        <button
+                                                            type="button"
+                                                            wire:click="markRefundCompleted({{ $row['id'] }})"
+                                                            @click="open = false"
+                                                            class="block w-full whitespace-nowrap px-3 py-1.5 text-left text-[13px] font-medium leading-5 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
+                                                        >
+                                                            {{ __('Mark refund completed') }}
+                                                        </button>
+                                                    @endif
+
+                                                    @if (($row['payment_status'] ?? null) === Booking::PAYMENT_STATUS_PAID && (($row['can_check_in'] ?? false) === true))
                                                         <button
                                                             type="button"
                                                             wire:click="checkInBooking({{ $row['id'] }})"
@@ -551,7 +647,7 @@
                                                         </button>
                                                     @endif
 
-                                                    @if (($row['status'] ?? null) === Booking::STATUS_OCCUPIED)
+                                                    @if (($row['can_complete'] ?? false) === true)
                                                         <button
                                                             type="button"
                                                             wire:click="completeBooking({{ $row['id'] }})"
@@ -562,7 +658,7 @@
                                                         </button>
                                                     @endif
 
-                                                    @if (! in_array(($row['status'] ?? null), [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED], true))
+                                                    @if (! in_array(($row['booking_status'] ?? null), [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED], true))
                                                         <button
                                                             type="button"
                                                             @click="open = false; cancelOpen = true"
@@ -574,7 +670,7 @@
 
                                                     <button
                                                         type="button"
-                                                        @click="open = false; delOpen = true; delVal = ''"
+                                                        @click="open = false; delOpen = true; delVal = ''; delConfirm = false"
                                                         class="block w-full whitespace-nowrap px-3 py-1.5 text-left text-[13px] font-medium leading-5 text-rose-700 hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-500/10"
                                                     >
                                                         Delete
@@ -597,7 +693,7 @@
                                                                 {{ __('Settle remaining balance') }}
                                                             </h3>
                                                             <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                                                                {{ __('This records one payment for the full remaining balance and sets status to Paid. For partial cash, use the Payments tab on the booking.') }}
+                                                                {{ __('This records one payment for the full remaining balance and sets payment to Paid. For partial cash, use the Payments tab on the booking.') }}
                                                             </p>
                                                             <div class="mt-4 flex justify-end gap-2">
                                                                 <button
@@ -666,35 +762,41 @@
                                                     >
                                                         <div class="absolute inset-0 bg-black/50" @click="delOpen = false"></div>
                                                         <div
-                                                            class="relative z-10 w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-xl dark:border-white/10 dark:bg-gray-900"
+                                                            class="relative z-10 w-full max-w-md rounded-xl border border-gray-200 bg-white p-4 shadow-xl dark:border-white/10 dark:bg-gray-900"
                                                             @click.stop
                                                         >
                                                             <h3 class="text-base font-semibold text-gray-900 dark:text-white">
                                                                 {{ __('Delete booking') }}
                                                             </h3>
-                                                            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                                                                {{ __('To confirm, type the booking reference below. This cannot be undone.') }}
-                                                            </p>
-                                                            <p class="mt-2 font-mono text-sm font-semibold text-gray-900 dark:text-white" x-text="delRef"></p>
+                                                            <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ __('Type the reference and confirm to move this booking to Recycle Bin.') }}</p>
+                                                            <p class="mt-2 rounded-md bg-gray-100 px-2 py-1 font-mono text-sm font-semibold text-gray-900 dark:bg-white/10 dark:text-white" x-text="delRef"></p>
                                                             <input
                                                                 type="text"
                                                                 x-model="delVal"
-                                                                class="mt-3 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-danger-500 focus:outline-none focus:ring-1 focus:ring-danger-500 dark:border-white/10 dark:bg-gray-950 dark:text-white"
+                                                                class="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-danger-500 focus:outline-none focus:ring-1 focus:ring-danger-500 dark:border-white/10 dark:bg-gray-950 dark:text-white"
                                                                 autocomplete="off"
                                                                 :placeholder="delRef"
                                                             />
+                                                            <label class="mt-2 flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    x-model="delConfirm"
+                                                                    class="mt-0.5 h-4 w-4 rounded border-gray-300 text-danger-600 focus:ring-danger-500 dark:border-white/20 dark:bg-gray-950"
+                                                                />
+                                                                <span>{{ __('I understand this will move the booking to Recycle Bin.') }}</span>
+                                                            </label>
                                                             <div class="mt-4 flex justify-end gap-2">
                                                                 <button
                                                                     type="button"
                                                                     class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5"
-                                                                    @click="delOpen = false"
+                                                                    @click="delOpen = false; delConfirm = false; delVal = ''"
                                                                 >
                                                                     {{ __('Cancel') }}
                                                                 </button>
                                                                 <button
                                                                     type="button"
                                                                     class="rounded-lg bg-rose-600 px-3 py-2 text-sm font-medium text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-40"
-                                                                    :disabled="delVal.trim() !== delRef"
+                                                                    :disabled="delVal.trim() !== delRef || !delConfirm"
                                                                     @click="submitDelete()"
                                                                 >
                                                                     {{ __('Delete booking') }}

@@ -4,13 +4,16 @@ use App\Http\Controllers\API\BlockedDateController;
 use App\Http\Controllers\API\BlogPostController;
 use App\Http\Controllers\API\BookingController;
 use App\Http\Controllers\API\BubbleChatFaqController;
+use App\Http\Controllers\API\ChangePasswordController;
 use App\Http\Controllers\API\ClientErrorReportController;
 use App\Http\Controllers\API\ContactController;
+use App\Http\Controllers\API\ForgotPasswordController;
 use App\Http\Controllers\API\GalleryController;
 use App\Http\Controllers\API\MaintenanceModeController;
 use App\Http\Controllers\API\PaymentSettingsController;
 use App\Http\Controllers\API\ReviewController;
 use App\Http\Controllers\API\RoomController;
+use App\Http\Controllers\API\ResetPasswordController;
 use App\Http\Controllers\API\VenueController;
 use App\Http\Controllers\API\XenditWebhookController;
 use App\Http\Middleware\EnsureApiKeyIsValid;
@@ -40,8 +43,23 @@ Route::get('/maintenance-mode', [MaintenanceModeController::class, 'show']);
 Route::get('/payment-settings', [PaymentSettingsController::class, 'show']);
 Route::post('/xendit/webhook', [XenditWebhookController::class, 'handle']);
 
+Route::get('bookings/verify-email/{booking}', [BookingController::class, 'verifyEmail'])
+    ->middleware(['signed', 'throttle:receipt_lookup'])
+    ->name('bookings.verify-email');
+
 Route::middleware([EnsureApiKeyIsValid::class])->group(function () {
     Route::middleware('throttle:api')->group(function () {
+        // Password management (client app)
+        Route::post('/auth/forgot-password', [ForgotPasswordController::class, 'store'])
+            ->middleware('throttle:password_reset');
+        Route::post('/auth/reset-password', [ResetPasswordController::class, 'store'])
+            ->middleware('throttle:password_reset');
+
+        Route::middleware('auth:sanctum')->group(function () {
+            Route::post('/auth/change-password', [ChangePasswordController::class, 'store'])
+                ->middleware('throttle:password_change');
+        });
+
         // Admin/staff booking management (requires user auth + policy checks)
         Route::middleware('auth:sanctum')->group(function () {
             Route::get('bookings', [BookingController::class, 'index']);
@@ -55,6 +73,8 @@ Route::middleware([EnsureApiKeyIsValid::class])->group(function () {
         Route::post('/bookings/{booking:reference_number}/otp/send', [BookingController::class, 'sendBookingOtp'])
             ->middleware('throttle:booking_otp');
         Route::patch('/bookings/{booking:reference_number}/cancel', [BookingController::class, 'cancel']);
+        Route::get('/bookings/{booking:reference_number}/billing-statement/pdf', [BookingController::class, 'downloadBillingStatementPdf'])
+            ->middleware('throttle:receipt_lookup');
         Route::get('bookings/receipt/{token}', [BookingController::class, 'showByReceiptToken'])->middleware('throttle:receipt_lookup');
         Route::get('bookings/receipt/{token}/payment-status', [BookingController::class, 'paymentStatusByReceiptToken'])->middleware('throttle:receipt_lookup');
         Route::post('bookings/receipt/{token}/retry-payment', [BookingController::class, 'retryOnlinePaymentByReceiptToken'])->middleware('throttle:receipt_lookup');
@@ -77,6 +97,8 @@ Route::middleware([EnsureApiKeyIsValid::class])->group(function () {
 
         // Contact form (stricter limit)
         Route::post('/contact', [ContactController::class, 'store'])->middleware('throttle:contact');
+        Route::get('/contact/{id}/messages', [ContactController::class, 'messages'])->middleware('throttle:api');
+        Route::post('/contact/{id}/messages', [ContactController::class, 'appendMessage'])->middleware('throttle:contact');
 
         // Gallery
         Route::get('/galleries', [GalleryController::class, 'index']);

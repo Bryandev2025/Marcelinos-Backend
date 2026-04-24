@@ -16,6 +16,8 @@ final class BookingCheckInEligibility
 
     public const REASON_INVALID_STATUS = 'invalid_status';
 
+    public const REASON_OUTSIDE_CHECK_IN_DAY = 'outside_check_in_day';
+
     public const REASON_ASSIGNMENTS = 'assignments';
 
     /**
@@ -27,7 +29,23 @@ final class BookingCheckInEligibility
             return ['allowed' => false, 'reason' => self::REASON_TRASHED, 'message' => null];
         }
 
-        if ($booking->status !== Booking::STATUS_PAID) {
+        if ($booking->booking_status !== Booking::BOOKING_STATUS_RESERVED) {
+            return [
+                'allowed' => false,
+                'reason' => self::REASON_INVALID_STATUS,
+                'message' => __('Booking must be Reserved before check-in.'),
+            ];
+        }
+
+        if (! $booking->isCheckInTodayManila()) {
+            return [
+                'allowed' => false,
+                'reason' => self::REASON_OUTSIDE_CHECK_IN_DAY,
+                'message' => __('Booking can only be checked in on the check-in date.'),
+            ];
+        }
+
+        if ($booking->payment_status !== Booking::PAYMENT_STATUS_PAID) {
             return [
                 'allowed' => false,
                 'reason' => self::REASON_INVALID_STATUS,

@@ -76,9 +76,9 @@
                                                 </td>
                                             </tr>
                                             <tr>
-                                                <td style="padding:6px 0; color:#6b7280; font-weight:400;">Reference No.</td>
+                                                <td style="padding:6px 0; color:#6b7280; font-weight:400;">Statement No.</td>
                                                 <td style="padding:6px 0; font-weight:600; color:#374151;">
-                                                    {{ $booking->reference_no ?? $booking->id }}
+                                                    {{ filled($booking->reference_number) ? $booking->reference_number : '—' }}
                                                 </td>
                                             </tr>
                                         </table>
@@ -99,7 +99,7 @@
                                     <td style="padding:4px 0; font-size:14px; line-height:22px; color:#374151;">• Valid ID</td>
                                 </tr>
                                 <tr>
-                                    <td style="padding:4px 0; font-size:14px; line-height:22px; color:#374151;">• Booking reference</td>
+                                    <td style="padding:4px 0; font-size:14px; line-height:22px; color:#374151;">• Booking Reference Number</td>
                                 </tr>
                                 <tr>
                                     <td style="padding:4px 0; font-size:14px; line-height:22px; color:#374151;">• Any remaining payment, if applicable</td>
@@ -113,7 +113,7 @@
                             <table role="presentation" cellspacing="0" cellpadding="0">
                                 <tr>
                                     <td align="center" style="border-radius:8px; background-color:#2563eb;">
-                                        <a href="{{ config('app.url') . '/booking' }}" style="display:inline-block; padding:12px 20px; font-size:14px; line-height:20px; font-weight:600; font-family:'Poppins', Arial, Helvetica, sans-serif; color:#ffffff; text-decoration:none; border-radius:8px;">
+                                        <a href="{{ rtrim(config('app.frontend_url'), '/') }}/booking-receipt/{{ $booking->receipt_token }}" style="display:inline-block; padding:12px 20px; font-size:14px; line-height:20px; font-weight:600; font-family:'Poppins', Arial, Helvetica, sans-serif; color:#ffffff; text-decoration:none; border-radius:8px;">
                                             View Booking
                                         </a>
                                     </td>

@@ -10,6 +10,7 @@ use App\Models\RoomBlockedDate;
 use App\Models\Venue;
 use App\Support\BookingPricing;
 use App\Support\RoomInventoryGroupKey;
+use App\Support\VenueWeddingPreparation;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Filament\Forms\Components\DateTimePicker;
@@ -125,6 +126,7 @@ class BookingForm
         return $schema->components([
             Section::make('Booking details')
                 ->description('Guest, room allocation, and venue assignment.')
+                ->extraAttributes(['class' => 'h-full'])
                 ->columns(2)
                 ->schema([
                     Select::make('guest_id')
@@ -134,25 +136,64 @@ class BookingForm
                         ->searchable()
                         ->preload()
                         ->required()
+                        ->visibleOn('create')
+                        ->columnSpanFull(),
+                    Section::make('Guest information')
+                        ->description('Read-only details for the selected guest.')
+                        ->columns(2)
+                        ->schema([
+                            TextInput::make('guest_info_full_name')
+                                ->label('Full name')
+                                ->formatStateUsing(fn (?Booking $record): string => $record?->guest?->full_name ?? '—')
+                                ->disabled()
+                                ->dehydrated(false),
+                            TextInput::make('guest_info_email')
+                                ->label('Email')
+                                ->formatStateUsing(fn (?Booking $record): string => $record?->guest?->email ?? '—')
+                                ->disabled()
+                                ->dehydrated(false),
+                            TextInput::make('guest_info_contact_num')
+                                ->label('Contact number')
+                                ->formatStateUsing(fn (?Booking $record): string => $record?->guest?->contact_num ?? '—')
+                                ->disabled()
+                                ->dehydrated(false),
+                            TextInput::make('guest_info_gender')
+                                ->label('Gender')
+                                ->formatStateUsing(fn (?Booking $record): string => $record?->guest?->gender ? ucfirst((string) $record->guest->gender) : '—')
+                                ->disabled()
+                                ->dehydrated(false),
+                            TextInput::make('guest_info_country')
+                                ->label('Country')
+                                ->formatStateUsing(fn (?Booking $record): string => $record?->guest?->country ?? '—')
+                                ->disabled()
+                                ->dehydrated(false)
+                                ->visible(fn (?Booking $record): bool => $record?->guest?->is_international ?? false),
+                            TextInput::make('guest_info_address')
+                                ->label('Address')
+                                ->formatStateUsing(function (?Booking $record): string {
+                                    $guest = $record?->guest;
+                                    if (! $guest) {
+                                        return '—';
+                                    }
+
+                                    $parts = array_filter([
+                                        $guest->barangay,
+                                        $guest->municipality,
+                                        $guest->province,
+                                        $guest->region,
+                                    ]);
+
+                                    return $parts !== [] ? implode(', ', $parts) : '—';
+                                })
+                                ->disabled()
+                                ->visible(fn (?Booking $record): bool => ! ($record?->guest?->is_international ?? false))
+                                ->dehydrated(false),
+                        ])
                         ->columnSpanFull(),
 
                     Section::make('Guest booking (billing summary)')
-                        ->description(function (?Booking $record): ?HtmlString {
-                            if (! $record || $record->roomLines->isEmpty()) {
-                                return null;
-                            }
-                            $record->loadMissing('roomLines');
-                            $html = '<ul class="list-disc ms-5 space-y-1 text-sm">';
-                            foreach ($record->roomLines as $line) {
-                                $html .= '<li>'.e($line->displayLabel()).' × '.(int) $line->quantity.'</li>';
-                            }
-                            $total = (int) $record->roomLines->sum('quantity');
-                            $html .= '</ul>';
-                            $html .= '<p class="mt-3 text-sm text-gray-500 dark:text-gray-400">Assign exactly <strong>'.$total.'</strong> physical room(s) in “Assigned rooms” so each line matches.</p>';
-
-                            return new HtmlString($html);
-                        })
-                        ->visible(fn (?Booking $record) => $record?->roomLines?->isNotEmpty())
+                        ->description(fn (?Booking $record): ?HtmlString => self::guestBookingBillingSummaryHtml($record))
+                        ->visible(fn (?Booking $record) => self::shouldShowGuestBookingBillingSummary($record))
                         ->schema([
                             Hidden::make('guest_booking_section_placeholder')->dehydrated(false),
                         ])
@@ -160,6 +201,7 @@ class BookingForm
 
                     Select::make('rooms')
                         ->label('Assigned rooms')
+                        ->visible(fn (Get $get, ?Booking $record): bool => self::shouldShowAssignedRoomsField($get, $record))
                         ->relationship(
                             'rooms',
                             'name',
@@ -191,6 +233,7 @@ class BookingForm
                             },
                         )
                         ->multiple()
+                        ->placeholder('Select an option')
                         ->searchable()
                         ->preload()
                         ->allowHtml()
@@ -257,8 +300,15 @@ class BookingForm
 
                     Select::make('venues')
                         ->label('Venues')
-                        ->relationship('venues', 'name')
+                        ->relationship(
+                            'venues',
+                            'name',
+                            modifyQueryUsing: function ($query, ?string $search, ?Booking $record, Get $get): void {
+                                self::constrainAvailableVenuesQuery($query, $get, $record);
+                            },
+                        )
                         ->multiple()
+                        ->placeholder('Select an option')
                         ->searchable()
                         ->preload()
                         ->live()
@@ -272,24 +322,35 @@ class BookingForm
                                 }
                             },
                             fn (Get $get, ?Booking $record) => function (string $attribute, $value, $fail) use ($get, $record): void {
-                                if (self::hasVenueConflicts($value, $get('check_in'), $get('check_out'), $record)) {
+                                if (self::hasVenueConflicts(
+                                    $value,
+                                    $get('check_in'),
+                                    $get('check_out'),
+                                    $record,
+                                    is_string($get('venue_event_type')) ? $get('venue_event_type') : null,
+                                )) {
                                     $fail('One or more selected venues are not available for the chosen dates.');
                                 }
                             },
                         ])
-                        ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePricing($get, $set)),
+                        ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePricing($get, $set))
+                        ->columnSpanFull(),
 
                     Radio::make('venue_event_type')
                         ->label('Venue event type')
                         ->options(BookingPricing::venueEventTypeOptions())
                         ->default(BookingPricing::VENUE_EVENT_WEDDING)
-                        ->visible(fn (Get $get) => ! empty(array_filter((array) ($get('venues') ?? []))))
+                        ->formatStateUsing(fn ($state): string => BookingPricing::normalizeVenueEventType(is_string($state) ? $state : null))
+                        ->dehydrateStateUsing(fn ($state): string => BookingPricing::normalizeVenueEventType(is_string($state) ? $state : null))
+                        ->visible(fn (Get $get, ?Booking $record): bool => ! $record instanceof Booking && self::shouldShowVenueEventTypeField($get, $record))
                         ->live()
                         ->afterStateUpdated(fn (Get $get, Set $set) => self::updatePricing($get, $set)),
+
                 ]),
 
             Section::make('Schedule and pricing')
                 ->description('Set stay dates and review auto-computed totals.')
+                ->extraAttributes(['class' => 'h-full'])
                 ->columns(2)
                 ->schema([
                     DateTimePicker::make('check_in')
@@ -308,13 +369,15 @@ class BookingForm
                         ->live(onBlur: true)
                         ->seconds(false)
                         ->minDate(fn (Get $get) => filled($get('check_in'))
-                            ? Carbon::parse($get('check_in'))->startOfDay()->addDay()
+                            ? (self::isVenueOnlyBookingState($get)
+                                ? Carbon::parse($get('check_in'))->startOfDay()
+                                : Carbon::parse($get('check_in'))->startOfDay()->addDay())
                             : now())
                         ->disabledDates(function (Get $get): array {
                             $disabled = self::disabledCalendarDateStringsForWizard(array_filter((array) ($get('rooms') ?? [])));
 
                             $checkIn = $get('check_in');
-                            if (filled($checkIn)) {
+                            if (filled($checkIn) && ! self::isVenueOnlyBookingState($get)) {
                                 try {
                                     $disabled[] = Carbon::parse($checkIn)->format('Y-m-d');
                                 } catch (\Exception $e) {
@@ -339,6 +402,14 @@ class BookingForm
                                     return;
                                 }
 
+                                if (self::isVenueOnlyBookingState($get)) {
+                                    if ($end->copy()->startOfDay()->lt($start->copy()->startOfDay())) {
+                                        $fail('Check-out date cannot be before check-in date.');
+                                    }
+
+                                    return;
+                                }
+
                                 if ($end->lessThanOrEqualTo($start) || $end->isSameDay($start)) {
                                     $fail('Check-out must be at least the next day after check-in.');
                                 }
@@ -360,44 +431,44 @@ class BookingForm
                         ->numeric()
                         ->prefix('₱')
                         ->helperText('Auto-calculated from selected rooms/venues and nights.'),
-                ]),
 
-            Section::make('Status and reference')
-                ->columns(2)
-                ->schema([
-                    TextInput::make('reference_number')
-                        ->label('Reference number')
-                        ->disabled()
-                        ->dehydrated(false),
-                    TextInput::make('payment_method')
-                        ->label('Payment method')
-                        ->formatStateUsing(fn ($state) => $state ? strtoupper((string) $state) : 'CASH')
-                        ->disabled()
-                        ->dehydrated(false),
-                    TextInput::make('online_payment_plan')
-                        ->label('Online payment plan')
-                        ->formatStateUsing(function ($state): string {
-                            $value = (string) $state;
-                            if (preg_match('/^partial_([1-9]|[1-9][0-9])$/', $value, $matches) === 1) {
-                                return 'PARTIAL '.$matches[1].'%';
-                            }
+                    Section::make('Status and reference')
+                        ->columns(2)
+                        ->columnSpanFull()
+                        ->schema([
+                            Select::make('booking_status')
+                                ->label('Stay status')
+                                ->options(Booking::bookingStatusOptions())
+                                ->required(),
+                            Select::make('payment_status')
+                                ->label('Payment status')
+                                ->options(Booking::paymentStatusOptions())
+                                ->required(),
+                            TextInput::make('reference_number')
+                                ->label('Reference number')
+                                ->disabled()
+                                ->dehydrated(false),
+                            TextInput::make('payment_method')
+                                ->label('Payment method')
+                                ->formatStateUsing(fn ($state) => $state ? strtoupper((string) $state) : 'CASH')
+                                ->disabled()
+                                ->dehydrated(false),
+                            TextInput::make('online_payment_plan')
+                                ->label('Online payment plan')
+                                ->formatStateUsing(function ($state): string {
+                                    $value = (string) $state;
+                                    if (preg_match('/^partial_([1-9]|[1-9][0-9])$/', $value, $matches) === 1) {
+                                        return 'PARTIAL '.$matches[1].'%';
+                                    }
 
-                            return match ($value) {
-                                'full' => 'FULL',
-                                default => '—',
-                            };
-                        })
-                        ->disabled()
-                        ->dehydrated(false),
-                    TextInput::make('xendit_invoice_id')
-                        ->label('Xendit invoice ID')
-                        ->disabled()
-                        ->dehydrated(false),
-                    TextInput::make('xendit_invoice_url')
-                        ->label('Xendit invoice URL')
-                        ->disabled()
-                        ->dehydrated(false)
-                        ->columnSpanFull(),
+                                    return match ($value) {
+                                        'full' => 'FULL',
+                                        default => '—',
+                                    };
+                                })
+                                ->disabled()
+                                ->dehydrated(false),
+                        ]),
                 ]),
         ]);
     }
@@ -422,9 +493,30 @@ class BookingForm
         try {
             $startDate = Carbon::parse($checkIn);
             $endDate = Carbon::parse($checkOut);
-            $days = (int) $startDate->diffInDays($endDate);
 
-            $set('no_of_days', max(1, $days)); // Store integer 1, 2, etc.
+            if (self::isVenueOnlyBookingState($get)) {
+                if ($endDate->copy()->startOfDay()->lt($startDate->copy()->startOfDay())) {
+                    $set('no_of_days', 0);
+
+                    return;
+                }
+
+                // Venue-only bookings are billed as inclusive calendar days.
+                $days = (int) $startDate->copy()->startOfDay()->diffInDays($endDate->copy()->startOfDay()) + 1;
+                $set('no_of_days', max(1, $days));
+
+                return;
+            }
+
+            if ($endDate->lessThanOrEqualTo($startDate)) {
+                $set('no_of_days', 0);
+
+                return;
+            }
+
+            // Room bookings follow calendar lodging nights, not elapsed 24-hour blocks.
+            $days = (int) $startDate->copy()->startOfDay()->diffInDays($endDate->copy()->startOfDay());
+            $set('no_of_days', max(1, $days));
         } catch (\Exception $e) {
             $set('no_of_days', 0);
         }
@@ -465,6 +557,71 @@ class BookingForm
         }
     }
 
+    /**
+     * Recomputes derived booking form fields when state is updated outside the main form
+     * flow (for example, in a slide-over editor).
+     *
+     * @param  array<string, mixed>  $state
+     * @return array<string, mixed>
+     */
+    public static function syncDerivedState(array $state, ?Booking $record = null): array
+    {
+        $checkIn = $state['check_in'] ?? null;
+        $checkOut = $state['check_out'] ?? null;
+        $roomIds = array_values(array_filter((array) ($state['rooms'] ?? [])));
+        $venueIds = array_values(array_filter((array) ($state['venues'] ?? [])));
+
+        $days = 0;
+
+        if ($checkIn && $checkOut) {
+            try {
+                $startDate = Carbon::parse((string) $checkIn);
+                $endDate = Carbon::parse((string) $checkOut);
+
+                $isVenueOnly = $roomIds === [] && $venueIds !== []
+                    && ! ($record instanceof Booking && $record->expectsRoomAssignments());
+
+                if ($isVenueOnly) {
+                    if (! $endDate->copy()->startOfDay()->lt($startDate->copy()->startOfDay())) {
+                        $days = max(1, (int) $startDate->copy()->startOfDay()->diffInDays($endDate->copy()->startOfDay()) + 1);
+                    }
+                } elseif ($endDate->greaterThan($startDate) && ! $endDate->isSameDay($startDate)) {
+                    $days = max(1, (int) $startDate->copy()->startOfDay()->diffInDays($endDate->copy()->startOfDay()));
+                }
+            } catch (\Exception $e) {
+                $days = 0;
+            }
+        }
+
+        $state['no_of_days'] = $days;
+
+        if (($roomIds !== [] || $venueIds !== []) && $days > 0) {
+            if ($roomIds !== []) {
+                $roomsTotal = (float) Room::query()->whereIn('id', $roomIds)->sum('price');
+            } else {
+                $roomsTotal = 0.0;
+                if ($record instanceof Booking) {
+                    $record->loadMissing('roomLines');
+                    if ($record->roomLines->isNotEmpty()) {
+                        $roomsTotal = (float) $record->roomLines->sum(
+                            fn ($line) => $line->quantity * (float) $line->unit_price_per_night
+                        );
+                    }
+                }
+            }
+
+            $venueEventType = $state['venue_event_type'] ?? null;
+            $venues = Venue::query()->whereIn('id', $venueIds)->get();
+            $venuesTotal = BookingPricing::sumVenueLine($venues, $venueEventType);
+
+            $state['total_price'] = ($roomsTotal + $venuesTotal) * $days;
+        } else {
+            $state['total_price'] = 0;
+        }
+
+        return $state;
+    }
+
     public static function hasRoomConflicts($roomIds, $checkIn, $checkOut, ?Booking $record): bool
     {
         $roomIds = is_array($roomIds) ? $roomIds : [$roomIds];
@@ -491,7 +648,7 @@ class BookingForm
 
         if (Booking::query()
             ->when($record, fn ($query) => $query->where('id', '!=', $record->id))
-            ->whereNotIn('status', [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED])
+            ->whereNotIn('booking_status', [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED])
             ->where('check_in', '<', $end)
             ->where('check_out', '>', $start)
             ->whereHas('rooms', fn ($query) => $query->whereIn('rooms.id', $roomIds))
@@ -506,7 +663,7 @@ class BookingForm
             ->exists();
     }
 
-    private static function hasVenueConflicts($venueIds, $checkIn, $checkOut, ?Booking $record): bool
+    public static function hasVenueConflicts($venueIds, $checkIn, $checkOut, ?Booking $record, ?string $venueEventType = null): bool
     {
         $venueIds = is_array($venueIds) ? $venueIds : [$venueIds];
         $venueIds = array_filter($venueIds);
@@ -522,21 +679,141 @@ class BookingForm
             return false;
         }
 
-        if ($end->lessThanOrEqualTo($start)) {
+        $startDay = $start->copy()->startOfDay();
+        $endDay = $end->copy()->startOfDay();
+
+        if ($endDay->lt($startDay)) {
             return false;
         }
 
-        if (BlockedDate::overlapsRange($start, $end)) {
+        if (self::hasBlockedCalendarDatesInInclusiveRange($startDay, $endDay)) {
             return true;
         }
 
-        return Booking::query()
-            ->when($record, fn ($query) => $query->where('id', '!=', $record->id))
-            ->whereNotIn('status', [Booking::STATUS_CANCELLED, Booking::STATUS_COMPLETED])
-            ->where('check_in', '<', $end)
-            ->where('check_out', '>', $start)
-            ->whereHas('venues', fn ($query) => $query->whereIn('venues.id', $venueIds))
-            ->exists();
+        if (Venue::query()
+            ->whereIn('id', $venueIds)
+            ->where(function ($query) use ($startDay, $endDay): void {
+                $query->where('status', Venue::STATUS_MAINTENANCE)
+                    ->orWhereHas('venueBlockedDates', function ($blocked) use ($startDay, $endDay): void {
+                        $blocked->whereDate('venue_blocked_dates.blocked_on', '>=', $startDay->toDateString())
+                            ->whereDate('venue_blocked_dates.blocked_on', '<=', $endDay->toDateString());
+                    });
+            })
+            ->exists()) {
+            return true;
+        }
+
+        $venuesCount = count($venueIds);
+        $availableCount = Venue::query()
+            ->whereIn('id', $venueIds)
+            ->availableBetween(
+                $start,
+                $end,
+                $record?->id,
+                BookingPricing::normalizeVenueEventType($venueEventType),
+                true,
+            )
+            ->count();
+
+        return $availableCount < $venuesCount;
+    }
+
+    public static function constrainAvailableVenuesQuery($query, Get $get, ?Booking $record = null): void
+    {
+        $checkIn = $get('check_in');
+        $checkOut = $get('check_out');
+        $venueTableKey = $query->getModel()->getQualifiedKeyName();
+
+        $currentVenueIds = [];
+        if ($record instanceof Booking) {
+            $record->loadMissing('venues:id');
+            $currentVenueIds = $record->venues->pluck('id')->map(fn ($id) => (int) $id)->filter()->values()->all();
+        }
+
+        if (! $checkIn || ! $checkOut) {
+            if ($currentVenueIds !== []) {
+                $query->whereIn($venueTableKey, $currentVenueIds);
+            } else {
+                $query->whereRaw('0 = 1');
+            }
+
+            return;
+        }
+
+        try {
+            $start = Carbon::parse((string) $checkIn);
+            $end = Carbon::parse((string) $checkOut);
+        } catch (\Exception $e) {
+            if ($currentVenueIds !== []) {
+                $query->whereIn($venueTableKey, $currentVenueIds);
+            } else {
+                $query->whereRaw('0 = 1');
+            }
+
+            return;
+        }
+
+        $startDay = $start->copy()->startOfDay();
+        $endDay = $end->copy()->startOfDay();
+        if ($endDay->lt($startDay)) {
+            if ($currentVenueIds !== []) {
+                $query->whereIn($venueTableKey, $currentVenueIds);
+            } else {
+                $query->whereRaw('0 = 1');
+            }
+
+            return;
+        }
+
+        if (self::hasBlockedCalendarDatesInInclusiveRange($startDay, $endDay)) {
+            if ($currentVenueIds !== []) {
+                $query->whereIn($venueTableKey, $currentVenueIds);
+            } else {
+                $query->whereRaw('0 = 1');
+            }
+
+            return;
+        }
+
+        $nameCol = $query->getModel()->qualifyColumn('name');
+
+        $venueEventType = (string) ($get('venue_event_type') ?? '');
+        if ($venueEventType === '') {
+            $venueEventType = BookingPricing::VENUE_EVENT_WEDDING;
+        } else {
+            $venueEventType = BookingPricing::normalizeVenueEventType($venueEventType);
+        }
+        $hasVenueSelection = ! empty(array_filter((array) ($get('venues') ?? [])));
+        $effIn = VenueWeddingPreparation::effectiveVenueBlockStart($start, $venueEventType, $hasVenueSelection);
+        $end = $end->copy();
+
+        $query->where(function ($outerQuery) use ($query, $startDay, $endDay, $effIn, $end, $record, $currentVenueIds, $venueTableKey): void {
+            $outerQuery
+                ->where(function ($availableQuery) use ($query, $startDay, $endDay, $effIn, $end, $record): void {
+                    $availableQuery
+                        ->where($query->getModel()->qualifyColumn('status'), '!=', Venue::STATUS_MAINTENANCE)
+                        ->whereDoesntHave('bookings', function ($bookingQuery) use ($effIn, $end, $record): void {
+                            $bookingQuery
+                                ->whereIn('bookings.booking_status', Booking::availabilityBlockingStatuses());
+                            VenueWeddingPreparation::constrainToBookingsThatCollideWithVenueCandidateRange(
+                                $bookingQuery,
+                                $effIn,
+                                $end,
+                                $record instanceof Booking ? (int) $record->id : null,
+                            );
+                        })
+                        ->whereDoesntHave('venueBlockedDates', function ($blockedQuery) use ($startDay, $endDay): void {
+                            $blockedQuery
+                                ->whereDate('venue_blocked_dates.blocked_on', '>=', $startDay->toDateString())
+                                ->whereDate('venue_blocked_dates.blocked_on', '<=', $endDay->toDateString());
+                        });
+                });
+
+            if ($currentVenueIds !== []) {
+                $outerQuery->orWhereIn($venueTableKey, $currentVenueIds);
+            }
+        })
+            ->orderBy($nameCol);
     }
 
     /**
@@ -564,7 +841,7 @@ class BookingForm
         $name = e(trim((string) $room->name));
         $summary = e($room->typeDashBedSummary());
 
-        return '<span class="inline-flex w-full max-w-full min-w-0 items-baseline gap-x-1 '.$class.'"><span class="font-medium text-gray-950 dark:text-white">'.$name.'</span><span class="text-gray-600 dark:text-gray-300 shrink-0">('.$summary.')</span></span>';
+        return '<span class="block w-full min-w-0 text-left '.$class.'"><span class="font-medium text-gray-950 dark:text-white">'.$name.'</span> <span class="text-gray-600 dark:text-gray-300">('.$summary.')</span></span>';
     }
 
     /**
@@ -620,5 +897,141 @@ class BookingForm
         }
 
         return $result;
+    }
+
+    private static function shouldShowAssignedRoomsField(Get $get, ?Booking $record): bool
+    {
+        if ($record instanceof Booking) {
+            $record->loadMissing('roomLines');
+
+            // Persisted room-line requirements take precedence over transient UI state.
+            if ($record->expectsRoomAssignments()) {
+                return true;
+            }
+        }
+
+        if (self::isVenueOnlyBookingState($get)) {
+            return false;
+        }
+
+        if (! $record instanceof Booking) {
+            return true;
+        }
+
+        return ! ($record->expectsVenueAssignments() && ! $record->expectsRoomAssignments());
+    }
+
+    private static function isVenueOnlyBookingState(Get $get): bool
+    {
+        $bookingType = (string) ($get('booking_type') ?? '');
+        if ($bookingType !== '') {
+            return $bookingType === 'venue';
+        }
+
+        $routeRecord = request()->route('record');
+        if ($routeRecord instanceof Booking) {
+            if ($routeRecord->expectsRoomAssignments()) {
+                return false;
+            }
+
+            if ($routeRecord->expectsVenueAssignments()) {
+                return true;
+            }
+        }
+
+        $roomIds = array_filter((array) ($get('rooms') ?? []));
+        $venueIds = array_filter((array) ($get('venues') ?? []));
+        if ($roomIds === [] && $venueIds !== []) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static function shouldShowGuestBookingBillingSummary(?Booking $record): bool
+    {
+        if (! $record instanceof Booking) {
+            return false;
+        }
+
+        $record->loadMissing(['roomLines', 'rooms.bedSpecifications', 'venues']);
+
+        return $record->roomLines->isNotEmpty()
+            || $record->rooms->isNotEmpty()
+            || $record->venues->isNotEmpty();
+    }
+
+    private static function guestBookingBillingSummaryHtml(?Booking $record): ?HtmlString
+    {
+        if (! $record instanceof Booking) {
+            return null;
+        }
+
+        $record->loadMissing(['roomLines', 'rooms.bedSpecifications', 'venues']);
+
+        $items = [];
+        foreach ($record->roomLines as $line) {
+            $items[] = e($line->displayLabel()).' × '.(int) $line->quantity;
+        }
+
+        if ($record->roomLines->isEmpty()) {
+            foreach ($record->rooms as $room) {
+                $items[] = e($room->typeDashBedSummary()).' × 1';
+            }
+        }
+
+        foreach ($record->venues as $venue) {
+            $items[] = e((string) ($venue->name ?? 'Venue')).' × 1';
+        }
+
+        if ($items === []) {
+            return null;
+        }
+
+        $html = '<ul class="list-disc ms-5 space-y-1 text-sm">';
+        foreach ($items as $item) {
+            $html .= '<li>'.$item.'</li>';
+        }
+        $html .= '</ul>';
+
+        $stayCount = max(0, (int) ($record->no_of_days ?? 0));
+        $totalPrice = max(0, (float) ($record->total_price ?? 0));
+        if ($stayCount > 0) {
+            $unitPrice = $totalPrice / $stayCount;
+            $stayLabel = $stayCount === 1 ? 'night' : 'nights';
+            $html .= '<p class="mt-3 text-sm font-medium text-gray-700 dark:text-gray-200">'
+                .e($stayCount.' '.$stayLabel)
+                .' × ₱'.number_format($unitPrice, 2)
+                .' = ₱'.number_format($totalPrice, 2)
+                .'</p>';
+        }
+
+        if ($record->roomLines->isNotEmpty()) {
+            $total = (int) $record->roomLines->sum('quantity');
+            $html .= '<p class="mt-3 text-sm text-gray-500 dark:text-gray-400">Assign exactly <strong>'.$total.'</strong> physical room(s) in “Assigned rooms” so each line matches.</p>';
+        }
+
+        return new HtmlString($html);
+    }
+
+    private static function hasBlockedCalendarDatesInInclusiveRange(Carbon $startDay, Carbon $endDay): bool
+    {
+        return BlockedDate::query()
+            ->whereDate('blocked_dates.date', '>=', $startDay->toDateString())
+            ->whereDate('blocked_dates.date', '<=', $endDay->toDateString())
+            ->exists();
+    }
+
+    private static function shouldShowVenueEventTypeField(Get $get, ?Booking $record): bool
+    {
+        if (! empty(array_filter((array) ($get('venues') ?? [])))) {
+            return true;
+        }
+
+        if (filled($get('venue_event_type'))) {
+            return true;
+        }
+
+        return $record instanceof Booking && $record->expectsVenueAssignments();
     }
 }

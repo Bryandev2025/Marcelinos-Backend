@@ -9,12 +9,19 @@ use Filament\Actions\CreateAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Tabs\Tab;
-use JeffersonGoncalves\Filament\QrCodeField\Forms\Components\QrCodeInput;
 use Illuminate\Database\Eloquent\Builder;
+use JeffersonGoncalves\Filament\QrCodeField\Forms\Components\QrCodeInput;
 
 class ListBookings extends ListRecords
 {
     protected static string $resource = BookingResource::class;
+
+    public function mount(): void
+    {
+        parent::mount();
+
+        BookingResource::markTodaysBookingsAsViewed();
+    }
 
     public function getHeading(): string
     {
@@ -85,7 +92,7 @@ class ListBookings extends ListRecords
                             $livewire->redirect(BookingResource::getUrl('view', ['record' => $booking]));
                         }),
                 ])
-                ->action(fn() => null),
+                ->action(fn () => null),
         ];
     }
 
@@ -96,26 +103,24 @@ class ListBookings extends ListRecords
                 ->badge(Booking::query()->count()),
         ];
 
-        $statusOrder = [
-            Booking::STATUS_UNPAID,
-            Booking::STATUS_PARTIAL,
-            Booking::STATUS_PAID,
-            Booking::STATUS_OCCUPIED,
-            Booking::STATUS_COMPLETED,
-            Booking::STATUS_CANCELLED,
-            Booking::STATUS_RESCHEDULED,
+        $stayOrder = [
+            Booking::BOOKING_STATUS_RESERVED,
+            Booking::BOOKING_STATUS_OCCUPIED,
+            Booking::BOOKING_STATUS_COMPLETED,
+            Booking::BOOKING_STATUS_CANCELLED,
+            Booking::BOOKING_STATUS_RESCHEDULED,
         ];
 
-        $statusOptions = Booking::statusOptions();
+        $stayOptions = Booking::bookingStatusOptions();
 
-        foreach ($statusOrder as $status) {
-            if (! array_key_exists($status, $statusOptions)) {
+        foreach ($stayOrder as $stay) {
+            if (! array_key_exists($stay, $stayOptions)) {
                 continue;
             }
 
-            $tabs[$status] = Tab::make($statusOptions[$status])
-                ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('status', $status))
-                ->badge(Booking::query()->where('status', $status)->count());
+            $tabs['stay_'.$stay] = Tab::make($stayOptions[$stay])
+                ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('booking_status', $stay))
+                ->badge(Booking::query()->where('booking_status', $stay)->count());
         }
 
         return $tabs;
@@ -194,6 +199,7 @@ class ListBookings extends ListRecords
 
         if (! str_starts_with($payload, '{') && ! str_starts_with($payload, '[')) {
             $trimmed = trim($payload);
+
             return $trimmed !== '' ? $trimmed : null;
         }
 

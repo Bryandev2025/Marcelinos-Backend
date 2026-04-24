@@ -19,6 +19,7 @@ class PaymentSettingsController extends Controller
                     'online_payment_enabled' => (bool) ($cached['online_payment_enabled'] ?? false),
                     'partial_payment_options' => $this->normalizePartialPaymentOptions($cached['partial_payment_options'] ?? null),
                     'allow_custom_partial_payment' => (bool) ($cached['allow_custom_partial_payment'] ?? false),
+                    'cancellation_fee_percent' => $this->normalizeCancellationFeePercent($cached['cancellation_fee_percent'] ?? 30),
                 ],
             ]);
         }
@@ -27,6 +28,7 @@ class PaymentSettingsController extends Controller
             'online_payment_enabled' => filter_var(env('PAYMENT_ONLINE_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
             'partial_payment_options' => $this->normalizePartialPaymentOptions((string) env('PAYMENT_PARTIAL_OPTIONS', '10,20,30')),
             'allow_custom_partial_payment' => filter_var(env('PAYMENT_PARTIAL_ALLOW_CUSTOM', false), FILTER_VALIDATE_BOOLEAN),
+            'cancellation_fee_percent' => $this->normalizeCancellationFeePercent(env('PAYMENT_CANCELLATION_FEE_PERCENT', 30)),
         ];
 
         Cache::forever('payment_settings_config', $data);
@@ -53,5 +55,12 @@ class PaymentSettingsController extends Controller
             ->all();
 
         return $values !== [] ? $values : [30];
+    }
+
+    private function normalizeCancellationFeePercent(mixed $raw): int
+    {
+        $value = (int) $raw;
+
+        return max(0, min(100, $value));
     }
 }
