@@ -1,12 +1,30 @@
 <?php
 
-$failoverMailers = array_values(array_filter(array_map(
-    static fn (string $mailer): string => trim($mailer),
-    explode(',', (string) env('MAIL_FAILOVER_MAILERS', 'smtp,smtp_backup,log'))
-)));
+$parseMailers = static function (string $value): array {
+    return array_values(array_filter(array_map(
+        static fn (string $mailer): string => trim($mailer),
+        explode(',', $value),
+    )));
+};
+
+$backupSmtpConfigured = (string) env('MAIL_BACKUP_HOST', '') !== ''
+    && (string) env('MAIL_BACKUP_PORT', '') !== '';
+
+$defaultFailoverMailers = $backupSmtpConfigured
+    ? 'smtp,smtp_backup,log'
+    : 'smtp,log';
+
+$failoverMailers = $parseMailers((string) env('MAIL_FAILOVER_MAILERS', $defaultFailoverMailers));
+
+if (! $backupSmtpConfigured) {
+    $failoverMailers = array_values(array_filter(
+        $failoverMailers,
+        static fn (string $mailer): bool => $mailer !== 'smtp_backup',
+    ));
+}
 
 if ($failoverMailers === []) {
-    $failoverMailers = ['smtp', 'smtp_backup', 'log'];
+    $failoverMailers = $parseMailers($defaultFailoverMailers);
 }
 
 return [
