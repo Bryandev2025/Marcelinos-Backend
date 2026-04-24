@@ -20,8 +20,21 @@ class RefundEligibleGuestMail extends Mailable
 
     public function build(): self
     {
+        $booking = $this->booking;
+        $booking->loadMissing('guest');
+
+        $guestDisplayName = trim((string) ($booking->guest?->full_name ?? ''));
+        if ($guestDisplayName === '') {
+            $guestDisplayName = 'Guest';
+        }
+
+        $preheader = "We're reviewing your payment for booking {$booking->reference_number} after a change to your reservation.";
+
         return $this
-            ->subject("Marcelino's Resort Hotel - Refund Review in Progress")
-            ->view('emails.refund-eligible-guest');
+            ->subject("Marcelino's Resort Hotel - Refund review in progress ({$booking->reference_number})")
+            ->view('emails.refund-eligible-guest', [
+                'guestDisplayName' => $guestDisplayName,
+                'preheader' => $preheader,
+            ]);
     }
 }
