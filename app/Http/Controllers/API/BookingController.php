@@ -7,14 +7,16 @@ use App\Events\BookingRescheduled;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\API\StoreBookingRequest;
 use App\Models\Booking;
+use App\Models\BookingRoomLine;
 use App\Models\Guest;
 use App\Models\Payment;
 use App\Models\Room;
 use App\Models\Venue;
 use App\Services\BookingActionOtpService;
+use Barryvdh\DomPDF\Facade\Pdf;
+use App\Support\CancellationPolicy;
 use App\Support\BookingDuplicateGuard;
 use App\Support\BookingPricing;
-use App\Support\CancellationPolicy;
 use App\Support\RoomInventoryGroupAvailability;
 use App\Support\RoomInventoryGroupKey;
 use Illuminate\Http\JsonResponse;
@@ -162,6 +164,41 @@ class BookingController extends Controller
         }
     }
 
+    public function downloadBillingStatementPdf(string $token)
+    {
+        try {
+            $booking = $this->findReceiptBooking($token);
+
+            if (! $booking) {
+                return response()->json([
+                    'message' => 'Booking not found',
+                ], 404);
+            }
+
+            if ($response = $this->rejectIfPendingVerification($booking)) {
+                return $response;
+            }
+
+            $statement = $this->buildBillingStatementData($booking);
+
+            $pdf = Pdf::loadView('billing-statements.step5', $statement)
+                ->setPaper('a4', 'portrait');
+
+            $filename = sprintf(
+                'marcelinos-billing-statement-%s-%s.pdf',
+                Str::slug((string) $booking->reference_number),
+                now()->format('Ymd-His'),
+            );
+
+            return $pdf->download($filename);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Error generating billing statement PDF',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     /**
      * Confirm a successful online payment from receipt return flow.
      * Uses opaque receipt token only and updates booking status to paid/partial.
@@ -280,6 +317,248 @@ class BookingController extends Controller
             'has_testimonial' => $hasTestimonial,
             'email_verification_required' => $pendingVerification,
         ], 200);
+    }
+
+    /**
+     * Build the data array used by the billing statement PDF.
+     * The PDF should always reflect server-side booking state, not editable DOM state.
+     */
+    private function buildBillingStatementData(Booking $booking): array
+    {
+        $booking->loadMissing(['guest', 'rooms.bedSpecifications', 'venues', 'roomLines', 'payments']);
+
+        $logoPath = public_path('brand-logo.webp');
+        $logoSrc = null;
+        if (is_file($logoPath)) {
+            $logoSrc = 'data:image/webp;base64,'.base64_encode((string) file_get_contents($logoPath));
+        }
+
+        $guest = $booking->guest;
+        $guestName = $guest
+            ? trim(implode(' ', array_filter([
+                $guest->first_name,
+                $guest->middle_name,
+                $guest->last_name,
+            ])))
+            : '—';
+
+        $guestAddressParts = $guest
+            ? array_filter([
+                $guest->street,
+                $guest->barangay,
+                $guest->municipality,
+                $guest->province,
+                $guest->region,
+                $guest->country,
+            ])
+            : [];
+        $guestAddress = ! empty($guestAddressParts) ? implode(', ', $guestAddressParts) : '—';
+
+        $billingUnits = max(
+            1,
+            (int) ($booking->no_of_days ?: ($booking->check_in && $booking->check_out
+                ? $booking->check_in->diffInDays($booking->check_out)
+                : 1))
+        );
+        $billingUnitLabel = $billingUnits === 1 ? 'night/day' : 'nights/days';
+
+        $roomItems = $booking->roomLines->isNotEmpty()
+            ? $booking->roomLines->map(function (BookingRoomLine $line) use ($billingUnits): array {
+                $unitPrice = (float) $line->unit_price_per_night;
+
+                return [
+                    'label' => $line->displayLabel(),
+                    'quantity' => (int) $line->quantity,
+                    'unit_price' => $unitPrice,
+                    'line_total' => $unitPrice * max(1, (int) $line->quantity) * $billingUnits,
+                ];
+            })->values()->all()
+            : $booking->rooms->map(function (Room $room) use ($billingUnits): array {
+                $room->loadMissing(['bedSpecifications']);
+                $unitPrice = (float) $room->price;
+
+                return [
+                    'label' => trim($room->name).' ('.$room->typeDashBedSummary().')',
+                    'quantity' => 1,
+                    'unit_price' => $unitPrice,
+                    'line_total' => $unitPrice * $billingUnits,
+                ];
+            })->values()->all();
+
+        $venueEventType = $this->normalizeVenueEventType((string) ($booking->venue_event_type ?? 'wedding'));
+        $venueItems = $booking->venues->map(function (Venue $venue) use ($billingUnits, $venueEventType): array {
+            $unitPrice = $this->venueUnitPrice($venue, $venueEventType);
+
+            return [
+                'label' => $venue->name,
+                'event_type' => $this->venueEventTypeLabel($venueEventType),
+                'capacity' => (int) $venue->capacity,
+                'unit_price' => $unitPrice,
+                'line_total' => $unitPrice * $billingUnits,
+            ];
+        })->values()->all();
+
+        $roomSubtotal = array_reduce($roomItems, fn (float $sum, array $item): float => $sum + (float) $item['line_total'], 0.0);
+        $venueSubtotal = array_reduce($venueItems, fn (float $sum, array $item): float => $sum + (float) $item['line_total'], 0.0);
+        $computedSubtotal = $roomSubtotal + $venueSubtotal;
+
+        $grandTotal = (float) $booking->total_price;
+        $originalTotal = (float) ($booking->special_discount_original_total_price ?? 0);
+        if ($originalTotal <= 0) {
+            $originalTotal = max($computedSubtotal, $grandTotal);
+        }
+
+        $discountApplied = (float) ($booking->special_discount_amount_applied ?? max(0, $originalTotal - $grandTotal));
+        $amountPaid = (float) $booking->total_paid;
+        $balance = (float) $booking->balance;
+
+        $paymentSettings = $this->paymentSettingsConfig();
+        $partialOptions = $paymentSettings['partial_payment_options'] ?? [];
+        $downPaymentPercent = isset($partialOptions[0]) ? (int) $partialOptions[0] : 30;
+        $downPaymentAmount = max(0.0, (float) round($grandTotal * ($downPaymentPercent / 100), 2));
+        $unpaidExpiresAt = $booking->unpaidExpiresAt();
+        $depositDueLabel = $unpaidExpiresAt
+            ? $unpaidExpiresAt->timezone('Asia/Manila')->format('F j, Y g:i A')
+            : '—';
+
+        $messengerBase = $this->messengerChatUrl();
+        $messengerMessage = implode("\n", [
+            "Hello Marcelino's Resort Hotel!",
+            '',
+            "I would like to settle my {$downPaymentPercent}% deposit for this booking.",
+            'Reference No.: '.((string) $booking->reference_number ?: '—'),
+            'Guest Name: '.($guestName !== '' ? $guestName : '—'),
+            'Check-in: '.($booking->check_in ? $booking->check_in->timezone('Asia/Manila')->format('F j, Y g:i A') : '—'),
+            'Check-out: '.($booking->check_out ? $booking->check_out->timezone('Asia/Manila')->format('F j, Y g:i A') : '—'),
+            'Reservation Total: ₱'.number_format($grandTotal, 2),
+            "Deposit Amount ({$downPaymentPercent}%): ₱".number_format($downPaymentAmount, 2),
+            '',
+            'Thank you!',
+        ]);
+        $messengerLink = $messengerBase !== ''
+            ? $messengerBase.(str_contains($messengerBase, '?') ? '&' : '?').'text='.rawurlencode($messengerMessage)
+            : null;
+
+        $bookingStatusLower = strtolower((string) $booking->booking_status);
+        $paymentStatusLower = strtolower((string) $booking->payment_status);
+        $showMessengerDepositBlock = in_array($bookingStatusLower, ['reserved', 'rescheduled'], true)
+            && $paymentStatusLower === Booking::PAYMENT_STATUS_UNPAID;
+
+        $qrCodeDataUri = null;
+        if ($booking->qr_code && Storage::disk('public')->exists($booking->qr_code)) {
+            $qrCodePath = $booking->qr_code;
+            $mimeType = Storage::disk('public')->mimeType($qrCodePath) ?: 'image/svg+xml';
+            $qrCodeDataUri = 'data:'.$mimeType.';base64,'.base64_encode((string) Storage::disk('public')->get($qrCodePath));
+        }
+
+        return [
+            'booking' => $booking,
+            'guestName' => $guestName,
+            'guestAddress' => $guestAddress,
+            'bookingTypeLabel' => $this->bookingTypeLabel($booking),
+            'bookingStatusLabel' => Booking::bookingStatusOptions()[(string) $booking->booking_status] ?? ucfirst((string) $booking->booking_status),
+            'paymentStatusLabel' => Booking::paymentStatusOptions()[(string) $booking->payment_status] ?? ucfirst((string) $booking->payment_status),
+            'paymentMethodLabel' => $this->paymentMethodLabel((string) ($booking->payment_method ?? 'cash'), (string) ($booking->online_payment_plan ?? '')),
+            'venueEventTypeLabel' => $this->venueEventTypeLabel($venueEventType),
+            'billingUnits' => $billingUnits,
+            'billingUnitLabel' => $billingUnitLabel,
+            'roomItems' => $roomItems,
+            'venueItems' => $venueItems,
+            'roomSubtotal' => $roomSubtotal,
+            'venueSubtotal' => $venueSubtotal,
+            'computedSubtotal' => $computedSubtotal,
+            'originalTotal' => $originalTotal,
+            'discountApplied' => $discountApplied,
+            'grandTotal' => $grandTotal,
+            'amountPaid' => $amountPaid,
+            'balance' => $balance,
+            'issuedAt' => $booking->created_at?->timezone('Asia/Manila') ?? now(),
+            'checkIn' => $booking->check_in,
+            'checkOut' => $booking->check_out,
+            'qrCodeDataUri' => $qrCodeDataUri,
+            'logoSrc' => $logoSrc,
+            'downPaymentPercent' => $downPaymentPercent,
+            'downPaymentAmount' => $downPaymentAmount,
+            'depositDueLabel' => $depositDueLabel,
+            'showMessengerDepositBlock' => $showMessengerDepositBlock,
+            'messengerLink' => $messengerLink,
+        ];
+    }
+
+    private function messengerChatUrl(): string
+    {
+        $configured = trim((string) env('FRONTEND_MESSENGER_CHAT_URL', ''));
+
+        return $configured !== ''
+            ? $configured
+            : 'https://m.me/61557457680496';
+    }
+
+    private function bookingTypeLabel(Booking $booking): string
+    {
+        $hasRooms = $booking->rooms->isNotEmpty() || $booking->roomLines->isNotEmpty();
+        $hasVenues = $booking->venues->isNotEmpty();
+
+        if ($hasRooms && $hasVenues) {
+            return 'Room + Venue';
+        }
+
+        if ($hasVenues) {
+            return 'Venue Booking';
+        }
+
+        if ($hasRooms) {
+            return 'Room Booking';
+        }
+
+        return 'Booking';
+    }
+
+    private function paymentMethodLabel(string $method, string $plan): string
+    {
+        $normalizedMethod = strtolower(trim($method));
+
+        if ($normalizedMethod === 'online') {
+            if (preg_match('/^partial_(\d+)$/', $plan, $matches)) {
+                return 'Online (Partial '.$matches[1].'%)';
+            }
+
+            return 'Online (Full)';
+        }
+
+        return $normalizedMethod !== ''
+            ? ucwords(str_replace('_', ' ', $normalizedMethod))
+            : 'Cash';
+    }
+
+    private function normalizeVenueEventType(string $eventType): string
+    {
+        $normalized = strtolower(trim($eventType));
+
+        return match ($normalized) {
+            'seminar', 'meeting', 'meeting_staff' => 'meeting_staff',
+            'birthday' => 'birthday',
+            'wedding' => 'wedding',
+            default => 'wedding',
+        };
+    }
+
+    private function venueEventTypeLabel(string $eventType): string
+    {
+        return match ($this->normalizeVenueEventType($eventType)) {
+            'birthday' => 'Birthday',
+            'meeting_staff' => 'Meeting / Staff',
+            default => 'Wedding',
+        };
+    }
+
+    private function venueUnitPrice(Venue $venue, string $eventType): float
+    {
+        return match ($this->normalizeVenueEventType($eventType)) {
+            'birthday' => (float) $venue->birthday_price,
+            'meeting_staff' => (float) $venue->meeting_staff_price,
+            default => (float) $venue->wedding_price,
+        };
     }
 
     /**
