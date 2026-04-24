@@ -245,9 +245,17 @@
                             <input type="range" min="1" max="100" wire:model.blur="emailAlertThreshold" class="w-full" />
                         </div>
 
-                        <x-filament::input.wrapper>
-                            <x-filament::input type="number" min="0" step="0.01" wire:model.blur="smsLowCreditThreshold" placeholder="Low SMS credits threshold" />
-                        </x-filament::input.wrapper>
+                        <div>
+                            <label class="mb-2 block text-xs font-medium text-gray-700 dark:text-gray-200">
+                                Low SMS credits threshold
+                            </label>
+                            <x-filament::input.wrapper>
+                                <x-filament::input type="number" min="0" step="0.01" wire:model.blur="smsLowCreditThreshold" />
+                            </x-filament::input.wrapper>
+                            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                Shows an alert when Semaphore credits fall below this amount.
+                            </p>
+                        </div>
                     </div>
                 </x-filament::section>
             </div>

@@ -484,11 +484,19 @@ class Settings extends Page
     public function updatedEmailAlertThreshold($value): void
     {
         $this->emailAlertThreshold = (string) max(1, min(100, (int) $value));
+
+        EnvEditor::updateMany([
+            'MAIL_ALERT_THRESHOLD_PERCENT' => $this->emailAlertThreshold,
+        ]);
     }
 
     public function updatedSmsLowCreditThreshold($value): void
     {
         $this->smsLowCreditThreshold = number_format(max(0, (float) $value), 2, '.', '');
+
+        EnvEditor::updateMany([
+            'SMS_LOW_CREDIT_THRESHOLD' => $this->smsLowCreditThreshold,
+        ]);
     }
 
     public function updatedAllowCustomPartialPayment($value): void
@@ -970,8 +978,13 @@ class Settings extends Page
 
     private function normalizeAlertThresholds(): void
     {
-        $this->emailAlertThreshold = (string) $this->emailAlertThresholdValue();
-        $this->smsLowCreditThreshold = number_format($this->smsLowCreditThresholdValue(), 2, '.', '');
+        $this->emailAlertThreshold = (string) max(1, min(100, (int) env('MAIL_ALERT_THRESHOLD_PERCENT', $this->emailAlertThreshold)));
+        $this->smsLowCreditThreshold = number_format(
+            max(0, (float) env('SMS_LOW_CREDIT_THRESHOLD', $this->smsLowCreditThreshold)),
+            2,
+            '.',
+            ''
+        );
     }
 
     private function emailAlertThresholdValue(): int
