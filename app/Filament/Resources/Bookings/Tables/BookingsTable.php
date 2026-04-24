@@ -16,6 +16,7 @@ use App\Support\BookingFullBalancePayment;
 use App\Support\BookingLifecycleActions;
 use App\Support\BookingPricing;
 use App\Support\BookingSpecialDiscount;
+use App\Support\CancellationPolicy;
 use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -43,8 +44,8 @@ use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Mail;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class BookingsTable
@@ -418,6 +419,7 @@ class BookingsTable
                 TextColumn::make('next_step')
                     ->label('Next step')
                     ->getStateUsing(fn (Booking $record): string => BookingAdminGuidance::listNextActionLabel($record))
+                    ->tooltip(fn (Booking $record): ?string => BookingAdminGuidance::listNextStepTooltip($record))
                     ->wrap()
                     ->toggleable(),
 
@@ -686,9 +688,12 @@ class BookingsTable
                         ->color('success')
                         ->requiresConfirmation()
                         ->modalHeading('Confirm refund completion?')
-                        ->modalDescription('Use this only after the guest refund has been processed externally. This updates payment status to Refunded.')
+                        ->modalDescription(fn (Booking $record): string => CancellationPolicy::adminMarkRefundCompletedModalBody($record))
                         ->visible(fn (Booking $record): bool => ! $record->trashed()
-                            && $record->booking_status === Booking::BOOKING_STATUS_RESCHEDULED
+                            && in_array($record->booking_status, [
+                                Booking::BOOKING_STATUS_RESCHEDULED,
+                                Booking::BOOKING_STATUS_CANCELLED,
+                            ], true)
                             && $record->payment_status === Booking::PAYMENT_STATUS_REFUND_PENDING)
                         ->action(function (Booking $record): void {
                             $record->update([

@@ -98,8 +98,14 @@ class EditBooking extends EditRecord
 
             // If staff changed dates/rooms/venues, total_price may change. When the payment status
             // field is left untouched, keep it consistent with the actual paid amount.
+            $refundPipelineStatuses = [
+                Booking::PAYMENT_STATUS_REFUND_PENDING,
+                Booking::PAYMENT_STATUS_REFUNDED,
+            ];
             if (array_key_exists('payment_status', $data)
-                && (string) $incomingPaymentStatus === (string) $record->payment_status) {
+                && (string) $incomingPaymentStatus === (string) $record->payment_status
+                && ! in_array($incomingPaymentStatus, $refundPipelineStatuses, true)
+                && ! in_array((string) $record->payment_status, $refundPipelineStatuses, true)) {
                 $newTotal = array_key_exists('total_price', $data) ? (float) $data['total_price'] : (float) $record->total_price;
                 $paid = (float) $record->total_paid;
                 $computed = Booking::paymentStatusFromAmounts($newTotal, $paid);

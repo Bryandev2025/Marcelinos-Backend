@@ -4,7 +4,6 @@ namespace App\Support;
 
 use App\Models\Booking;
 use Illuminate\Support\HtmlString;
-use App\Support\BookingSpecialDiscount;
 
 /**
  * Staff-facing copy for “what’s next” on a booking (list column, operations panel).
@@ -21,6 +20,30 @@ final class BookingAdminGuidance
         $paymentStatus = (string) $booking->payment_status;
 
         if ($bookingStatus === Booking::BOOKING_STATUS_CANCELLED) {
+            $row = CancellationPolicy::cancelledBookingRefundTransparency($booking);
+            if ($row === null) {
+                return __('No further actions — booking is cancelled.');
+            }
+
+            if ($paymentStatus === Booking::PAYMENT_STATUS_REFUND_PENDING) {
+                return __('Refund pending: pay out PHP :refund to the guest after deduction. Cancellation fee is :pct% of booking total (PHP :fee); PHP :retained retained (non-refundable); they paid PHP :paid. Then use “Mark refund completed.”', [
+                    'refund' => number_format($row['refund_to_guest'], 2),
+                    'pct' => (string) $row['fee_percent'],
+                    'fee' => number_format($row['fee_from_total'], 2),
+                    'retained' => number_format($row['retained'], 2),
+                    'paid' => number_format($row['amount_paid'], 2),
+                ]);
+            }
+
+            if ($paymentStatus === Booking::PAYMENT_STATUS_REFUNDED) {
+                return __('Refund completed. Per policy: :pct% fee (PHP :fee), PHP :retained retained, guest refund PHP :refund.', [
+                    'pct' => (string) $row['fee_percent'],
+                    'fee' => number_format($row['fee_from_total'], 2),
+                    'retained' => number_format($row['retained'], 2),
+                    'refund' => number_format($row['refund_to_guest'], 2),
+                ]);
+            }
+
             return __('No further actions — booking is cancelled.');
         }
 
@@ -66,6 +89,25 @@ final class BookingAdminGuidance
     }
 
     /**
+     * Extra detail for the list “Next step” column tooltip (cancelled + refund pipeline).
+     */
+    public static function listNextStepTooltip(Booking $booking): ?string
+    {
+        $row = CancellationPolicy::cancelledBookingRefundTransparency($booking);
+        if ($row === null) {
+            return null;
+        }
+
+        return __(':pct% fee on total (₱:fee). Guest paid ₱:paid. Retained ₱:retained. Refund ₱:refund.', [
+            'pct' => (string) $row['fee_percent'],
+            'fee' => number_format($row['fee_from_total'], 2),
+            'paid' => number_format($row['amount_paid'], 2),
+            'retained' => number_format($row['retained'], 2),
+            'refund' => number_format($row['refund_to_guest'], 2),
+        ]);
+    }
+
+    /**
      * Short label for the optional list “Next action” column.
      */
     public static function listNextActionLabel(Booking $booking): string
@@ -78,6 +120,10 @@ final class BookingAdminGuidance
         $paymentStatus = (string) $booking->payment_status;
 
         if ($bookingStatus === Booking::BOOKING_STATUS_CANCELLED) {
+            if ($paymentStatus === Booking::PAYMENT_STATUS_REFUND_PENDING) {
+                return __('Complete refund');
+            }
+
             return '—';
         }
 
@@ -148,6 +194,27 @@ final class BookingAdminGuidance
 
         $next = e(self::nextStepPlainText($booking));
 
+        $cancellationHtml = '';
+        $cr = CancellationPolicy::cancelledBookingRefundTransparency($booking);
+        if ($cr !== null) {
+            $pct = e((string) $cr['fee_percent']);
+            $fee = e(number_format($cr['fee_from_total'], 2));
+            $paidCr = e(number_format($cr['amount_paid'], 2));
+            $retained = e(number_format($cr['retained'], 2));
+            $refund = e(number_format($cr['refund_to_guest'], 2));
+            $cancellationHtml = <<<HTML
+    <div class="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm ring-1 ring-orange-900/5 dark:border-orange-400/25 dark:bg-orange-950/30 dark:ring-white/10">
+        <p class="font-semibold text-orange-950 dark:text-orange-100">Cancellation — refund transparency</p>
+        <p class="mt-1 text-xs text-orange-900/90 dark:text-orange-100/80">Policy deduction: <strong>{$pct}%</strong> of booking total (fee PHP <span class="tabular-nums">{$fee}</span>).</p>
+        <dl class="mt-2 grid gap-1 sm:grid-cols-2 text-xs sm:text-sm">
+            <div><dt class="text-orange-800/80 dark:text-orange-200/80">Amount guest paid</dt><dd class="font-medium tabular-nums text-orange-950 dark:text-orange-50">₱{$paidCr}</dd></div>
+            <div><dt class="text-orange-800/80 dark:text-orange-200/80">Deducted / retained</dt><dd class="font-medium tabular-nums text-orange-950 dark:text-orange-50">₱{$retained}</dd></div>
+            <div class="sm:col-span-2"><dt class="text-orange-800/80 dark:text-orange-200/80">Refund to guest (after deduction)</dt><dd class="font-semibold tabular-nums text-orange-950 dark:text-orange-50">₱{$refund}</dd></div>
+        </dl>
+    </div>
+HTML;
+        }
+
         $discountRow = $discount > 0.009
             ? '<div><dt class="text-gray-500 dark:text-gray-400">Gross</dt><dd class="font-medium tabular-nums">₱'.$grossText.'</dd></div>
                <div><dt class="text-gray-500 dark:text-gray-400">Discount</dt><dd class="font-medium tabular-nums text-rose-700 dark:text-rose-300">- ₱'.$discountText.'</dd></div>'
@@ -171,6 +238,7 @@ final class BookingAdminGuidance
         <div><dt class="text-gray-500 dark:text-gray-400">Paid</dt><dd class="font-medium tabular-nums">₱{$paid}</dd></div>
         <div><dt class="text-gray-500 dark:text-gray-400">Balance</dt><dd class="font-medium tabular-nums">₱{$balance}</dd></div>
     </dl>
+    {$cancellationHtml}
     <p class="rounded-lg bg-gray-50 p-3 text-gray-800 ring-1 ring-gray-950/5 dark:bg-white/5 dark:text-gray-200 dark:ring-white/10"><span class="font-medium text-gray-950 dark:text-white">Next:</span> {$next}</p>
 </div>
 HTML;

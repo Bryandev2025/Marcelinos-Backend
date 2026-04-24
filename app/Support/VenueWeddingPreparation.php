@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Booking;
+use Carbon\CarbonInterface;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -59,8 +60,8 @@ final class VenueWeddingPreparation
      */
     public static function constrainToBookingsThatCollideWithVenueCandidateRange(
         Builder $bookingQuery,
-        Carbon $effClientStart,
-        Carbon $clientCheckOut,
+        CarbonInterface $effClientStart,
+        CarbonInterface $clientCheckOut,
         ?int $excludeBookingId = null,
     ): void {
         if ($excludeBookingId) {
