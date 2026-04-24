@@ -124,6 +124,10 @@ class Guest extends Model
 
         if (! $validated['is_international']) {
             $validated['country'] = 'Philippines';
+        } elseif (isset($validated['country']) && strcasecmp((string) $validated['country'], 'Philippines') === 0) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'country' => ['Foreign guests cannot use Philippines as country.'],
+            ]);
         } elseif (($validated['contact_num'] ?? null) === null) {
             // DB column is non-nullable; foreign guests may legitimately skip phone.
             $validated['contact_num'] = '';

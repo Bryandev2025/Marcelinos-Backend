@@ -89,6 +89,20 @@ class CreateBooking extends CreateRecord
         $guestData['is_international'] = (bool) ($guestData['is_international'] ?? false);
         if (! $guestData['is_international']) {
             $guestData['country'] = $guestData['country'] ?? 'Philippines';
+        } else {
+            $guestData['contact_num'] = trim((string) ($guestData['contact_num'] ?? ''));
+            $country = trim((string) ($guestData['country'] ?? ''));
+
+            if (strcasecmp($country, 'Philippines') === 0) {
+                throw ValidationException::withMessages([
+                    'data.country' => __('Foreign guests cannot use Philippines as country.'),
+                ]);
+            }
+        }
+
+        if ($guestData['is_international'] && ($guestData['contact_num'] ?? null) === '') {
+            // guests.contact_num is non-nullable; keep empty string for foreign guests without phone.
+            $guestData['contact_num'] = '';
         }
 
         $guest = Guest::query()->create($guestData);

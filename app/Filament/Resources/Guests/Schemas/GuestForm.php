@@ -32,7 +32,9 @@ class GuestForm
                     ->live(onBlur: true)
                     ->afterStateUpdated(fn (Set $set, ?string $state) => $set('last_name', Str::title((string) $state)))
                     ->dehydrateStateUsing(fn (?string $state): string => Str::title(trim((string) $state))),
-                TextInput::make('contact_num')->required(),
+                TextInput::make('contact_num')
+                    ->required(fn (Get $get): bool => ! ((bool) $get('is_international')))
+                    ->maxLength(20),
                 TextInput::make('email')
                     ->required()
                     ->email(),
@@ -61,7 +63,19 @@ class GuestForm
                 TextInput::make('country')
                     ->default('Philippines')
                     ->required(fn (Get $get) => (bool) $get('is_international'))
-                    ->visible(fn (Get $get) => (bool) $get('is_international')),
+                    ->visible(fn (Get $get) => (bool) $get('is_international'))
+                    ->rules([
+                        fn (Get $get) => function (string $attribute, mixed $value, \Closure $fail) use ($get): void {
+                            if (! ((bool) $get('is_international'))) {
+                                return;
+                            }
+
+                            $country = trim((string) $value);
+                            if ($country !== '' && strcasecmp($country, 'Philippines') === 0) {
+                                $fail('Foreign guests cannot use Philippines as country.');
+                            }
+                        },
+                    ]),
                 ...PhAddressFields::make(),
             ]);
     }

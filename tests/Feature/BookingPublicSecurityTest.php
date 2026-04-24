@@ -183,4 +183,39 @@ class BookingPublicSecurityTest extends TestCase
         $this->assertSame(Booking::BOOKING_STATUS_RESERVED, (string) $booking->booking_status);
         $this->assertNotNull($booking->email_verified_at);
     }
+
+    #[Test]
+    public function foreign_guest_can_book_without_phone_number(): void
+    {
+        Mail::fake();
+        $venue = $this->createVenue();
+        $payload = $this->venueOnlyPayload($venue, 'foreign-no-phone@example.test');
+        $payload['is_international'] = true;
+        $payload['country'] = 'Japan';
+        unset($payload['contact_num']);
+
+        $response = $this->withHeaders($this->apiHeaders())
+            ->postJson('/api/bookings', $payload);
+
+        $response->assertCreated()
+            ->assertJsonPath('guest.is_international', true)
+            ->assertJsonPath('guest.country', 'Japan')
+            ->assertJsonPath('guest.contact_num', '');
+    }
+
+    #[Test]
+    public function foreign_guest_cannot_set_country_to_philippines(): void
+    {
+        Mail::fake();
+        $venue = $this->createVenue();
+        $payload = $this->venueOnlyPayload($venue, 'foreign-ph@example.test');
+        $payload['is_international'] = true;
+        $payload['country'] = 'Philippines';
+        $payload['contact_num'] = '';
+
+        $this->withHeaders($this->apiHeaders())
+            ->postJson('/api/bookings', $payload)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['country']);
+    }
 }

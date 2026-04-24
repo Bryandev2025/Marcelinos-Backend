@@ -299,7 +299,7 @@ class BookingCreateWizard
                         ->native(false),
                     TextInput::make('contact_num')
                         ->label('Phone number')
-                        ->required()
+                        ->required(fn (Get $get): bool => ! ((bool) $get('is_international')))
                         ->maxLength(20),
                     TextInput::make('email')
                         ->email()
@@ -328,7 +328,19 @@ class BookingCreateWizard
                         ->default('Philippines')
                         ->maxLength(100)
                         ->required(fn (Get $get) => (bool) $get('is_international'))
-                        ->visible(fn (Get $get) => (bool) $get('is_international')),
+                        ->visible(fn (Get $get) => (bool) $get('is_international'))
+                        ->rules([
+                            fn (Get $get) => function (string $attribute, mixed $value, Closure $fail) use ($get): void {
+                                if (! ((bool) $get('is_international'))) {
+                                    return;
+                                }
+
+                                $country = trim((string) $value);
+                                if ($country !== '' && strcasecmp($country, 'Philippines') === 0) {
+                                    $fail('Foreign guests cannot use Philippines as country.');
+                                }
+                            },
+                        ]),
                     ...PhAddressFields::make(),
                 ]),
             Step::make('Review')
