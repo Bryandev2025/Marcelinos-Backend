@@ -309,16 +309,52 @@
             text-transform: none;
         }
 
-        .badge.status {
-            background: #e8f1ef;
-            border-color: #c3d6d2;
-            color: #0f3d36;
+        .badge.status-green {
+            background: #dcfce7;
+            border-color: #bbf7d0;
+            color: #166534;
         }
 
-        .badge.payment {
-            background: #eef1ff;
-            border-color: #ccd4ff;
-            color: #2f3f88;
+        .badge.status-yellow {
+            background: #fef9c3;
+            border-color: #fde68a;
+            color: #a16207;
+        }
+
+        .badge.status-red {
+            background: #fee2e2;
+            border-color: #fecaca;
+            color: #b91c1c;
+        }
+
+        .badge.status-purple {
+            background: #f3e8ff;
+            border-color: #e9d5ff;
+            color: #7e22ce;
+        }
+
+        .badge.payment-green {
+            background: #dcfce7;
+            border-color: #bbf7d0;
+            color: #166534;
+        }
+
+        .badge.payment-amber {
+            background: #fef3c7;
+            border-color: #fde68a;
+            color: #92400e;
+        }
+
+        .badge.payment-yellow {
+            background: #fef9c3;
+            border-color: #fde68a;
+            color: #a16207;
+        }
+
+        .badge.payment-rose {
+            background: #ffe4e6;
+            border-color: #fecdd3;
+            color: #be123c;
         }
 
         .badge.method {
@@ -515,9 +551,35 @@
             color: #667085;
             text-align: center;
         }
+
+        .peso {
+            font-family: DejaVu Sans, Arial, sans-serif;
+        }
     </style>
 </head>
 <body>
+    @php
+        $bookingStatusKey = strtolower((string) $booking->booking_status);
+        $paymentStatusKey = strtolower((string) $booking->payment_status);
+
+        $bookingStatusBadgeClass = match ($bookingStatusKey) {
+            'completed' => 'status-green',
+            'cancelled' => 'status-red',
+            'pending' => 'status-yellow',
+            'confirmed', 'reserved' => 'status-green',
+            'occupied' => 'status-green',
+            'rescheduled' => 'status-purple',
+            default => 'status-yellow',
+        };
+
+        $paymentStatusBadgeClass = match ($paymentStatusKey) {
+            'paid' => 'payment-green',
+            'partial' => 'payment-amber',
+            'unpaid' => 'payment-yellow',
+            'refunded' => 'payment-rose',
+            default => 'payment-yellow',
+        };
+    @endphp
     <div class="page">
         <div class="watermark">
             <strong>LEGITIMATE OFFICIAL COPY</strong>
@@ -620,11 +682,11 @@
                         <table class="kv-row">
                             <tr>
                                 <td class="kv-label">Stay status</td>
-                                <td class="kv-value"><span class="badge status">{{ $bookingStatusLabel }}</span></td>
+                                <td class="kv-value"><span class="badge {{ $bookingStatusBadgeClass }}">{{ $bookingStatusLabel }}</span></td>
                             </tr>
                             <tr>
                                 <td class="kv-label">Payment status</td>
-                                <td class="kv-value"><span class="badge payment">{{ $paymentStatusLabel }}</span></td>
+                                <td class="kv-value"><span class="badge {{ $paymentStatusBadgeClass }}">{{ $paymentStatusLabel }}</span></td>
                             </tr>
                             <tr>
                                 <td class="kv-label">Method</td>
@@ -632,11 +694,11 @@
                             </tr>
                             <tr>
                                 <td class="kv-label">Amount paid</td>
-                                <td class="kv-value">₱{{ number_format($amountPaid, 2) }}</td>
+                                <td class="kv-value"><span class="peso">P</span>{{ number_format($amountPaid, 2) }}</td>
                             </tr>
                             <tr>
                                 <td class="kv-label">Remaining balance</td>
-                                <td class="kv-value">₱{{ number_format($balance, 2) }}</td>
+                                <td class="kv-value"><span class="peso">P</span>{{ number_format($balance, 2) }}</td>
                             </tr>
                         </table>
                     </td>
@@ -652,23 +714,23 @@
                     <table class="cr-table">
                         <tr>
                             <td>Booking total (for fee calculation)</td>
-                            <td>₱{{ number_format((float) $grandTotal, 2) }}</td>
+                            <td><span class="peso">&#8369;</span>{{ number_format((float) $grandTotal, 2) }}</td>
                         </tr>
                         <tr>
                             <td>Cancellation fee ({{ (int) $cancellationRefund['fee_percent'] }}% of booking total)</td>
-                            <td>₱{{ number_format((float) $cancellationRefund['fee_from_total'], 2) }}</td>
+                            <td><span class="peso">&#8369;</span>{{ number_format((float) $cancellationRefund['fee_from_total'], 2) }}</td>
                         </tr>
                         <tr>
                             <td>Amount you paid</td>
-                            <td>₱{{ number_format((float) $cancellationRefund['amount_paid'], 2) }}</td>
+                            <td><span class="peso">&#8369;</span>{{ number_format((float) $cancellationRefund['amount_paid'], 2) }}</td>
                         </tr>
                         <tr>
                             <td>Deducted / retained (non-refundable portion)</td>
-                            <td>₱{{ number_format((float) $cancellationRefund['retained'], 2) }}</td>
+                            <td><span class="peso">&#8369;</span>{{ number_format((float) $cancellationRefund['retained'], 2) }}</td>
                         </tr>
                         <tr>
                             <td><strong>Refund to you (after deduction)</strong></td>
-                            <td><strong>₱{{ number_format((float) $cancellationRefund['refund_to_guest'], 2) }}</strong></td>
+                            <td><strong><span class="peso">&#8369;</span>{{ number_format((float) $cancellationRefund['refund_to_guest'], 2) }}</strong></td>
                         </tr>
                     </table>
                 </div>
@@ -701,9 +763,9 @@
                         <tr>
                             <td>#{{ $line++ }}</td>
                             <td><strong>{{ $item['label'] }}</strong></td>
-                            <td class="right-align">₱{{ number_format((float) $item['unit_price'], 2) }}</td>
+                            <td class="right-align"><span class="peso">&#8369;</span>{{ number_format((float) $item['unit_price'], 2) }}</td>
                             <td class="right-align">{{ $item['quantity'] }}</td>
-                            <td class="right-align">₱{{ number_format((float) $item['line_total'], 2) }}</td>
+                            <td class="right-align"><span class="peso">&#8369;</span>{{ number_format((float) $item['line_total'], 2) }}</td>
                         </tr>
                     @empty
                         <tr>
@@ -718,9 +780,9 @@
                                 <strong>{{ $item['label'] }}</strong>
                                 <div class="muted" style="font-size:8px; margin-top:1px;">{{ $item['event_type'] }} event · Capacity {{ $item['capacity'] }}</div>
                             </td>
-                            <td class="right-align">₱{{ number_format((float) $item['unit_price'], 2) }}</td>
+                            <td class="right-align"><span class="peso">&#8369;</span>{{ number_format((float) $item['unit_price'], 2) }}</td>
                             <td class="right-align">{{ $billingUnits }}</td>
-                            <td class="right-align">₱{{ number_format((float) $item['line_total'], 2) }}</td>
+                            <td class="right-align"><span class="peso">&#8369;</span>{{ number_format((float) $item['line_total'], 2) }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -750,23 +812,23 @@
                             <table class="totals">
                                 <tr>
                                     <td>Room subtotal</td>
-                                    <td>₱{{ number_format($roomSubtotal, 2) }}</td>
+                                    <td><span class="peso">&#8369;</span>{{ number_format($roomSubtotal, 2) }}</td>
                                 </tr>
                                 <tr>
                                     <td>Venue subtotal</td>
-                                    <td>₱{{ number_format($venueSubtotal, 2) }}</td>
+                                    <td><span class="peso">&#8369;</span>{{ number_format($venueSubtotal, 2) }}</td>
                                 </tr>
                                 <tr>
                                     <td>Original total</td>
-                                    <td>₱{{ number_format($originalTotal, 2) }}</td>
+                                    <td><span class="peso">&#8369;</span>{{ number_format($originalTotal, 2) }}</td>
                                 </tr>
                                 <tr>
                                     <td>Discount applied</td>
-                                    <td>- ₱{{ number_format($discountApplied, 2) }}</td>
+                                    <td>- <span class="peso">&#8369;</span>{{ number_format($discountApplied, 2) }}</td>
                                 </tr>
                                 <tr class="grand">
                                     <td>Grand total</td>
-                                    <td>₱{{ number_format($grandTotal, 2) }}</td>
+                                    <td><span class="peso">&#8369;</span>{{ number_format($grandTotal, 2) }}</td>
                                 </tr>
                             </table>
                         </div>
