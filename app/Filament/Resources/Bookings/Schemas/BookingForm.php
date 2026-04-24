@@ -10,6 +10,7 @@ use App\Models\RoomBlockedDate;
 use App\Models\Venue;
 use App\Support\BookingPricing;
 use App\Support\RoomInventoryGroupKey;
+use App\Support\VenueWeddingPreparation;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Filament\Forms\Components\DateTimePicker;
@@ -302,7 +303,7 @@ class BookingForm
                         ->relationship(
                             'venues',
                             'name',
-                            modifyQueryUsing: function ($query, ?string $search, ?Booking $record = null, Get $get): void {
+                            modifyQueryUsing: function ($query, ?string $search, ?Booking $record, Get $get): void {
                                 self::constrainAvailableVenuesQuery($query, $get, $record);
                             },
                         )
@@ -321,7 +322,13 @@ class BookingForm
                                 }
                             },
                             fn (Get $get, ?Booking $record) => function (string $attribute, $value, $fail) use ($get, $record): void {
-                                if (self::hasVenueConflicts($value, $get('check_in'), $get('check_out'), $record)) {
+                                if (self::hasVenueConflicts(
+                                    $value,
+                                    $get('check_in'),
+                                    $get('check_out'),
+                                    $record,
+                                    is_string($get('venue_event_type')) ? $get('venue_event_type') : null,
+                                )) {
                                     $fail('One or more selected venues are not available for the chosen dates.');
                                 }
                             },
@@ -656,7 +663,7 @@ class BookingForm
             ->exists();
     }
 
-    public static function hasVenueConflicts($venueIds, $checkIn, $checkOut, ?Booking $record): bool
+    public static function hasVenueConflicts($venueIds, $checkIn, $checkOut, ?Booking $record, ?string $venueEventType = null): bool
     {
         $venueIds = is_array($venueIds) ? $venueIds : [$venueIds];
         $venueIds = array_filter($venueIds);
@@ -696,13 +703,19 @@ class BookingForm
             return true;
         }
 
-        return Booking::query()
-            ->when($record, fn ($query) => $query->where('id', '!=', $record->id))
-            ->whereNotIn('booking_status', [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED])
-            ->whereDate('check_in', '<=', $endDay->toDateString())
-            ->whereDate('check_out', '>=', $startDay->toDateString())
-            ->whereHas('venues', fn ($query) => $query->whereIn('venues.id', $venueIds))
-            ->exists();
+        $venuesCount = count($venueIds);
+        $availableCount = Venue::query()
+            ->whereIn('id', $venueIds)
+            ->availableBetween(
+                $start,
+                $end,
+                $record?->id,
+                BookingPricing::normalizeVenueEventType($venueEventType),
+                true,
+            )
+            ->count();
+
+        return $availableCount < $venuesCount;
     }
 
     public static function constrainAvailableVenuesQuery($query, Get $get, ?Booking $record = null): void
@@ -764,20 +777,30 @@ class BookingForm
 
         $nameCol = $query->getModel()->qualifyColumn('name');
 
-        $query->where(function ($outerQuery) use ($query, $startDay, $endDay, $record, $currentVenueIds, $venueTableKey): void {
+        $venueEventType = (string) ($get('venue_event_type') ?? '');
+        if ($venueEventType === '') {
+            $venueEventType = BookingPricing::VENUE_EVENT_WEDDING;
+        } else {
+            $venueEventType = BookingPricing::normalizeVenueEventType($venueEventType);
+        }
+        $hasVenueSelection = ! empty(array_filter((array) ($get('venues') ?? [])));
+        $effIn = VenueWeddingPreparation::effectiveVenueBlockStart($start, $venueEventType, $hasVenueSelection);
+        $end = $end->copy();
+
+        $query->where(function ($outerQuery) use ($query, $startDay, $endDay, $effIn, $end, $record, $currentVenueIds, $venueTableKey): void {
             $outerQuery
-                ->where(function ($availableQuery) use ($query, $startDay, $endDay, $record): void {
+                ->where(function ($availableQuery) use ($query, $startDay, $endDay, $effIn, $end, $record): void {
                     $availableQuery
                         ->where($query->getModel()->qualifyColumn('status'), '!=', Venue::STATUS_MAINTENANCE)
-                        ->whereDoesntHave('bookings', function ($bookingQuery) use ($startDay, $endDay, $record): void {
+                        ->whereDoesntHave('bookings', function ($bookingQuery) use ($effIn, $end, $record): void {
                             $bookingQuery
-                                ->whereNotIn('bookings.booking_status', [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED])
-                                ->whereDate('bookings.check_in', '<=', $endDay->toDateString())
-                                ->whereDate('bookings.check_out', '>=', $startDay->toDateString());
-
-                            if ($record instanceof Booking) {
-                                $bookingQuery->where('bookings.id', '!=', $record->id);
-                            }
+                                ->whereIn('bookings.booking_status', Booking::availabilityBlockingStatuses());
+                            VenueWeddingPreparation::constrainToBookingsThatCollideWithVenueCandidateRange(
+                                $bookingQuery,
+                                $effIn,
+                                $end,
+                                $record instanceof Booking ? (int) $record->id : null,
+                            );
                         })
                         ->whereDoesntHave('venueBlockedDates', function ($blockedQuery) use ($startDay, $endDay): void {
                             $blockedQuery

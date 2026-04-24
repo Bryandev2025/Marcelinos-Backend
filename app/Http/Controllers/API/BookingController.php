@@ -12,12 +12,13 @@ use App\Models\Payment;
 use App\Models\Room;
 use App\Models\Venue;
 use App\Services\BookingActionOtpService;
-use App\Support\CancellationPolicy;
 use App\Support\BookingDuplicateGuard;
 use App\Support\BookingPricing;
+use App\Support\CancellationPolicy;
 use App\Support\RoomInventoryGroupAvailability;
 use App\Support\RoomInventoryGroupKey;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -27,7 +28,6 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Facades\Mail;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class BookingController extends Controller
@@ -309,7 +309,7 @@ class BookingController extends Controller
     /**
      * Signed link from {@see VerifyBookingEmail}: activate hold, optional Xendit invoice.
      */
-    public function verifyEmail(Request $request, Booking $booking): JsonResponse|\Illuminate\Http\RedirectResponse
+    public function verifyEmail(Request $request, Booking $booking): JsonResponse|RedirectResponse
     {
         if ($booking->booking_status === Booking::BOOKING_STATUS_CANCELLED) {
             return response()->json([
@@ -365,7 +365,13 @@ class BookingController extends Controller
 
         if ($venueIds !== []) {
             $availableVenueIds = Venue::whereIn('id', $venueIds)
-                ->availableBetween($checkIn, $checkOut, $booking->id)
+                ->availableBetween(
+                    $checkIn,
+                    $checkOut,
+                    $booking->id,
+                    $booking->venue_event_type,
+                    $booking->venues->isNotEmpty(),
+                )
                 ->pluck('id')
                 ->all();
 
@@ -397,7 +403,7 @@ class BookingController extends Controller
         );
     }
 
-    private function verificationSuccessResponse(Booking $booking, ?string $paymentUrl = null): JsonResponse|\Illuminate\Http\RedirectResponse
+    private function verificationSuccessResponse(Booking $booking, ?string $paymentUrl = null): JsonResponse|RedirectResponse
     {
         if (request()->expectsJson()) {
             return response()->json([
@@ -505,8 +511,9 @@ class BookingController extends Controller
             }
 
             if ($hasVenues) {
+                $venueEventForAvailability = BookingPricing::normalizeVenueEventType($validated['venue_event_type'] ?? null);
                 $availableVenueIds = Venue::whereIn('id', $venueIds)
-                    ->availableBetween($checkIn, $checkOut)
+                    ->availableBetween($checkIn, $checkOut, null, $venueEventForAvailability, true)
                     ->pluck('id')
                     ->all();
 
@@ -1011,7 +1018,13 @@ class BookingController extends Controller
         $venueIds = $booking->venues->pluck('id')->toArray();
         if (! empty($venueIds)) {
             $availableVenueIds = Venue::whereIn('id', $venueIds)
-                ->availableBetween($checkIn, $checkOut, $booking->id)
+                ->availableBetween(
+                    $checkIn,
+                    $checkOut,
+                    $booking->id,
+                    $booking->venue_event_type,
+                    $booking->venues->isNotEmpty(),
+                )
                 ->pluck('id')
                 ->toArray();
 
