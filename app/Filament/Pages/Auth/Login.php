@@ -13,6 +13,8 @@ use Filament\Models\Contracts\FilamentUser;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Component;
+use Filament\Schemas\Components\EmbeddedSchema;
+use Filament\Schemas\Components\Form;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Alignment;
 use Illuminate\Auth\SessionGuard;
@@ -23,23 +25,50 @@ class Login extends BaseLogin
 {
     public function form(Schema $schema): Schema
     {
-        $components = [
+        return $schema->components([
             $this->getEmailFormComponent(),
             $this->getPasswordFormComponent(),
+            $this->getRememberFormComponent(),
+        ]);
+    }
+
+    protected function getFormActions(): array
+    {
+        return [
+            $this->getAuthenticateFormAction(),
+        ];
+    }
+
+    public function getFormContentComponent(): Component
+    {
+        $footer = [
+            Actions::make($this->getFormActions())
+                ->alignment($this->getFormActionsAlignment())
+                ->fullWidth($this->hasFullWidthFormActions())
+                ->key('form-actions'),
         ];
 
         if (filament()->hasPasswordReset()) {
-            $components[] = Actions::make([
-                Action::make('requestPasswordReset')
-                    ->link()
-                    ->label(__('filament-panels::auth/pages/login.actions.request_password_reset.label'))
-                    ->url(filament()->getRequestPasswordResetUrl()),
-            ])->alignment(Alignment::End);
+            $footer[] = Actions::make([
+                $this->getRequestPasswordResetFormAction(),
+            ])
+                ->alignment(Alignment::Center)
+                ->key('request-password-reset-action');
         }
 
-        $components[] = $this->getRememberFormComponent();
+        return Form::make([EmbeddedSchema::make('form')])
+            ->id('form')
+            ->livewireSubmitHandler('authenticate')
+            ->footer($footer)
+            ->visible(fn (): bool => blank($this->userUndertakingMultiFactorAuthentication));
+    }
 
-        return $schema->components($components);
+    protected function getRequestPasswordResetFormAction(): Action
+    {
+        return Action::make('requestPasswordReset')
+            ->link()
+            ->label(__('filament-panels::auth/pages/login.actions.request_password_reset.label'))
+            ->url(filament()->getRequestPasswordResetUrl());
     }
 
     protected function getPasswordFormComponent(): Component
