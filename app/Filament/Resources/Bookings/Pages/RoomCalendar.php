@@ -568,17 +568,25 @@ class RoomCalendar extends Page
         $amount = BookingSpecialDiscount::discountAmount($booking);
         $gross = BookingSpecialDiscount::grossTotal($booking);
         $type = (string) ($booking->special_discount_type ?? '');
+        $target = BookingSpecialDiscount::resolveDiscountTarget($booking, (string) ($booking->special_discount_target ?? null));
         $value = (float) ($booking->special_discount_value ?? 0);
 
         $valueLabel = $type === BookingSpecialDiscount::TYPE_PERCENT
             ? rtrim(rtrim(number_format($value, 2), '0'), '.').'%'
             : 'PHP '.number_format($value, 2);
 
+        $targetLabel = match ($target) {
+            BookingSpecialDiscount::TARGET_ROOM => 'room subtotal',
+            BookingSpecialDiscount::TARGET_VENUE => 'venue subtotal',
+            default => 'grand total',
+        };
+
         return [
             'has_special_discount' => true,
             'discount_badge_text' => 'Discounted',
             'discount_tooltip' => sprintf(
-                'Special discount applied: %s off (PHP %s).',
+                'Special discount applied on %s: %s off (PHP %s).',
+                $targetLabel,
                 $valueLabel,
                 number_format($amount, 2),
             ),

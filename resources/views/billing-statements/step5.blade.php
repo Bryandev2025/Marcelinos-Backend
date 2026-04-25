@@ -853,6 +853,12 @@
                                     <td>Discount applied</td>
                                     <td>- <span class="peso">&#8369;</span>{{ number_format($discountApplied, 2) }}</td>
                                 </tr>
+                                @if ((float) $discountApplied > 0)
+                                    <tr>
+                                        <td>Discount target</td>
+                                        <td>{{ $discountTargetLabel ?? 'Grand total (room + venue)' }}</td>
+                                    </tr>
+                                @endif
                                 <tr class="grand">
                                     <td>Grand total</td>
                                     <td><span class="peso">&#8369;</span>{{ number_format($grandTotal, 2) }}</td>

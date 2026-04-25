@@ -34,6 +34,7 @@ class Booking extends Model
         'check_out',
         'total_price',
         'special_discount_type',
+        'special_discount_target',
         'special_discount_value',
         'special_discount_reason_code',
         'special_discount_note',

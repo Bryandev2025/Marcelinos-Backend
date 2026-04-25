@@ -15,6 +15,7 @@ use App\Models\Venue;
 use App\Services\BookingActionOtpService;
 use App\Support\BookingDuplicateGuard;
 use App\Support\BookingPricing;
+use App\Support\BookingSpecialDiscount;
 use App\Support\CancellationPolicy;
 use App\Support\RoomInventoryGroupAvailability;
 use App\Support\RoomInventoryGroupKey;
@@ -287,6 +288,7 @@ class BookingController extends Controller
         $amountPaid = (float) $bookingPayload->total_paid;
         $balance = max(0, (float) $bookingPayload->balance);
         $amountDueNow = $this->resolveAmountDueNow($bookingPayload);
+        $discountTarget = BookingSpecialDiscount::resolveDiscountTarget($bookingPayload, (string) ($bookingPayload->special_discount_target ?? null));
 
         $paymentSettings = $this->paymentSettingsConfig();
         $partialOptions = $paymentSettings['partial_payment_options'] ?? [];
@@ -294,6 +296,13 @@ class BookingController extends Controller
 
         return response()->json([
             'booking' => $bookingPayload,
+            'discount' => [
+                'has_special_discount' => BookingSpecialDiscount::hasDiscount($bookingPayload),
+                'target' => $discountTarget,
+                'target_label' => BookingSpecialDiscount::targetLabel($discountTarget),
+                'amount' => (float) ($bookingPayload->special_discount_amount_applied ?? 0),
+                'gross_total' => (float) BookingSpecialDiscount::grossTotal($bookingPayload),
+            ],
             'payment' => [
                 'method' => (string) ($bookingPayload->payment_method ?? 'cash'),
                 'plan' => (string) ($bookingPayload->online_payment_plan ?? ''),
@@ -410,6 +419,8 @@ class BookingController extends Controller
         }
 
         $discountApplied = (float) ($booking->special_discount_amount_applied ?? max(0, $originalTotal - $grandTotal));
+        $discountTarget = BookingSpecialDiscount::resolveDiscountTarget($booking, (string) ($booking->special_discount_target ?? null));
+        $discountTargetLabel = BookingSpecialDiscount::targetLabel($discountTarget);
         $amountPaid = (float) $booking->total_paid;
         $balance = (float) $booking->balance;
 
@@ -470,6 +481,8 @@ class BookingController extends Controller
             'computedSubtotal' => $computedSubtotal,
             'originalTotal' => $originalTotal,
             'discountApplied' => $discountApplied,
+            'discountTarget' => $discountTarget,
+            'discountTargetLabel' => $discountTargetLabel,
             'grandTotal' => $grandTotal,
             'amountPaid' => $amountPaid,
             'balance' => $balance,
