@@ -15,7 +15,8 @@
         $totalPrice = (float) $booking->total_price;
         $overageRefund = max(0, $totalPaid - $totalPrice);
         $isCancelled = (string) $booking->booking_status === Booking::BOOKING_STATUS_CANCELLED;
-        $cancellation = $isCancelled ? CancellationPolicy::breakdown($totalPrice, $totalPaid) : null;
+        $cancellation = $isCancelled ? CancellationPolicy::breakdownForCancelledBooking($totalPrice, $totalPaid) : null;
+        $appliesPercent = $cancellation !== null && ! empty($cancellation['applies_cancellation_percent']);
         $latestPayment = $booking->payments->sortByDesc('created_at')->first();
     @endphp
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
@@ -35,10 +36,13 @@
                                 <tr><td style="padding:6px 0; color:#6b7280;">Guest email</td><td style="padding:6px 0;"><strong>{{ $booking->guest?->email ?? 'N/A' }}</strong></td></tr>
                                 <tr><td style="padding:6px 0; color:#6b7280;">Total price</td><td style="padding:6px 0;"><strong>PHP {{ number_format($totalPrice, 2) }}</strong></td></tr>
                                 <tr><td style="padding:6px 0; color:#6b7280;">Total paid</td><td style="padding:6px 0;"><strong>PHP {{ number_format($totalPaid, 2) }}</strong></td></tr>
-                                @if($cancellation !== null)
+                                @if($cancellation !== null && $appliesPercent)
                                 <tr><td style="padding:6px 0; color:#6b7280;">Cancellation deduction</td><td style="padding:6px 0;"><strong>{{ (int) $cancellation['fee_percent'] }}% of booking total (PHP {{ number_format($cancellation['fee_from_total'], 2) }})</strong></td></tr>
                                 <tr><td style="padding:6px 0; color:#6b7280;">Amount retained (fee)</td><td style="padding:6px 0;"><strong>PHP {{ number_format($cancellation['amount_to_keep'], 2) }}</strong></td></tr>
                                 <tr><td style="padding:6px 0; color:#6b7280;">Amount to refund (policy)</td><td style="padding:6px 0;"><strong>PHP {{ number_format($cancellation['amount_to_refund'], 2) }}</strong></td></tr>
+                                @elseif($cancellation !== null)
+                                <tr><td style="padding:6px 0; color:#6b7280;" colspan="2">Partial payment at cancellation: treated as a <strong>non-refundable reservation fee</strong>. No guest refund; retain PHP <strong>{{ number_format($cancellation['amount_to_keep'], 2) }}</strong>.</td></tr>
+                                <tr><td style="padding:6px 0; color:#6b7280;">Amount to refund</td><td style="padding:6px 0;"><strong>PHP {{ number_format($cancellation['amount_to_refund'], 2) }}</strong></td></tr>
                                 @else
                                 <tr><td style="padding:6px 0; color:#6b7280;">Refund amount (paid minus new total)</td><td style="padding:6px 0;"><strong>PHP {{ number_format($overageRefund, 2) }}</strong></td></tr>
                                 @endif

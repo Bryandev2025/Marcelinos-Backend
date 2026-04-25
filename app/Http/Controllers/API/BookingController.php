@@ -1207,7 +1207,7 @@ class BookingController extends Controller
                 ], 422);
             }
 
-            $cancellation = CancellationPolicy::breakdown(
+            $cancellation = CancellationPolicy::breakdownForCancelledBooking(
                 (float) $booking->total_price,
                 (float) $booking->total_paid
             );

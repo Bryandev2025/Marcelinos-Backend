@@ -60,6 +60,40 @@ class BookingGuestCancelRefundTest extends TestCase
     }
 
     #[Test]
+    public function guest_cancel_of_partially_paid_booking_retains_deposit_with_zero_refund(): void
+    {
+        Mail::fake();
+        $this->mockCancelOtpVerification();
+        config()->set('notifications.refund_guest_eligible_enabled', false);
+        config()->set('notifications.refund_staff_alert_enabled', true);
+        config()->set('notifications.refund_staff_recipients', ['ops@example.test']);
+
+        $booking = $this->createPartiallyPaidReservedVenueBooking(
+            days: 2,
+            venueDayPrice: 1000,
+            paidAmount: 600.0,
+        );
+
+        $response = $this->withHeaders($this->apiHeaders())->patchJson("/api/bookings/{$booking->reference_number}/cancel", [
+            'otp' => '123456',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('message', 'Booking cancelled successfully.');
+        $this->assertSame('partial_deposit', $response->json('cancellation.settlement_type'));
+        $this->assertFalse($response->json('cancellation.applies_cancellation_percent'));
+        $this->assertEqualsWithDelta(0.0, (float) $response->json('cancellation.amount_to_refund'), 0.001);
+        $this->assertEqualsWithDelta(600.0, (float) $response->json('cancellation.amount_to_keep'), 0.001);
+
+        $token = (string) $booking->fresh()->receipt_token;
+        $receipt = $this->withHeaders($this->apiHeaders())->getJson("/api/bookings/receipt/{$token}");
+        $receipt->assertOk();
+        $this->assertFalse($receipt->json('cancellation_refund.applies_cancellation_percent'));
+        $this->assertEqualsWithDelta(0.0, (float) $receipt->json('cancellation_refund.refund_to_guest'), 0.01);
+        $this->assertStringContainsString('reservation', (string) $receipt->json('cancellation_refund.statement_note'));
+    }
+
+    #[Test]
     public function guest_cancel_of_unpaid_booking_leaves_payment_unpaid(): void
     {
         Mail::fake();
@@ -179,6 +213,55 @@ class BookingGuestCancelRefundTest extends TestCase
         ]);
 
         return [$booking->fresh(), $venue];
+    }
+
+    private function createPartiallyPaidReservedVenueBooking(int $days, int $venueDayPrice, float $paidAmount): Booking
+    {
+        $guest = Guest::query()->create([
+            'first_name' => 'Partial',
+            'middle_name' => null,
+            'last_name' => 'Cancel',
+            'contact_num' => '09171234570',
+            'email' => 'partial-cancel@example.test',
+            'gender' => Guest::GENDER_OTHER,
+        ]);
+
+        $venue = Venue::query()->create([
+            'name' => 'Partial Cancel Venue',
+            'description' => 'Feature test venue',
+            'capacity' => 100,
+            'price' => $venueDayPrice,
+            'wedding_price' => $venueDayPrice,
+            'birthday_price' => $venueDayPrice,
+            'meeting_staff_price' => $venueDayPrice,
+            'status' => Venue::STATUS_AVAILABLE,
+        ]);
+
+        $total = $venueDayPrice * $days;
+        $booking = Booking::query()->create([
+            'guest_id' => $guest->id,
+            'check_in' => '2026-05-10 00:00:00',
+            'check_out' => '2026-05-12 00:00:00',
+            'no_of_days' => $days,
+            'total_price' => $total,
+            'booking_status' => Booking::BOOKING_STATUS_RESERVED,
+            'payment_status' => Booking::PAYMENT_STATUS_PARTIAL,
+            'venue_event_type' => 'wedding',
+        ]);
+
+        $booking->venues()->attach($venue->id);
+
+        Payment::query()->create([
+            'booking_id' => $booking->id,
+            'total_amount' => $total,
+            'partial_amount' => $paidAmount,
+            'is_fullypaid' => false,
+            'provider' => 'cash',
+            'provider_ref' => 'test-partial-cancel-'.$booking->id,
+            'provider_status' => 'partial',
+        ]);
+
+        return $booking->fresh();
     }
 
     private function createUnpaidReservedVenueBooking(): Booking

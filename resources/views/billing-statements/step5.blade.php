@@ -706,33 +706,60 @@
             </table>
 
             @if (! empty($cancellationRefund))
+                @php
+                    $crAppliesPercent = ! empty($cancellationRefund['applies_cancellation_percent']);
+                @endphp
                 <div class="banner cancellation-refund" style="margin-top: 10px;">
                     <strong>Cancellation — refund transparency</strong>
-                    <div class="muted" style="margin-top: 2px; font-size: 8.5px; line-height: 1.35;">
-                        Based on the cancellation policy in effect now: <strong>{{ (int) $cancellationRefund['fee_percent'] }}%</strong> of the booking total is the cancellation fee. Amounts below show how that applies to what you paid.
-                    </div>
-                    <table class="cr-table">
-                        <tr>
-                            <td>Booking total (for fee calculation)</td>
-                            <td><span class="peso">&#8369;</span>{{ number_format((float) $grandTotal, 2) }}</td>
-                        </tr>
-                        <tr>
-                            <td>Cancellation fee ({{ (int) $cancellationRefund['fee_percent'] }}% of booking total)</td>
-                            <td><span class="peso">&#8369;</span>{{ number_format((float) $cancellationRefund['fee_from_total'], 2) }}</td>
-                        </tr>
-                        <tr>
-                            <td>Amount you paid</td>
-                            <td><span class="peso">&#8369;</span>{{ number_format((float) $cancellationRefund['amount_paid'], 2) }}</td>
-                        </tr>
-                        <tr>
-                            <td>Deducted / retained (non-refundable portion)</td>
-                            <td><span class="peso">&#8369;</span>{{ number_format((float) $cancellationRefund['retained'], 2) }}</td>
-                        </tr>
-                        <tr>
-                            <td><strong>Refund to you (after deduction)</strong></td>
-                            <td><strong><span class="peso">&#8369;</span>{{ number_format((float) $cancellationRefund['refund_to_guest'], 2) }}</strong></td>
-                        </tr>
-                    </table>
+                    @if ($crAppliesPercent)
+                        <div class="muted" style="margin-top: 2px; font-size: 8.5px; line-height: 1.35;">
+                            Based on the cancellation policy in effect now: <strong>{{ (int) $cancellationRefund['fee_percent'] }}%</strong> of the booking total is the cancellation fee. Amounts below show how that applies to what you paid.
+                        </div>
+                        <table class="cr-table">
+                            <tr>
+                                <td>Booking total (for fee calculation)</td>
+                                <td><span class="peso">&#8369;</span>{{ number_format((float) $grandTotal, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td>Cancellation fee ({{ (int) $cancellationRefund['fee_percent'] }}% of booking total)</td>
+                                <td><span class="peso">&#8369;</span>{{ number_format((float) $cancellationRefund['fee_from_total'], 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td>Amount you paid</td>
+                                <td><span class="peso">&#8369;</span>{{ number_format((float) $cancellationRefund['amount_paid'], 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td>Deducted / retained (non-refundable portion)</td>
+                                <td><span class="peso">&#8369;</span>{{ number_format((float) $cancellationRefund['retained'], 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Refund to you (after deduction)</strong></td>
+                                <td><strong><span class="peso">&#8369;</span>{{ number_format((float) $cancellationRefund['refund_to_guest'], 2) }}</strong></td>
+                            </tr>
+                        </table>
+                    @else
+                        <div class="muted" style="margin-top: 2px; font-size: 8.5px; line-height: 1.35;">
+                            {{ (string) ($cancellationRefund['statement_note'] ?? '') }}
+                        </div>
+                        <table class="cr-table">
+                            <tr>
+                                <td>Booking total</td>
+                                <td><span class="peso">&#8369;</span>{{ number_format((float) $grandTotal, 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td>Amount you paid (partial / reservation)</td>
+                                <td><span class="peso">&#8369;</span>{{ number_format((float) $cancellationRefund['amount_paid'], 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td>Non-refundable (reservation fee)</td>
+                                <td><span class="peso">&#8369;</span>{{ number_format((float) $cancellationRefund['retained'], 2) }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Refund to you</strong></td>
+                                <td><strong><span class="peso">&#8369;</span>{{ number_format((float) $cancellationRefund['refund_to_guest'], 2) }}</strong></td>
+                            </tr>
+                        </table>
+                    @endif
                 </div>
             @endif
 
