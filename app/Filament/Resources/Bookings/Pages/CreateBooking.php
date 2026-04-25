@@ -139,6 +139,8 @@ class CreateBooking extends CreateRecord
 
         $totalInt = (int) round($total);
         $data['booking_status'] = Booking::BOOKING_STATUS_RESERVED;
+        $data['payment_method'] = 'cash';
+        $data['online_payment_plan'] = '';
         if ($total <= 0) {
             $data['payment_status'] = Booking::PAYMENT_STATUS_UNPAID;
         } elseif ($this->pendingPaymentAmount >= $totalInt && $totalInt > 0) {
