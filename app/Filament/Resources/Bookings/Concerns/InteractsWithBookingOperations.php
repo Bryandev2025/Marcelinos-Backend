@@ -86,7 +86,7 @@ trait InteractsWithBookingOperations
                                     ->required()
                                     ->default($value)
                                     ->live()
-                                    ->helperText(__('Percent: 1–99. Fixed: peso amount to deduct.')),
+                                    ->helperText(__('Enter the peso amount to deduct.')),
                                 Select::make('reason_code')
                                     ->label(__('Reason'))
                                     ->options([
@@ -371,7 +371,7 @@ trait InteractsWithBookingOperations
                             ->required()
                             ->default($value)
                             ->live()
-                            ->helperText(__('Percent: 1–99. Fixed: peso amount to deduct.')),
+                            ->helperText(__('Enter the peso amount to deduct.')),
                         Select::make('reason_code')
                             ->label(__('Reason'))
                             ->options([
