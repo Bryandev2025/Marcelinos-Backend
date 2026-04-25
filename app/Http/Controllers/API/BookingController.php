@@ -768,14 +768,6 @@ class BookingController extends Controller
             $hasRoomComponent = $hasRoomLines;
             [$checkIn, $checkOut] = $this->bookingWindowForStorage($hasRoomComponent, $checkInDate, $checkOutDate);
 
-            $this->bookingDuplicateGuard->assertNoOverlappingActiveBooking(
-                (string) $request->input('email', ''),
-                $checkIn,
-                $checkOut,
-            );
-
-            $guest = Guest::store($request);
-
             $venueIds = $hasVenues
                 ? collect($validated['venues'])
                     ->map(fn ($id) => (int) $id)
@@ -783,6 +775,23 @@ class BookingController extends Controller
                     ->values()
                     ->all()
                 : [];
+
+            $venueEventForDuplicate = $hasVenues
+                ? ($validated['venue_event_type'] ?? BookingPricing::VENUE_EVENT_WEDDING)
+                : null;
+            $this->bookingDuplicateGuard->assertNotIdenticalActiveBooking(
+                (string) $request->input('email', ''),
+                $checkIn,
+                $checkOut,
+                (int) $validated['days'],
+                $roomLines,
+                $venueIds,
+                $venueEventForDuplicate,
+                (string) ($validated['payment_method'] ?? 'cash'),
+                (string) ($validated['online_payment_plan'] ?? ''),
+            );
+
+            $guest = Guest::store($request);
 
             if ($hasRoomLines) {
                 $roomLineError = $this->validateGuestRoomLines($roomLines, $checkIn, $checkOut, null);

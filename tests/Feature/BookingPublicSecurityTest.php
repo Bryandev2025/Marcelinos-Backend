@@ -8,6 +8,8 @@ use App\Models\Guest;
 use App\Models\Venue;
 use App\Support\BookingPricing;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use PHPUnit\Framework\Attributes\Test;
@@ -16,6 +18,13 @@ use Tests\TestCase;
 class BookingPublicSecurityTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // More than five POST /bookings calls per run would hit throttle:bookings (5/min per IP).
+        $this->withoutMiddleware(ThrottleRequests::class);
+    }
 
     /**
      * @return array<string, string>
@@ -112,7 +121,7 @@ class BookingPublicSecurityTest extends TestCase
     }
 
     #[Test]
-    public function duplicate_overlapping_email_rejected(): void
+    public function identical_booking_rejected(): void
     {
         Mail::fake();
         $venue = $this->createVenue();
@@ -125,16 +134,22 @@ class BookingPublicSecurityTest extends TestCase
             'gender' => Guest::GENDER_OTHER,
         ]);
 
-        Booking::query()->create([
+        $checkIn = Carbon::parse('2026-05-10')->startOfDay();
+        $checkOut = Carbon::parse('2026-05-12')->endOfDay();
+
+        $booking = Booking::query()->create([
             'guest_id' => $guest->id,
-            'check_in' => '2026-05-10 12:00:00',
-            'check_out' => '2026-05-12 10:00:00',
+            'check_in' => $checkIn,
+            'check_out' => $checkOut,
             'no_of_days' => 2,
             'total_price' => 1000,
             'booking_status' => Booking::BOOKING_STATUS_RESERVED,
             'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
+            'payment_method' => 'cash',
+            'online_payment_plan' => '',
             'venue_event_type' => BookingPricing::VENUE_EVENT_WEDDING,
         ]);
+        $booking->venues()->attach($venue->id);
 
         $payload = $this->venueOnlyPayload($venue, 'dup@example.test');
 
@@ -142,6 +157,85 @@ class BookingPublicSecurityTest extends TestCase
             ->postJson('/api/bookings', $payload)
             ->assertStatus(422)
             ->assertJsonValidationErrors(['email']);
+    }
+
+    #[Test]
+    public function same_email_same_dates_different_venue_allowed(): void
+    {
+        Mail::fake();
+        $venueA = $this->createVenue();
+        $venueB = Venue::query()->create([
+            'name' => 'Security Test Venue B',
+            'description' => 'Test',
+            'capacity' => 50,
+            'price' => 5000,
+            'wedding_price' => 5000,
+            'birthday_price' => 5000,
+            'meeting_staff_price' => 5000,
+            'status' => Venue::STATUS_AVAILABLE,
+        ]);
+
+        $guest = Guest::query()->create([
+            'first_name' => 'Twice',
+            'middle_name' => null,
+            'last_name' => 'Guest',
+            'contact_num' => '09171234567',
+            'email' => 'twice@example.test',
+            'gender' => Guest::GENDER_OTHER,
+        ]);
+
+        $checkIn = Carbon::parse('2026-06-01')->startOfDay();
+        $checkOut = Carbon::parse('2026-06-03')->endOfDay();
+
+        $existing = Booking::query()->create([
+            'guest_id' => $guest->id,
+            'check_in' => $checkIn,
+            'check_out' => $checkOut,
+            'no_of_days' => 2,
+            'total_price' => 1000,
+            'booking_status' => Booking::BOOKING_STATUS_RESERVED,
+            'payment_status' => Booking::PAYMENT_STATUS_UNPAID,
+            'payment_method' => 'cash',
+            'online_payment_plan' => '',
+            'venue_event_type' => BookingPricing::VENUE_EVENT_WEDDING,
+        ]);
+        $existing->venues()->attach($venueA->id);
+
+        $days = 2;
+        $total = BookingPricing::expectedTotalFromRoomLines(
+            $days,
+            [],
+            collect([$venueB]),
+            BookingPricing::VENUE_EVENT_WEDDING,
+        );
+
+        $payload = [
+            'website' => '',
+            'check_in' => 'Jun 1, 2026',
+            'check_out' => 'Jun 3, 2026',
+            'days' => $days,
+            'venues' => [$venueB->id],
+            'venue_event_type' => BookingPricing::VENUE_EVENT_WEDDING,
+            'total_price' => $total,
+            'payment_method' => 'cash',
+            'first_name' => 'Test',
+            'middle_name' => null,
+            'last_name' => 'Booker',
+            'email' => 'twice@example.test',
+            'contact_num' => '09171234567',
+            'gender' => Guest::GENDER_OTHER,
+            'is_international' => false,
+            'street' => '',
+            'address' => 'Test',
+            'zip_code' => '',
+            'category' => '',
+            'newsletter' => false,
+            'notifications' => false,
+        ];
+
+        $this->withHeaders($this->apiHeaders())
+            ->postJson('/api/bookings', $payload)
+            ->assertCreated();
     }
 
     #[Test]
