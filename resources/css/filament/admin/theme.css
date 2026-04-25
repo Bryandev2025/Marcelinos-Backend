@@ -361,3 +361,52 @@
 .fi-no-notification-unread-ctn .fi-no-notification {
     background-color: transparent !important;
 }
+
+/* Bell notifications: highlight Contact Us entries. */
+.fi-no-contact-inquiry-ctn,
+.fi-no-contact-inquiry-ctn > div,
+.fi-no-contact-inquiry-ctn .fi-no-notification {
+    background-color: #ecfdf5 !important;
+    border: 1px solid #22c55e !important;
+    border-radius: 0.75rem;
+}
+
+.fi-no-contact-inquiry-ctn .fi-no-notification-title,
+.fi-no-contact-inquiry-ctn .fi-no-notification-body {
+    color: #166534 !important;
+    font-weight: 700 !important;
+}
+
+.dark .fi-no-contact-inquiry-ctn,
+.dark .fi-no-contact-inquiry-ctn > div,
+.dark .fi-no-contact-inquiry-ctn .fi-no-notification {
+    background-color: rgba(20, 83, 45, 0.35) !important;
+    border-color: rgba(34, 197, 94, 0.75) !important;
+}
+
+.dark .fi-no-contact-inquiry-ctn .fi-no-notification-title,
+.dark .fi-no-contact-inquiry-ctn .fi-no-notification-body {
+    color: #86efac !important;
+}
+
+/* Contact Inquiries list: highlight not-yet-opened (status=new) rows. */
+.fi-contact-us-new-row td {
+    background-color: #f0fdf4 !important;
+}
+
+.fi-contact-us-new-row td,
+.fi-contact-us-new-row .fi-ta-text,
+.fi-contact-us-new-row .fi-ta-text-item {
+    color: #020202 !important;
+    font-weight: 700 !important;
+}
+
+.dark .fi-contact-us-new-row td {
+    background-color: rgba(20, 83, 45, 0.24) !important;
+}
+
+.dark .fi-contact-us-new-row td,
+.dark .fi-contact-us-new-row .fi-ta-text,
+.dark .fi-contact-us-new-row .fi-ta-text-item {
+    color: rgba(34, 197, 94, 0.75) !important;
+}
