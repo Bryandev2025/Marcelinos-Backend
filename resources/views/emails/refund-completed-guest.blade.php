@@ -133,7 +133,7 @@
                                                 <td style="padding:6px 0; color:#6b7280; font-weight:400; font-family:'Poppins', Arial, Helvetica, sans-serif;">Total amount paid</td>
                                                 <td style="padding:6px 0; font-weight:600; color:#374151; text-align:right; font-family:'Poppins', Arial, Helvetica, sans-serif;">PHP {{ number_format($totalPaid, 2) }}</td>
                                             </tr>
-                                            @if($cancellationBreakdown !== null)
+                                            @if($cancellationBreakdown !== null && !empty($cancellationBreakdown['applies_cancellation_percent']))
                                                 <tr>
                                                     <td style="padding:6px 0; color:#6b7280; font-weight:400; font-family:'Poppins', Arial, Helvetica, sans-serif;">Cancellation fee ({{ (int) $cancellationBreakdown['fee_percent'] }}% of booking total)</td>
                                                     <td style="padding:6px 0; font-weight:600; color:#374151; text-align:right; font-family:'Poppins', Arial, Helvetica, sans-serif;">PHP {{ number_format($cancellationBreakdown['fee_from_total'], 2) }}</td>
@@ -141,6 +141,18 @@
                                                 <tr>
                                                     <td style="padding:6px 0; color:#6b7280; font-weight:400; font-family:'Poppins', Arial, Helvetica, sans-serif;">Amount retained (policy)</td>
                                                     <td style="padding:6px 0; font-weight:600; color:#374151; text-align:right; font-family:'Poppins', Arial, Helvetica, sans-serif;">PHP {{ number_format($cancellationBreakdown['amount_to_keep'], 2) }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td style="padding:10px 0 6px; color:#111827; font-weight:700; font-family:'Poppins', Arial, Helvetica, sans-serif; border-top:1px solid #e5e7eb;">Amount refunded to you</td>
+                                                    <td style="padding:10px 0 6px; font-weight:700; color:#111827; text-align:right; font-family:'Poppins', Arial, Helvetica, sans-serif; border-top:1px solid #e5e7eb;">PHP {{ number_format($refundAmount, 2) }}</td>
+                                                </tr>
+                                            @elseif($cancellationBreakdown !== null)
+                                                <tr>
+                                                    <td style="padding:6px 0; color:#6b7280; font-weight:400; font-family:'Poppins', Arial, Helvetica, sans-serif; vertical-align:top;">Reservation fee (not refundable)</td>
+                                                    <td style="padding:6px 0; font-weight:600; color:#374151; text-align:right; font-family:'Poppins', Arial, Helvetica, sans-serif;">PHP {{ number_format($cancellationBreakdown['amount_to_keep'], 2) }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td colspan="2" style="padding:6px 0; font-size:12.5px; line-height:20px; color:#4b5563; font-family:'Poppins', Arial, Helvetica, sans-serif;">{{ $cancellationBreakdown['statement_note'] ?? '' }}</td>
                                                 </tr>
                                                 <tr>
                                                     <td style="padding:10px 0 6px; color:#111827; font-weight:700; font-family:'Poppins', Arial, Helvetica, sans-serif; border-top:1px solid #e5e7eb;">Amount refunded to you</td>

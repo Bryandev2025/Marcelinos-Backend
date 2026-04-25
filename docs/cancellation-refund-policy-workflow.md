@@ -30,20 +30,26 @@ This document explains the cancellation deduction and refund flow implemented in
 
 ## 3) Cancellation math (current behavior)
 
-When a booking is cancelled, backend computes:
+Classification uses **amounts** (`total_price` vs `total_paid` / balance), not `payment_status` (which becomes `refund_pending` after cancel). Fully settled is when `max(0, total_price - total_paid) <= 0.01` (see `CancellationPolicy::BALANCE_SETTLED_EPSILON`).
+
+### A) Not fully settled (partial payment at cancellation / deposit only)
+
+- The entire amount paid is treated as a **non-refundable reservation fee**.
+- `amount_to_refund = 0`, `amount_to_keep = amount_paid`, `fee_from_total = 0` (percentage policy does not apply to this case).
+- Guest-facing text uses `statement_note` and `applies_cancellation_percent: false` / `settlement_type: partial_deposit`.
+
+### B) Fully settled (full payment before cancel)
 
 - `fee_from_total = booking_total * (fee_percent / 100)`
 - `amount_to_keep = min(amount_paid, fee_from_total)`
 - `amount_to_refund = max(0, amount_paid - fee_from_total)`
 
-This means:
+This matches the previous single-path behavior for **fully paid** bookings.
 
-- If guest paid less than the fee: keep all paid, refund `0`.
-- If guest paid more than the fee: keep only fee amount, refund the excess.
+Computation:
 
-Computation helper:
-
-- `App\Support\CancellationPolicy::breakdown(float $bookingTotal, float $amountPaid): array`
+- `App\Support\CancellationPolicy::breakdownForCancelledBooking(float $bookingTotal, float $amountPaid): array` — use this for **cancel** flows, receipts, and emails.
+- `App\Support\CancellationPolicy::breakdown(float $bookingTotal, float $amountPaid): array` — still used **inside** the fully-settled branch for the percent math.
 
 ## 4) API behavior
 
@@ -60,11 +66,14 @@ Returns:
 
 When the booking is **cancelled** and `payment_status` is **`refund_pending`** or **`refunded`**, and the guest **paid** something, the JSON includes **`cancellation_refund`**:
 
-- `fee_percent` — cancellation deduction percentage (admin setting)
-- `fee_from_total` — fee amount from booking total (PHP)
+- `fee_percent` — cancellation deduction percentage when **fully settled**; `0` when **partial_deposit** (not used for the fee)
+- `fee_from_total` — fee amount from booking total (PHP) when **fully settled**; `0` for **partial_deposit**
 - `amount_paid` — total amount the guest paid (PHP)
 - `retained` — non-refundable portion kept (PHP)
-- `refund_to_guest` — amount the guest receives back after deduction (PHP)
+- `refund_to_guest` — amount the guest receives back (PHP; **0** for **partial_deposit**)
+- `applies_cancellation_percent` — `true` if admin **%** applies; `false` for **partial_deposit** / reservation-fee only
+- `settlement_type` — `full_settlement` or `partial_deposit`
+- `statement_note` — human-readable note for the guest (billing statement and receipt)
 
 The same figures appear on the **billing statement PDF** download for those bookings. The guest-facing receipt (Step 5) renders this block for full transparency.
 
@@ -75,15 +84,9 @@ After OTP verification:
 - `booking_status` is set to `cancelled`.
 - If the booking was **partial** or **paid**, `payment_status` is set to **`refund_pending`** (unpaid bookings stay `unpaid`).
 - Response `booking` reflects the updated row.
-- Response `cancellation` includes:
+- Response `cancellation` includes the result of `breakdownForCancelledBooking` (e.g. `amount_paid`, `amount_to_keep`, `amount_to_refund`, `settlement_type`, `applies_cancellation_percent`, `statement_note`, and when applicable the admin **Cancellation Deduction Percentage** via `fee_percent` / `fee_from_total`).
 
-  - `cancellation.fee_percent`
-  - `cancellation.fee_from_total`
-  - `cancellation.amount_paid`
-  - `cancellation.amount_to_keep`
-  - `cancellation.amount_to_refund`
-
-The `cancellation` object is computed **before** the status update, using the active admin **Cancellation Deduction Percentage** (`cancellation_fee_percent`).
+The `cancellation` object is computed **before** the status update.
 
 ## 5a) Admin list & view (next step)
 
