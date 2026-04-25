@@ -59,6 +59,7 @@ trait InteractsWithBookingOperations
                             $record = $this->getRecord() instanceof Booking ? $this->getRecord() : null;
                             $type = $record?->special_discount_type ?: BookingSpecialDiscount::TYPE_FIXED;
                             $value = $record?->special_discount_value ?: null;
+                            $target = $record?->special_discount_target ?: BookingSpecialDiscount::TARGET_TOTAL;
 
                             return [
                                 Select::make('type')
@@ -69,6 +70,15 @@ trait InteractsWithBookingOperations
                                     ])
                                     ->default($type)
                                     ->live(),
+                                Select::make('target')
+                                    ->label(__('Discount applies to'))
+                                    ->options(fn (): array => $record instanceof Booking
+                                        ? BookingSpecialDiscount::targetOptionsForBooking($record)
+                                        : [BookingSpecialDiscount::TARGET_TOTAL => __('Grand total (room + venue)')])
+                                    ->default($target)
+                                    ->required()
+                                    ->native(false)
+                                    ->visible(fn (): bool => $record instanceof Booking && count(BookingSpecialDiscount::targetOptionsForBooking($record)) > 1),
                                 TextInput::make('value')
                                     ->label(__('Discount value'))
                                     ->numeric()
@@ -104,6 +114,7 @@ trait InteractsWithBookingOperations
                                         }
 
                                         $type = (string) ($get('type') ?? '');
+                                        $target = (string) ($get('target') ?? ($record->special_discount_target ?: BookingSpecialDiscount::TARGET_TOTAL));
                                         $value = (float) ($get('value') ?? 0);
                                         if ($type === '' || $value <= 0) {
                                             $gross = BookingSpecialDiscount::grossTotal($record);
@@ -111,11 +122,12 @@ trait InteractsWithBookingOperations
                                             return 'Gross ₱'.number_format($gross, 2).' → Net ₱'.number_format((float) $record->total_price, 2);
                                         }
 
-                                        $p = BookingSpecialDiscount::preview($record, $type, $value);
+                                        $p = BookingSpecialDiscount::preview($record, $type, $value, $target);
 
                                         return 'Gross ₱'.number_format($p['gross'], 2)
                                             .' → Net ₱'.number_format($p['net'], 2)
-                                            .' (Discount ₱'.number_format($p['discount'], 2).')';
+                                            .' (Discount ₱'.number_format($p['discount'], 2)
+                                            .' from ₱'.number_format((float) ($p['discountableGross'] ?? $p['gross']), 2).')';
                                     }),
                             ];
                         })
@@ -130,6 +142,7 @@ trait InteractsWithBookingOperations
                                     booking: $record,
                                     type: (string) ($data['type'] ?? ''),
                                     value: (float) ($data['value'] ?? 0),
+                                    target: isset($data['target']) ? (string) $data['target'] : null,
                                     reasonCode: isset($data['reason_code']) ? (string) $data['reason_code'] : null,
                                     note: isset($data['note']) ? (string) $data['note'] : null,
                                     actor: auth()->user(),
@@ -331,6 +344,7 @@ trait InteractsWithBookingOperations
                     $record = $this->getRecord() instanceof Booking ? $this->getRecord() : null;
                     $type = $record?->special_discount_type ?: BookingSpecialDiscount::TYPE_FIXED;
                     $value = $record?->special_discount_value ?: null;
+                    $target = $record?->special_discount_target ?: BookingSpecialDiscount::TARGET_TOTAL;
 
                     return [
                         Select::make('type')
@@ -341,6 +355,15 @@ trait InteractsWithBookingOperations
                             ])
                             ->default($type)
                             ->live(),
+                        Select::make('target')
+                            ->label(__('Discount applies to'))
+                            ->options(fn (): array => $record instanceof Booking
+                                ? BookingSpecialDiscount::targetOptionsForBooking($record)
+                                : [BookingSpecialDiscount::TARGET_TOTAL => __('Grand total (room + venue)')])
+                            ->default($target)
+                            ->required()
+                            ->native(false)
+                            ->visible(fn (): bool => $record instanceof Booking && count(BookingSpecialDiscount::targetOptionsForBooking($record)) > 1),
                         TextInput::make('value')
                             ->label(__('Discount value'))
                             ->numeric()
@@ -376,6 +399,7 @@ trait InteractsWithBookingOperations
                                 }
 
                                 $type = (string) ($get('type') ?? '');
+                                $target = (string) ($get('target') ?? ($record->special_discount_target ?: BookingSpecialDiscount::TARGET_TOTAL));
                                 $value = (float) ($get('value') ?? 0);
                                 if ($type === '' || $value <= 0) {
                                     $gross = BookingSpecialDiscount::grossTotal($record);
@@ -383,11 +407,12 @@ trait InteractsWithBookingOperations
                                     return 'Gross ₱'.number_format($gross, 2).' → Net ₱'.number_format((float) $record->total_price, 2);
                                 }
 
-                                $p = BookingSpecialDiscount::preview($record, $type, $value);
+                                $p = BookingSpecialDiscount::preview($record, $type, $value, $target);
 
                                 return 'Gross ₱'.number_format($p['gross'], 2)
                                     .' → Net ₱'.number_format($p['net'], 2)
-                                    .' (Discount ₱'.number_format($p['discount'], 2).')';
+                                    .' (Discount ₱'.number_format($p['discount'], 2)
+                                    .' from ₱'.number_format((float) ($p['discountableGross'] ?? $p['gross']), 2).')';
                             }),
                     ];
                 })
@@ -402,6 +427,7 @@ trait InteractsWithBookingOperations
                             booking: $record,
                             type: (string) ($data['type'] ?? ''),
                             value: (float) ($data['value'] ?? 0),
+                            target: isset($data['target']) ? (string) $data['target'] : null,
                             reasonCode: isset($data['reason_code']) ? (string) $data['reason_code'] : null,
                             note: isset($data['note']) ? (string) $data['note'] : null,
                             actor: auth()->user(),

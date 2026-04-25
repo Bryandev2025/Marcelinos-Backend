@@ -33,7 +33,7 @@ class RefundCompletedGuestMail extends Mailable
         $balanceDue = 0.0;
 
         if ($isCancelled) {
-            $cancellationBreakdown = CancellationPolicy::breakdown($totalPrice, $totalPaid);
+            $cancellationBreakdown = CancellationPolicy::breakdownForCancelledBooking($totalPrice, $totalPaid);
             $refundAmount = (float) $cancellationBreakdown['amount_to_refund'];
         } else {
             $refundAmount = max(0.0, round($totalPaid - $totalPrice, 2));

@@ -45,19 +45,14 @@ class BookingResource extends Resource
      */
     public static function getNavigationBadge(): ?string
     {
-        $viewedBookingIds = static::getViewedBookingIdsForToday();
-
-        $count = Booking::query()
-            ->whereDate('created_at', today())
-            ->when($viewedBookingIds !== [], fn (Builder $query): Builder => $query->whereNotIn('id', $viewedBookingIds))
-            ->count();
+        $count = static::getUnviewedTodaysBookingsCount();
 
         return $count > 0 ? (string) $count : null;
     }
 
     public static function getNavigationBadgeColor(): ?string
     {
-        return 'danger';
+        return static::getUnviewedTodaysBookingsCount() > 0 ? 'danger' : 'gray';
     }
 
     /**
@@ -132,6 +127,16 @@ class BookingResource extends Resource
         $userId = auth()->id() ?? 'guest';
 
         return 'filament.bookings.viewed.'.today()->toDateString().'.'.$userId;
+    }
+
+    protected static function getUnviewedTodaysBookingsCount(): int
+    {
+        $viewedBookingIds = static::getViewedBookingIdsForToday();
+
+        return Booking::query()
+            ->whereDate('created_at', today())
+            ->when($viewedBookingIds !== [], fn (Builder $query): Builder => $query->whereNotIn('id', $viewedBookingIds))
+            ->count();
     }
 
     public static function form(Schema $schema): Schema

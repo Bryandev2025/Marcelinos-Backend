@@ -365,7 +365,9 @@ class BookingsTable
                         if (BookingSpecialDiscount::hasDiscount($record)) {
                             $gross = number_format(BookingSpecialDiscount::grossTotal($record), 2);
                             $discount = number_format(BookingSpecialDiscount::discountAmount($record), 2);
-                            $desc .= " · Discount: -{$discount} (Gross {$gross})";
+                            $target = BookingSpecialDiscount::resolveDiscountTarget($record, (string) ($record->special_discount_target ?? null));
+                            $targetLabel = BookingSpecialDiscount::targetLabel($target);
+                            $desc .= " · Discount: -{$discount} ({$targetLabel}; Gross {$gross})";
                         }
 
                         return $desc;

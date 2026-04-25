@@ -91,6 +91,9 @@ class ContactUsTable
                     TypedForceDeleteBulkAction::make(),
                 ]),
             ])
+            ->recordClasses(fn (ContactUs $record): string => $record->status === 'new'
+                ? 'fi-contact-us-new-row'
+                : '')
             ->defaultSort('created_at', 'desc');
     }
 }
