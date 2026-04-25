@@ -100,6 +100,7 @@ class EditBooking extends EditRecord
             // field is left untouched, keep it consistent with the actual paid amount.
             $refundPipelineStatuses = [
                 Booking::PAYMENT_STATUS_REFUND_PENDING,
+                Booking::PAYMENT_STATUS_NON_REFUNDABLE,
                 Booking::PAYMENT_STATUS_REFUNDED,
             ];
             if (array_key_exists('payment_status', $data)

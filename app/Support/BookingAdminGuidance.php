@@ -58,6 +58,13 @@ final class BookingAdminGuidance
                 ]);
             }
 
+            if ($paymentStatus === Booking::PAYMENT_STATUS_NON_REFUNDABLE) {
+                return __('Non-refundable: no guest payout is due. Amount retained: PHP :retained from paid PHP :paid.', [
+                    'retained' => number_format($row['retained'], 2),
+                    'paid' => number_format($row['amount_paid'], 2),
+                ]);
+            }
+
             return __('No further actions — booking is cancelled.');
         }
 

@@ -67,6 +67,7 @@ class BookingController extends Controller
                         Booking::PAYMENT_STATUS_PARTIAL,
                         Booking::PAYMENT_STATUS_PAID,
                         Booking::PAYMENT_STATUS_REFUND_PENDING,
+                        Booking::PAYMENT_STATUS_NON_REFUNDABLE,
                         Booking::PAYMENT_STATUS_REFUNDED,
                     ], true)
                 );
@@ -1122,6 +1123,7 @@ class BookingController extends Controller
                     Booking::PAYMENT_STATUS_PARTIAL,
                     Booking::PAYMENT_STATUS_PAID,
                     Booking::PAYMENT_STATUS_REFUND_PENDING,
+                    Booking::PAYMENT_STATUS_NON_REFUNDABLE,
                     Booking::PAYMENT_STATUS_REFUNDED,
                 ]),
             ]);
@@ -1209,6 +1211,7 @@ class BookingController extends Controller
                         Booking::PAYMENT_STATUS_PARTIAL,
                         Booking::PAYMENT_STATUS_PAID,
                         Booking::PAYMENT_STATUS_REFUND_PENDING,
+                        Booking::PAYMENT_STATUS_NON_REFUNDABLE,
                         Booking::PAYMENT_STATUS_REFUNDED,
                     ], true)
                 );
@@ -1243,7 +1246,9 @@ class BookingController extends Controller
                 Booking::PAYMENT_STATUS_PARTIAL,
                 Booking::PAYMENT_STATUS_PAID,
             ], true)) {
-                $updates['payment_status'] = Booking::PAYMENT_STATUS_REFUND_PENDING;
+                $updates['payment_status'] = ((float) ($cancellation['amount_to_refund'] ?? 0) > 0.009)
+                    ? Booking::PAYMENT_STATUS_REFUND_PENDING
+                    : Booking::PAYMENT_STATUS_NON_REFUNDABLE;
             }
 
             $booking->update($updates);

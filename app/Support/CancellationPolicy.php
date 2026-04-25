@@ -125,6 +125,7 @@ final class CancellationPolicy
 
         if (! in_array((string) $booking->payment_status, [
             Booking::PAYMENT_STATUS_REFUND_PENDING,
+            Booking::PAYMENT_STATUS_NON_REFUNDABLE,
             Booking::PAYMENT_STATUS_REFUNDED,
         ], true)) {
             return null;

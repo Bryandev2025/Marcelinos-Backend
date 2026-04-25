@@ -366,6 +366,8 @@ class Booking extends Model
 
     const PAYMENT_STATUS_REFUND_PENDING = 'refund_pending';
 
+    const PAYMENT_STATUS_NON_REFUNDABLE = 'non_refundable';
+
     const PAYMENT_STATUS_REFUNDED = 'refunded';
 
     /**
@@ -497,6 +499,7 @@ class Booking extends Model
             self::PAYMENT_STATUS_PARTIAL => 'Partial',
             self::PAYMENT_STATUS_PAID => 'Paid',
             self::PAYMENT_STATUS_REFUND_PENDING => 'Refund Pending',
+            self::PAYMENT_STATUS_NON_REFUNDABLE => 'Non-refundable',
             self::PAYMENT_STATUS_REFUNDED => 'Refunded',
         ];
     }
@@ -605,6 +608,7 @@ class Booking extends Model
             'info' => self::PAYMENT_STATUS_PARTIAL,
             'success' => self::PAYMENT_STATUS_PAID,
             'warning' => self::PAYMENT_STATUS_REFUND_PENDING,
+            'danger' => self::PAYMENT_STATUS_NON_REFUNDABLE,
             'gray' => self::PAYMENT_STATUS_REFUNDED,
         ];
     }
