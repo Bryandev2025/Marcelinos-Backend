@@ -827,7 +827,7 @@ class BookingController extends Controller
                         ->get(['id', 'name']);
 
                     return response()->json([
-                        'message' => 'Booking conflict: one or more venues are already booked for the selected dates.',
+                        'message' => 'Facility conflict: one or more selected venues are already booked for the selected dates.',
                         'error' => 'date_range_conflict',
                         'conflicts' => [
                             'venues' => $conflictingVenues
@@ -1015,7 +1015,7 @@ class BookingController extends Controller
                 [$type, $invKey] = explode("\0", $composite, 2);
 
                 return response()->json([
-                    'message' => 'Not enough units left for one of your selected room types for these dates.',
+                    'message' => 'Facility conflict: not enough available rooms for one or more selected room types on the selected dates.',
                     'error' => 'date_range_conflict',
                     'conflicts' => [
                         'room_lines' => [

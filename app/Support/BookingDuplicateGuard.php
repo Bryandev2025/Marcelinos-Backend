@@ -73,7 +73,7 @@ class BookingDuplicateGuard
             }
 
             throw ValidationException::withMessages([
-                'email' => ['A booking with the same room and venue details for these dates is already on file.'],
+                'email' => ['Duplicate submission detected: this guest already has a booking with the same dates and the same selected facilities. Choose different facilities or dates to create another booking.'],
             ]);
         }
     }

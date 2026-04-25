@@ -133,6 +133,22 @@ class Guest extends Model
             $validated['contact_num'] = '';
         }
 
+        $normalizedEmail = strtolower(trim((string) $validated['email']));
+        $existingGuest = self::withTrashed()
+            ->whereRaw('LOWER(TRIM(email)) = ?', [$normalizedEmail])
+            ->first();
+
+        if ($existingGuest instanceof self) {
+            if ($existingGuest->trashed()) {
+                $existingGuest->restore();
+            }
+
+            $existingGuest->fill($validated);
+            $existingGuest->save();
+
+            return $existingGuest->fresh();
+        }
+
         return self::create($validated);
     }
 
