@@ -25,6 +25,8 @@ return [
         'http://127.0.0.1:5173',
         env('FRONTEND_URL'),
         'https://marcelinos-resort-hotel.com',
+        'https://www.marcelinos-resort-hotel.com',
+        'https://marcelinos.tech',
     ])) ?: ['*'],
 
     'allowed_origins_patterns' => [],
