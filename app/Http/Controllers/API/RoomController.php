@@ -18,6 +18,20 @@ use Illuminate\Validation\ValidationException;
 class RoomController extends Controller
 {
     /**
+     * Guest booking semantics for rooms: check-in at 12:00 PM, check-out at 10:00 AM
+     * on the selected calendar dates (same window as {@see BookingController}).
+     *
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    private function roomStayWindowFromCalendarDates(Carbon $checkInDate, Carbon $checkOutDate): array
+    {
+        return [
+            $checkInDate->copy()->setTime(12, 0, 0),
+            $checkOutDate->copy()->setTime(10, 0, 0),
+        ];
+    }
+
+    /**
      * List rooms.
      * Same availability contract as VenueController: when check_in/check_out are provided,
      * All rooms are returned but add availability status (available or not available).
@@ -43,8 +57,9 @@ class RoomController extends Controller
                 ]);
 
                 try {
-                    $checkIn = Carbon::parse($request->query('check_in'))->startOfDay();
-                    $checkOut = Carbon::parse($request->query('check_out'))->endOfDay();
+                    $checkInDate = Carbon::parse($request->query('check_in'))->startOfDay();
+                    $checkOutDate = Carbon::parse($request->query('check_out'))->startOfDay();
+                    [$checkIn, $checkOut] = $this->roomStayWindowFromCalendarDates($checkInDate, $checkOutDate);
                 } catch (Exception $e) {
                     return response()->json([
                         'success' => false,
@@ -66,8 +81,9 @@ class RoomController extends Controller
             $checkIn = null;
             $checkOut = null;
             if (! $isAll) {
-                $checkIn = Carbon::parse($request->query('check_in'))->startOfDay();
-                $checkOut = Carbon::parse($request->query('check_out'))->endOfDay();
+                $checkInDate = Carbon::parse($request->query('check_in'))->startOfDay();
+                $checkOutDate = Carbon::parse($request->query('check_out'))->startOfDay();
+                [$checkIn, $checkOut] = $this->roomStayWindowFromCalendarDates($checkInDate, $checkOutDate);
             }
 
             $rooms = $query->limit($limit)->get();
@@ -218,8 +234,9 @@ class RoomController extends Controller
             $checkOutQuery = $request->query('check_out');
             if ($checkInQuery !== null && $checkInQuery !== '' && $checkOutQuery !== null && $checkOutQuery !== '') {
                 try {
-                    $ci = Carbon::parse($checkInQuery)->startOfDay();
-                    $co = Carbon::parse($checkOutQuery)->endOfDay();
+                    $checkInDate = Carbon::parse($checkInQuery)->startOfDay();
+                    $checkOutDate = Carbon::parse($checkOutQuery)->startOfDay();
+                    [$ci, $co] = $this->roomStayWindowFromCalendarDates($checkInDate, $checkOutDate);
                     if (! $co->lt($ci)) {
                         $data['is_block_date'] = RoomBlockedDate::query()
                             ->where('room_id', $room->id)
