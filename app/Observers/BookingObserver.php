@@ -8,15 +8,19 @@ use App\Events\FilamentNotificationSound;
 use App\Filament\Resources\Bookings\BookingResource;
 use App\Jobs\SyncBookingToGoogleSheet;
 use App\Models\Booking;
+use App\Models\RoomChecklist;
+use App\Models\RoomChecklistItem;
 use App\Models\User;
 use App\Notifications\Slack\BookingLifecycleSlackNotification;
 use App\Services\RefundNotificationService;
 use App\Support\ActivityLogger;
 use App\Support\BookingDoubleBookAlert;
+use App\Support\RoomDamageLossCharges;
 use App\Support\SlackBookingAlerts;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class BookingObserver
@@ -125,6 +129,11 @@ class BookingObserver
 
     public function updated(Booking $booking): void
     {
+        if ($booking->wasChanged('booking_status')
+            && (string) $booking->booking_status === Booking::BOOKING_STATUS_COMPLETED) {
+            $this->ensureCompletionRoomChecklists($booking);
+        }
+
         if ($booking->wasChanged('booking_status')
             && (string) $booking->getOriginal('booking_status') === Booking::BOOKING_STATUS_PENDING_VERIFICATION
             && (string) $booking->booking_status === Booking::BOOKING_STATUS_RESERVED) {
@@ -265,6 +274,61 @@ class BookingObserver
             bookingId: (int) $booking->id,
             referenceNumber: (string) $booking->reference_number,
         );
+    }
+
+    private function ensureCompletionRoomChecklists(Booking $booking): void
+    {
+        try {
+            $booking->loadMissing(['rooms']);
+
+            if ($booking->rooms->isEmpty()) {
+                return;
+            }
+
+            $charges = RoomDamageLossCharges::all();
+            if ($charges === []) {
+                return;
+            }
+
+            DB::transaction(function () use ($booking, $charges): void {
+                foreach ($booking->rooms as $room) {
+                    $roomId = (int) $room->id;
+
+                    $checklist = RoomChecklist::query()->firstOrCreate(
+                        [
+                            'booking_id' => (int) $booking->id,
+                            'room_id' => $roomId,
+                        ],
+                        [
+                            'generated_at' => now(),
+                        ],
+                    );
+
+                    if ($checklist->items()->exists()) {
+                        continue;
+                    }
+
+                    $items = [];
+                    foreach ($charges as $i => $row) {
+                        $items[] = [
+                            'label' => (string) ($row['item'] ?? ''),
+                            'charge' => (string) ($row['charge'] ?? ''),
+                            'status' => RoomChecklistItem::STATUS_GOOD,
+                            'notes' => null,
+                            'sort_order' => $i,
+                        ];
+                    }
+
+                    $checklist->items()->createMany($items);
+                }
+            });
+        } catch (\Throwable $e) {
+            Log::warning('Failed generating room completion checklist', [
+                'booking_id' => $booking->id,
+                'reference_number' => $booking->reference_number,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function collectBookingChanges(Booking $booking): array

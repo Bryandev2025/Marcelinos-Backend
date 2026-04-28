@@ -7,6 +7,11 @@ return new class extends Migration
 {
     public function up(): void
     {
+        $driver = DB::getDriverName();
+        if (! in_array($driver, ['mysql', 'mariadb'], true)) {
+            return;
+        }
+
         DB::statement("ALTER TABLE bookings MODIFY COLUMN status ENUM(
             'unpaid',
             'partial',
@@ -22,6 +27,11 @@ return new class extends Migration
 
     public function down(): void
     {
+        $driver = DB::getDriverName();
+        if (! in_array($driver, ['mysql', 'mariadb'], true)) {
+            return;
+        }
+
         DB::statement("ALTER TABLE bookings MODIFY COLUMN status ENUM(
             'unpaid',
             'occupied',

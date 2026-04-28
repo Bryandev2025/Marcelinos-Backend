@@ -82,7 +82,12 @@ class EditBooking extends EditRecord
             $wasAlreadyPaid = (string) $record->payment_status === Booking::PAYMENT_STATUS_PAID;
             $hasOutstandingBalance = (float) $record->balance > 0.009;
 
-            if ($incomingPaymentStatus === Booking::PAYMENT_STATUS_PAID && ! $wasAlreadyPaid && $hasOutstandingBalance) {
+            $canAutoRecordFullPayment = ! in_array($nextBookingStatus, [
+                Booking::BOOKING_STATUS_CANCELLED,
+                Booking::BOOKING_STATUS_COMPLETED,
+            ], true);
+
+            if ($incomingPaymentStatus === Booking::PAYMENT_STATUS_PAID && ! $wasAlreadyPaid && $hasOutstandingBalance && $canAutoRecordFullPayment) {
                 $assessment = BookingFullBalancePayment::assess($record);
 
                 if (! $assessment['allowed']) {
