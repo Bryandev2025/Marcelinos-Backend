@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Mail\BookingCreated;
 use App\Mail\VerifyBookingEmail;
 use App\Mail\TestimonialFeedbackEmail;
+use App\Models\RoomChecklist;
 use App\Support\RoomInventoryGroupKey;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -189,6 +190,11 @@ class Booking extends Model
     public function rooms()
     {
         return $this->belongsToMany(Room::class, 'booking_room')->withTimestamps();
+    }
+
+    public function roomChecklists()
+    {
+        return $this->hasMany(RoomChecklist::class);
     }
 
     /**
