@@ -38,8 +38,10 @@ final class PhAddressFields
                         $set('ph_region_code', $regionCode);
                     }
                 })
-                ->required(fn (Get $get): bool => ! (bool) $get('is_international'))
-                ->visible(fn (Get $get): bool => ! (bool) $get('is_international'))
+                ->required(fn (Get $get): bool => ! (bool) $get('is_international') && ((string) ($get('guest_status') ?? 'new') !== 'returning' || (bool) $get('existing_guest_found')))
+                ->visible(fn (Get $get): bool => ! (bool) $get('is_international')
+                    && ((string) ($get('guest_status') ?? 'new') !== 'returning'
+                        || ((bool) $get('existing_guest_found') && (bool) $get('edit_returning_guest'))))
                 ->afterStateUpdated(function (Set $set, ?string $state): void {
                     $set('ph_province_code', null);
                     $set('ph_municipality_code', null);
@@ -85,12 +87,17 @@ final class PhAddressFields
                     if ((bool) $get('is_international')) {
                         return false;
                     }
+                    if ((string) ($get('guest_status') ?? 'new') === 'returning' && (! (bool) $get('existing_guest_found') || ! (bool) $get('edit_returning_guest'))) {
+                        return false;
+                    }
 
                     $region = (string) ($get('ph_region_code') ?? '');
 
                     return $region !== '' && ! PsgcApi::isNcr($region);
                 })
-                ->required(fn (Get $get): bool => ! (bool) $get('is_international') && ! PsgcApi::isNcr((string) ($get('ph_region_code') ?? '')))
+                ->required(fn (Get $get): bool => ! (bool) $get('is_international')
+                    && ! PsgcApi::isNcr((string) ($get('ph_region_code') ?? ''))
+                    && ((string) ($get('guest_status') ?? 'new') !== 'returning' || ((bool) $get('existing_guest_found') && (bool) $get('edit_returning_guest'))))
                 ->disabled(fn (Get $get): bool => (string) ($get('ph_region_code') ?? '') === '')
                 ->afterStateUpdated(function (Get $get, Set $set, ?string $state): void {
                     $set('ph_municipality_code', null);
@@ -134,8 +141,10 @@ final class PhAddressFields
                         $set('ph_municipality_code', $municipalityCode);
                     }
                 })
-                ->required(fn (Get $get): bool => ! (bool) $get('is_international'))
-                ->visible(fn (Get $get): bool => ! (bool) $get('is_international'))
+                ->required(fn (Get $get): bool => ! (bool) $get('is_international')
+                    && ((string) ($get('guest_status') ?? 'new') !== 'returning' || ((bool) $get('existing_guest_found') && (bool) $get('edit_returning_guest'))))
+                ->visible(fn (Get $get): bool => ! (bool) $get('is_international')
+                    && ((string) ($get('guest_status') ?? 'new') !== 'returning' || ((bool) $get('existing_guest_found') && (bool) $get('edit_returning_guest'))))
                 ->disabled(function (Get $get): bool {
                     $region = (string) ($get('ph_region_code') ?? '');
                     if ($region === '') {
@@ -179,8 +188,10 @@ final class PhAddressFields
                         $set('ph_barangay_code', $barangayCode);
                     }
                 })
-                ->required(fn (Get $get): bool => ! (bool) $get('is_international'))
-                ->visible(fn (Get $get): bool => ! (bool) $get('is_international'))
+                ->required(fn (Get $get): bool => ! (bool) $get('is_international')
+                    && ((string) ($get('guest_status') ?? 'new') !== 'returning' || ((bool) $get('existing_guest_found') && (bool) $get('edit_returning_guest'))))
+                ->visible(fn (Get $get): bool => ! (bool) $get('is_international')
+                    && ((string) ($get('guest_status') ?? 'new') !== 'returning' || ((bool) $get('existing_guest_found') && (bool) $get('edit_returning_guest'))))
                 ->disabled(fn (Get $get): bool => (string) ($get('ph_municipality_code') ?? '') === '')
                 ->afterStateUpdated(function (Get $get, Set $set, ?string $state): void {
                     $municipalityCode = (string) ($get('ph_municipality_code') ?? '');

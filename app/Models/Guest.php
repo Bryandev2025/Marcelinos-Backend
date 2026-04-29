@@ -134,9 +134,13 @@ class Guest extends Model
         }
 
         $normalizedEmail = strtolower(trim((string) $validated['email']));
-        $existingGuest = self::withTrashed()
-            ->whereRaw('LOWER(TRIM(email)) = ?', [$normalizedEmail])
-            ->first();
+        $existingGuest = null;
+
+        if (self::shouldAttemptEmailIdentityReuse($source, $normalizedEmail)) {
+            $existingGuest = self::withTrashed()
+                ->whereRaw('LOWER(TRIM(email)) = ?', [$normalizedEmail])
+                ->first();
+        }
 
         if ($existingGuest instanceof self) {
             if ($existingGuest->trashed()) {
@@ -150,6 +154,79 @@ class Guest extends Model
         }
 
         return self::create($validated);
+    }
+
+    /**
+     * Dynamic email identity matching policy:
+     * - Online/public bookings can auto-match by email.
+     * - Manual/walk-in sources do NOT auto-match by email by default.
+     * - Shared email patterns can disable matching without hardcoding a single address.
+     *
+     * @param  array<string, mixed>  $source
+     */
+    private static function shouldAttemptEmailIdentityReuse(array $source, string $normalizedEmail): bool
+    {
+        if ($normalizedEmail === '') {
+            return false;
+        }
+
+        $forceManual = self::toBoolean($source['is_manual_booking'] ?? false)
+            || self::toBoolean($source['is_walk_in'] ?? false)
+            || self::toBoolean($source['email_is_shared'] ?? false);
+        if ($forceManual) {
+            return false;
+        }
+
+        if (self::matchesSharedEmailPattern($normalizedEmail)) {
+            return false;
+        }
+
+        $bookingSourceRaw = trim((string) ($source['booking_source'] ?? $source['source'] ?? 'online'));
+        $bookingSource = strtolower($bookingSourceRaw);
+        $manualSources = ['manual', 'walk_in', 'walk-in', 'walkin', 'staff', 'admin'];
+        $isManualSource = in_array($bookingSource, $manualSources, true);
+
+        if ($isManualSource) {
+            return self::toBoolean($source['allow_manual_email_match'] ?? false);
+        }
+
+        return true;
+    }
+
+    private static function matchesSharedEmailPattern(string $normalizedEmail): bool
+    {
+        $patternsRaw = trim((string) env('GUEST_SHARED_EMAIL_PATTERNS', ''));
+        if ($patternsRaw === '') {
+            return false;
+        }
+
+        $patterns = array_values(array_filter(array_map(
+            static fn (string $item): string => strtolower(trim($item)),
+            explode(',', $patternsRaw)
+        )));
+
+        foreach ($patterns as $pattern) {
+            if ($pattern === '') {
+                continue;
+            }
+
+            // Pattern formats:
+            // - exact email: frontdesk@example.com
+            // - domain suffix: @example.com
+            if (str_starts_with($pattern, '@')) {
+                if (str_ends_with($normalizedEmail, $pattern)) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if ($normalizedEmail === $pattern) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

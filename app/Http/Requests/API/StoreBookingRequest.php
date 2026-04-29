@@ -16,6 +16,19 @@ class StoreBookingRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        $bookingSource = strtolower(trim((string) $this->input('booking_source', 'online')));
+        if ($bookingSource === '') {
+            $bookingSource = 'online';
+        }
+        $manualLikeSources = ['manual', 'walk-in', 'walk_in', 'walkin', 'staff', 'admin'];
+        if (in_array($bookingSource, $manualLikeSources, true)) {
+            $bookingSource = 'manual';
+        }
+
+        $this->merge([
+            'booking_source' => $bookingSource,
+        ]);
+
         if ($this->venue_event_type === BookingPricing::VENUE_EVENT_SEMINAR) {
             $this->merge(['venue_event_type' => BookingPricing::VENUE_EVENT_MEETING_STAFF]);
         }
@@ -76,6 +89,11 @@ class StoreBookingRequest extends FormRequest
             'check_out' => 'required|string',
             'days' => 'required|integer|min:1',
             'total_price' => 'required|numeric|min:0',
+            'booking_source' => ['nullable', 'string', Rule::in(['online', 'manual'])],
+            'allow_manual_email_match' => ['nullable', 'boolean'],
+            'is_manual_booking' => ['nullable', 'boolean'],
+            'is_walk_in' => ['nullable', 'boolean'],
+            'email_is_shared' => ['nullable', 'boolean'],
             'payment_method' => ['nullable', 'string', Rule::in(['cash', 'online'])],
             'online_payment_plan' => [
                 'nullable',
