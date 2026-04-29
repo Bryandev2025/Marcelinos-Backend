@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\Bookings\Schemas;
 
 use App\Filament\Forms\Components\PhAddressFields;
-use App\Models\BedSpecification;
 use App\Models\Booking;
 use App\Models\Guest;
 use App\Models\Room;
@@ -34,7 +33,7 @@ class BookingCreateWizard
     {
         return [
             Step::make('Accommodation')
-                ->description('Pick dates, choose bed specification, then select available room(s) for those dates.')
+                ->description('Pick dates, then select available room(s) for those dates.')
                 ->schema([
                     Select::make('booking_type')
                         ->label('Booking type')
@@ -47,7 +46,6 @@ class BookingCreateWizard
                         ->live()
                         ->afterStateUpdated(function (Get $get, Set $set, ?string $state): void {
                             if ($state === 'venue') {
-                                $set('bed_specification_id', null);
                                 $set('rooms', []);
                                 self::applyVenueFixedTimes($get, $set);
                             }
@@ -138,21 +136,6 @@ class BookingCreateWizard
                             BookingForm::updatePricing($get, $set);
                         }),
 
-                    Select::make('bed_specification_id')
-                        ->label('Bed specification')
-                        ->options(fn (): array => BedSpecification::query()->orderBy('specification')->pluck('specification', 'id')->all())
-                        ->searchable()
-                        ->preload()
-                        ->required(fn (Get $get): bool => self::bookingTypeUsesRooms($get))
-                        ->visible(fn (Get $get): bool => self::bookingTypeUsesRooms($get))
-                        ->live()
-                        ->helperText('Choose the bed specification first. The Rooms list will show only rooms with this spec that are available for the selected dates.')
-                        ->afterStateUpdated(function (Get $get, Set $set): void {
-                            $set('rooms', []);
-                            BookingForm::updatePricing($get, $set);
-                        })
-                        ->columnSpanFull(),
-
                     Select::make('rooms')
                         ->label('Rooms')
                         ->relationship(
@@ -161,8 +144,7 @@ class BookingCreateWizard
                             modifyQueryUsing: function ($query, ?string $search, ?Booking $record, Get $get): void {
                                 $checkIn = $get('check_in');
                                 $checkOut = $get('check_out');
-                                $bedSpecId = $get('bed_specification_id');
-                                if (! $checkIn || ! $checkOut || ! $bedSpecId) {
+                                if (! $checkIn || ! $checkOut) {
                                     $query->whereRaw('0 = 1');
 
                                     return;
@@ -184,7 +166,6 @@ class BookingCreateWizard
                                 $typeCol = $query->getModel()->qualifyColumn('type');
                                 $nameCol = $query->getModel()->qualifyColumn('name');
                                 $query->availableBetween($start, $end, null)
-                                    ->whereHas('bedSpecifications', fn ($q) => $q->where('bed_specifications.id', (int) $bedSpecId))
                                     ->with(['bedSpecifications'])
                                     ->orderBy($typeCol)
                                     ->orderBy($nameCol);
@@ -196,7 +177,7 @@ class BookingCreateWizard
                         ->required(fn (Get $get): bool => self::bookingTypeRequiresRooms($get))
                         ->visible(fn (Get $get): bool => self::bookingTypeUsesRooms($get))
                         ->live()
-                        ->helperText('Rooms are filtered by the selected bed specification and availability for the selected dates.')
+                        ->helperText('Rooms are filtered by availability for the selected dates.')
                         ->rules([
                             fn (Get $get, ?Booking $record) => function (string $attribute, $value, $fail) use ($get, $record): void {
                                 if (! self::bookingTypeUsesRooms($get)) {
