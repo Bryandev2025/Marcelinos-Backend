@@ -10,11 +10,13 @@ use App\Filament\Resources\Guests\Pages\ViewGuest;
 use App\Filament\Resources\Guests\RelationManagers\ReviewsRelationManager;
 use App\Filament\Resources\Guests\Schemas\GuestForm;
 use App\Filament\Resources\Guests\Tables\GuestsTable;
+use App\Models\Booking;
 use App\Models\Guest;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class GuestResource extends Resource
 {
@@ -31,6 +33,21 @@ class GuestResource extends Resource
     protected static ?string $navigationLabel = 'Guests';
 
     protected static ?string $recordTitleAttribute = 'first_name';
+
+    public static function getNavigationBadge(): ?string
+    {
+        $count = Booking::query()
+            ->where('damage_settlement_status', Booking::DAMAGE_SETTLEMENT_STATUS_PENDING)
+            ->distinct('guest_id')
+            ->count('guest_id');
+
+        return $count > 0 ? (string) $count : null;
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'danger';
+    }
 
     public static function getGloballySearchableAttributes(): array
     {
@@ -58,6 +75,15 @@ class GuestResource extends Resource
     public static function table(Table $table): Table
     {
         return GuestsTable::configure($table);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->withCount([
+                'bookings as pending_settlement_bookings_count' => fn (Builder $query): Builder => $query
+                    ->where('damage_settlement_status', Booking::DAMAGE_SETTLEMENT_STATUS_PENDING),
+            ]);
     }
 
     // Define relations (if you want to show bookings for a guest)

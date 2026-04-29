@@ -30,13 +30,10 @@ use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Utilities\Get;
@@ -755,57 +752,10 @@ class BookingsTable
                         ->color('secondary')
                         ->requiresConfirmation()
                         ->modalHeading(fn (Booking $record): string => $record->adminCheckoutActionLabel())
-                        ->modalDescription('Optionally review damaged-property checklist before completing this booking. You can skip this step and complete anyway.')
-                        ->form([
-                            Toggle::make('include_damage_checklist')
-                                ->label('Review damaged-property checklist')
-                                ->helperText('Optional: turn on to review or update item statuses before completion.')
-                                ->default(false)
-                                ->live(),
-                            Repeater::make('damage_checklist')
-                                ->label('Damaged property checklist (optional)')
-                                ->default(fn (Booking $record): array => BookingLifecycleActions::checkoutChecklistFormItems($record))
-                                ->schema([
-                                    Hidden::make('id'),
-                                    TextInput::make('room_name')
-                                        ->label('Room')
-                                        ->disabled()
-                                        ->dehydrated(false),
-                                    TextInput::make('label')
-                                        ->label('Item')
-                                        ->disabled()
-                                        ->dehydrated(false),
-                                    TextInput::make('charge')
-                                        ->label('Charge')
-                                        ->disabled()
-                                        ->dehydrated(false),
-                                    Select::make('status')
-                                        ->options([
-                                            'good' => 'Good',
-                                            'broken' => 'Broken',
-                                            'missing' => 'Missing',
-                                        ])
-                                        ->required(),
-                                    Textarea::make('notes')
-                                        ->rows(2)
-                                        ->columnSpanFull(),
-                                ])
-                                ->columns(4)
-                                ->deletable(false)
-                                ->reorderable(false)
-                                ->addable(false)
-                                ->visible(fn (Get $get): bool => (bool) $get('include_damage_checklist'))
-                                ->dehydrated(fn (Get $get): bool => (bool) $get('include_damage_checklist')),
-                        ])
+                        ->modalDescription('Mark this booking as completed.')
                         ->visible(fn (Booking $record): bool => $record->canAdminCheckout())
-                        ->action(function (Booking $record, array $data): void {
+                        ->action(function (Booking $record): void {
                             try {
-                                if ((bool) ($data['include_damage_checklist'] ?? false)) {
-                                    BookingLifecycleActions::saveCheckoutChecklistItems(
-                                        $record,
-                                        is_array($data['damage_checklist'] ?? null) ? $data['damage_checklist'] : [],
-                                    );
-                                }
                                 BookingLifecycleActions::complete($record);
                             } catch (\InvalidArgumentException $e) {
                                 Notification::make()

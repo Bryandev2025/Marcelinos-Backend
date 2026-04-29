@@ -12,13 +12,10 @@ use App\Support\BookingSpecialDiscount;
 use App\Support\CancellationPolicy;
 use App\Support\BookingDamageSettlement;
 use Filament\Actions\Action;
-use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
@@ -256,12 +253,11 @@ trait InteractsWithBookingOperations
                         ->color('secondary')
                         ->requiresConfirmation()
                         ->modalHeading(fn (): string => $this->record instanceof Booking ? $this->record->adminCheckoutActionLabel() : __('Checkout'))
-                        ->modalDescription(__('Optionally review damaged-property checklist before completing this booking. You can skip this step and complete anyway.'))
-                        ->form(fn (): array => $this->checkoutActionFormSchema())
+                        ->modalDescription(__('Mark this booking as completed.'))
                         ->visible(fn (): bool => $this->record instanceof Booking
                             && $this->record->canAdminCheckout())
-                        ->action(function (array $data): void {
-                            $this->runBookingComplete($data);
+                        ->action(function (): void {
+                            $this->runBookingComplete();
                         }),
                     Action::make('bookingOpMarkDamageSettled')
                         ->label(__('Mark damage settled'))
@@ -488,12 +484,11 @@ trait InteractsWithBookingOperations
                 ->color('secondary')
                 ->requiresConfirmation()
                 ->modalHeading(fn (): string => $this->record instanceof Booking ? $this->record->adminCheckoutActionLabel() : __('Checkout'))
-                ->modalDescription(__('Optionally review damaged-property checklist before completing this booking. You can skip this step and complete anyway.'))
-                ->form(fn (): array => $this->checkoutActionFormSchema())
+                ->modalDescription(__('Mark this booking as completed.'))
                 ->visible(fn (): bool => $this->record instanceof Booking
                     && $this->record->canAdminCheckout())
-                ->action(function (array $data): void {
-                    $this->runBookingComplete($data);
+                ->action(function (): void {
+                    $this->runBookingComplete();
                 }),
             Action::make('viewBookingMarkDamageSettled')
                 ->label(__('Mark damage settled'))
@@ -645,7 +640,7 @@ trait InteractsWithBookingOperations
         $this->afterBookingLifecycleMutation();
     }
 
-    public function runBookingComplete(array $data = []): void
+    public function runBookingComplete(): void
     {
         $record = $this->getRecord();
         if (! $record instanceof Booking) {
@@ -653,12 +648,6 @@ trait InteractsWithBookingOperations
         }
 
         try {
-            if ((bool) ($data['include_damage_checklist'] ?? false)) {
-                BookingLifecycleActions::saveCheckoutChecklistItems(
-                    $record,
-                    is_array($data['damage_checklist'] ?? null) ? $data['damage_checklist'] : [],
-                );
-            }
             BookingLifecycleActions::complete($record);
         } catch (\InvalidArgumentException $e) {
             Notification::make()
@@ -676,58 +665,6 @@ trait InteractsWithBookingOperations
             ->send();
 
         $this->afterBookingLifecycleMutation();
-    }
-
-    /**
-     * @return array<int, \Filament\Forms\Components\Component>
-     */
-    protected function checkoutActionFormSchema(): array
-    {
-        $record = $this->getRecord();
-
-        return [
-            Toggle::make('include_damage_checklist')
-                ->label(__('Review damaged-property checklist'))
-                ->helperText(__('Optional: turn on to review or update item statuses before completion.'))
-                ->default(false)
-                ->live(),
-            Repeater::make('damage_checklist')
-                ->label(__('Damaged property checklist (optional)'))
-                ->default(fn (): array => $record instanceof Booking
-                    ? BookingLifecycleActions::checkoutChecklistFormItems($record)
-                    : [])
-                ->schema([
-                    Hidden::make('id'),
-                    TextInput::make('room_name')
-                        ->label(__('Room'))
-                        ->disabled()
-                        ->dehydrated(false),
-                    TextInput::make('label')
-                        ->label(__('Item'))
-                        ->disabled()
-                        ->dehydrated(false),
-                    TextInput::make('charge')
-                        ->label(__('Charge'))
-                        ->disabled()
-                        ->dehydrated(false),
-                    Select::make('status')
-                        ->options([
-                            'good' => __('Good'),
-                            'broken' => __('Broken'),
-                            'missing' => __('Missing'),
-                        ])
-                        ->required(),
-                    Textarea::make('notes')
-                        ->rows(2)
-                        ->columnSpanFull(),
-                ])
-                ->columns(4)
-                ->deletable(false)
-                ->reorderable(false)
-                ->addable(false)
-                ->visible(fn ($get): bool => (bool) $get('include_damage_checklist'))
-                ->dehydrated(fn ($get): bool => (bool) $get('include_damage_checklist')),
-        ];
     }
 
     public function runBookingCancel(): void

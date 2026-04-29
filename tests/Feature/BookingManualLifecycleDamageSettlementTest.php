@@ -3,11 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\Booking;
-use App\Models\DamageProperty;
 use App\Models\Guest;
 use App\Models\Room;
 use App\Models\RoomChecklist;
 use App\Models\RoomChecklistItem;
+use App\Models\RoomChecklistTemplate;
 use App\Models\User;
 use App\Support\BookingLifecycleActions;
 use Carbon\Carbon;
@@ -147,35 +147,33 @@ class BookingManualLifecycleDamageSettlementTest extends TestCase
         $this->assertSame(Booking::DAMAGE_SETTLEMENT_STATUS_PENDING, (string) $booking->damage_settlement_status);
     }
 
-    public function test_checkout_checklist_items_are_generated_from_associated_room_damage_properties(): void
+    public function test_checkout_checklist_uses_active_templates_for_attached_room(): void
     {
+        RoomChecklistTemplate::query()->delete();
+        RoomChecklistTemplate::query()->create([
+            'label' => 'Wall paint',
+            'default_charge' => '350.00',
+            'is_active' => true,
+            'sort_order' => 1,
+        ]);
+        RoomChecklistTemplate::query()->create([
+            'label' => 'Aircon filter',
+            'default_charge' => null,
+            'is_active' => true,
+            'sort_order' => 2,
+        ]);
+
         $booking = $this->createBooking();
         $room = $this->createRoom();
         $booking->rooms()->attach($room->id);
 
-        $window = DamageProperty::query()->create([
-            'name' => 'Window '.strval(random_int(1000, 9999)),
-            'default_charge' => '900.00',
-            'is_active' => true,
-        ]);
-        $television = DamageProperty::query()->create([
-            'name' => 'Television '.strval(random_int(1000, 9999)),
-            'default_charge' => '1500.00',
-            'is_active' => true,
-        ]);
-
-        $room->damageProperties()->attach([$window->id, $television->id]);
-        $this->assertSame(1, $booking->fresh()->rooms()->count());
-        $this->assertSame(2, $room->fresh()->damageProperties()->count());
-
         $rows = BookingLifecycleActions::checkoutChecklistFormItems($booking->fresh());
 
         $this->assertCount(2, $rows);
-        $this->assertSame(
-            collect([$television->name, $window->name])->sort()->values()->all(),
-            collect($rows)->pluck('label')->sort()->values()->all()
-        );
-        $this->assertSame(['900.00', '1500.00'], collect($rows)->pluck('charge')->sort()->values()->all());
+        $this->assertSame('Wall paint', $rows[0]['label']);
+        $this->assertSame('350.00', $rows[0]['charge']);
+        $this->assertSame('Aircon filter', $rows[1]['label']);
+        $this->assertSame('', $rows[1]['charge']);
 
         $checklist = RoomChecklist::query()
             ->where('booking_id', (int) $booking->id)
@@ -184,25 +182,6 @@ class BookingManualLifecycleDamageSettlementTest extends TestCase
 
         $this->assertNotNull($checklist);
         $this->assertSame(2, $checklist->items()->count());
-    }
-
-    public function test_checkout_checklist_is_empty_when_room_has_no_associated_damage_properties(): void
-    {
-        $booking = $this->createBooking();
-        $room = $this->createRoom();
-        $booking->rooms()->attach($room->id);
-
-        $rows = BookingLifecycleActions::checkoutChecklistFormItems($booking->fresh());
-
-        $this->assertSame([], $rows);
-
-        $checklist = RoomChecklist::query()
-            ->where('booking_id', (int) $booking->id)
-            ->where('room_id', (int) $room->id)
-            ->first();
-
-        $this->assertNotNull($checklist);
-        $this->assertSame(0, $checklist->items()->count());
     }
 
     /**
