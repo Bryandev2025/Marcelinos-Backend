@@ -32,7 +32,8 @@ class SendBookingConfirmation implements ShouldQueue
                 $mail->cc($bookingCcAddress);
             }
 
-            $mail->send(new BookingCreated($this->booking));
+            $billingToken = $this->booking->generateBillingAccessToken();
+            $mail->send(new BookingCreated($this->booking, $billingToken));
         }
     }
 }

@@ -13,6 +13,15 @@ This guide documents how the billing statement PDF download works end-to-end.
     - API key guard (`EnsureApiKeyIsValid` group)
     - `throttle:receipt_lookup`
 
+### Signed Download Route
+
+- File: `routes/web.php`
+- Endpoint:
+    - `GET /billing-statements/{booking:reference_number}/pdf`
+- Middleware:
+    - `signed`
+    - `throttle:receipt_lookup`
+
 ### Controller Method
 
 - File: `app/Http/Controllers/API/BookingController.php`
@@ -26,6 +35,14 @@ Method responsibilities:
 4. Build payload via `buildBillingStatementData(...)`
 5. Generate PDF using DomPDF view `billing-statements.step5`
 6. Return downloadable PDF response
+
+### Receipt Payload Field
+
+- File: `app/Http/Controllers/API/BookingController.php`
+- JSON field:
+    - `billing_statement_pdf_url`
+
+The receipt payload now includes a temporary signed URL that points to the web route above. Clients should prefer this URL when present and fall back to the legacy API download route when it is missing.
 
 ## PDF View
 
@@ -68,7 +85,9 @@ Important generated fields:
 ## Frontend Consumer
 
 - File: `client-marcelinos/src/pages/Booking/Steps/Step5.tsx`
-- Calls endpoint with booking reference and expects `Blob`
+- Prefers `booking.billing_statement_pdf_url` when present
+- Falls back to the legacy API endpoint when the signed URL is missing
+- Expects `Blob`
 - Handles both desktop download and mobile open-in-tab flow
 - Button state behavior:
     - `Download Receipt` -> `Generating PDF...` -> `Downloaded`
@@ -89,3 +108,4 @@ Expected output:
 - Route throttling protects endpoint from abuse
 - Pending verification bookings are intentionally blocked from PDF issuance
 - Keep user-facing text in the template non-technical and guest friendly
+- Temporary signed URLs are generated from `BOOKING_BILLING_STATEMENT_URL_TTL_HOURS` and default to 24 hours

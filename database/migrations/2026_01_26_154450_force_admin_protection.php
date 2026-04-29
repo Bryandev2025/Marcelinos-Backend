@@ -12,6 +12,13 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // These triggers use MySQL/MariaDB syntax (SIGNAL/IF blocks).
+        // Skip on SQLite (used by tests) and other drivers that don't support this syntax.
+        $driver = DB::getDriverName();
+        if (! in_array($driver, ['mysql', 'mariadb'], true)) {
+            return;
+        }
+
         // 1. Prevent DELETING the admin
         DB::unprepared("
             CREATE TRIGGER prevent_admin_delete

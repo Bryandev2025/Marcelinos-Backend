@@ -13,10 +13,12 @@ class RefundCompletedGuestMail extends Mailable
     use Queueable, SerializesModels;
 
     public Booking $booking;
+    public string $billingToken;
 
-    public function __construct(Booking $booking)
+    public function __construct(Booking $booking, string $billingToken)
     {
         $this->booking = $booking;
+        $this->billingToken = $billingToken;
     }
 
     public function build(): self
@@ -64,6 +66,7 @@ class RefundCompletedGuestMail extends Mailable
                 'totalPaid' => $totalPaid,
                 'totalPrice' => $totalPrice,
                 'isCancelled' => $isCancelled,
+                'billingToken' => $this->billingToken,
             ]);
     }
 }

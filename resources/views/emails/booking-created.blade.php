@@ -128,8 +128,8 @@
                     <tr>
                         <td style="padding:0 32px 24px; font-family:'Poppins', Arial, Helvetica, sans-serif;">
                             <p style="margin:0 0 12px; font-size:13.5px; line-height:22px; color:#6b7280; font-family:'Poppins', Arial, Helvetica, sans-serif;">
-                                <a href="{{ rtrim(config('app.frontend_url'), '/') }}/booking-receipt/{{ $booking->receipt_token }}" style="color:#2563eb; font-weight:600; text-decoration:none; font-family:'Poppins', Arial, Helvetica, sans-serif;">
-                                    Click here to view your booking receipt
+                                <a href="{{ rtrim(config('app.frontend_url'), '/') }}/billing/{{ $booking->id }}?token={{ urlencode($billingToken) }}" style="color:#2563eb; font-weight:600; text-decoration:none; font-family:'Poppins', Arial, Helvetica, sans-serif;">
+                                    Click here to view your billing statement
                                 </a>
                             </p>
 

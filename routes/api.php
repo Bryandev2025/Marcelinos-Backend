@@ -12,6 +12,7 @@ use App\Http\Controllers\API\GalleryController;
 use App\Http\Controllers\API\MaintenanceModeController;
 use App\Http\Controllers\API\PaymentSettingsController;
 use App\Http\Controllers\API\ReviewController;
+use App\Http\Controllers\API\RoomDamageLossChargesController;
 use App\Http\Controllers\API\RoomController;
 use App\Http\Controllers\API\ResetPasswordController;
 use App\Http\Controllers\API\VenueController;
@@ -41,6 +42,7 @@ Route::get('/health', function () {
 
 Route::get('/maintenance-mode', [MaintenanceModeController::class, 'show']);
 Route::get('/payment-settings', [PaymentSettingsController::class, 'show']);
+Route::get('/room-damage-loss-charges', [RoomDamageLossChargesController::class, 'show']);
 Route::post('/xendit/webhook', [XenditWebhookController::class, 'handle']);
 
 Route::get('bookings/verify-email/{booking}', [BookingController::class, 'verifyEmail'])
@@ -74,6 +76,8 @@ Route::middleware([EnsureApiKeyIsValid::class])->group(function () {
             ->middleware('throttle:booking_otp');
         Route::patch('/bookings/{booking:reference_number}/cancel', [BookingController::class, 'cancel']);
         Route::get('/bookings/{booking:reference_number}/billing-statement/pdf', [BookingController::class, 'downloadBillingStatementPdf'])
+            ->middleware('throttle:receipt_lookup');
+        Route::get('/billing/{id}', [BookingController::class, 'showBillingByAccessToken'])
             ->middleware('throttle:receipt_lookup');
         Route::get('bookings/receipt/{token}', [BookingController::class, 'showByReceiptToken'])->middleware('throttle:receipt_lookup');
         Route::get('bookings/receipt/{token}/payment-status', [BookingController::class, 'paymentStatusByReceiptToken'])->middleware('throttle:receipt_lookup');

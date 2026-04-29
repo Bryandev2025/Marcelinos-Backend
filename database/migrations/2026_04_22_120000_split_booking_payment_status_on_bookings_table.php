@@ -35,29 +35,59 @@ return new class extends Migration
         END");
 
         // Payment state from ledger (preferred over legacy status)
-        DB::statement('UPDATE bookings b
-            LEFT JOIN (
-                SELECT booking_id, COALESCE(SUM(partial_amount), 0) AS paid_sum
-                FROM payments
-                GROUP BY booking_id
-            ) p ON p.booking_id = b.id
-            SET b.payment_status = CASE
-                WHEN COALESCE(p.paid_sum, 0) <= 0.0001 THEN \'unpaid\'
-                WHEN COALESCE(p.paid_sum, 0) < (CAST(b.total_price AS DECIMAL(12, 2)) - 0.009) THEN \'partial\'
-                ELSE \'paid\'
-            END');
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            // SQLite doesn't support MySQL-style UPDATE ... LEFT JOIN, so use correlated subqueries.
+            $paidSumExpr = "(SELECT COALESCE(SUM(partial_amount), 0) FROM payments WHERE booking_id = bookings.id)";
 
-        Schema::table('bookings', function (Blueprint $table) {
-            $table->dropColumn('status');
-        });
+            DB::statement("UPDATE bookings SET payment_status = CASE
+                WHEN {$paidSumExpr} <= 0.0001 THEN 'unpaid'
+                WHEN {$paidSumExpr} < (bookings.total_price - 0.009) THEN 'partial'
+                ELSE 'paid'
+            END");
+        } else {
+            DB::statement('UPDATE bookings b
+                LEFT JOIN (
+                    SELECT booking_id, COALESCE(SUM(partial_amount), 0) AS paid_sum
+                    FROM payments
+                    GROUP BY booking_id
+                ) p ON p.booking_id = b.id
+                SET b.payment_status = CASE
+                    WHEN COALESCE(p.paid_sum, 0) <= 0.0001 THEN \'unpaid\'
+                    WHEN COALESCE(p.paid_sum, 0) < (CAST(b.total_price AS DECIMAL(12, 2)) - 0.009) THEN \'partial\'
+                    ELSE \'paid\'
+                END');
+        }
 
-        DB::statement("ALTER TABLE bookings MODIFY booking_status ENUM(
-            'reserved','occupied','completed','cancelled','rescheduled'
-        ) NOT NULL DEFAULT 'reserved'");
+        // Some DB schemas / test environments may already have `status` removed.
+        // SQLite also tends to be stricter about dropping columns.
+        if (DB::connection()->getDriverName() === 'sqlite') {
+            try {
+                if (Schema::hasColumn('bookings', 'status')) {
+                    Schema::table('bookings', function (Blueprint $table) {
+                        $table->dropColumn('status');
+                    });
+                }
+            } catch (\Throwable $e) {
+                // Best-effort: if SQLite can't drop the legacy column, the app can still run.
+            }
+        } else {
+            if (Schema::hasColumn('bookings', 'status')) {
+                Schema::table('bookings', function (Blueprint $table) {
+                    $table->dropColumn('status');
+                });
+            }
+        }
 
-        DB::statement("ALTER TABLE bookings MODIFY payment_status ENUM(
-            'unpaid','partial','paid'
-        ) NOT NULL DEFAULT 'unpaid'");
+        if (DB::connection()->getDriverName() !== 'sqlite') {
+            // MySQL-only: enforce ENUM + defaults. SQLite treats enums as generic strings.
+            DB::statement("ALTER TABLE bookings MODIFY booking_status ENUM(
+                'reserved','occupied','completed','cancelled','rescheduled'
+            ) NOT NULL DEFAULT 'reserved'");
+
+            DB::statement("ALTER TABLE bookings MODIFY payment_status ENUM(
+                'unpaid','partial','paid'
+            ) NOT NULL DEFAULT 'unpaid'");
+        }
     }
 
     public function down(): void

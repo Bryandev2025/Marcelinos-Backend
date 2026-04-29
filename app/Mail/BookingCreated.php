@@ -14,8 +14,9 @@ class BookingCreated extends Mailable implements ShouldQueue
     use Queueable, SerializesModels;
 
     public Booking $booking;
+    public string $billingToken;
 
-    public function __construct(Booking $booking)
+    public function __construct(Booking $booking, string $billingToken)
     {
         if (! Str::isUuid((string) $booking->receipt_token)) {
             $booking->forceFill([
@@ -24,6 +25,7 @@ class BookingCreated extends Mailable implements ShouldQueue
         }
 
         $this->booking = $booking;
+        $this->billingToken = $billingToken;
     }
 
     public function build()
@@ -45,6 +47,7 @@ class BookingCreated extends Mailable implements ShouldQueue
             ->subject('Marcelino\'s Resort Hotel - Booking Confirmation')
             ->view('emails.booking-created', [
                 'guestDisplayName' => $guestDisplayName,
+                'billingToken' => $this->billingToken,
             ]);
     }
 }

@@ -57,7 +57,8 @@ class RefundNotificationService
         }
 
         try {
-            Mail::to($email)->send(new RefundEligibleGuestMail($booking));
+            $billingToken = $booking->generateBillingAccessToken();
+            Mail::to($email)->send(new RefundEligibleGuestMail($booking, $billingToken));
             $booking->updateQuietly(['refund_guest_notice_sent_at' => now()]);
         } catch (\Throwable $exception) {
             $this->logFailure($booking, 'refund_guest_eligible', [$email], $exception);
@@ -81,7 +82,8 @@ class RefundNotificationService
         }
 
         try {
-            Mail::to($email)->send(new RefundCompletedGuestMail($booking));
+            $billingToken = $booking->generateBillingAccessToken();
+            Mail::to($email)->send(new RefundCompletedGuestMail($booking, $billingToken));
             $booking->updateQuietly(['refund_guest_confirmation_sent_at' => now()]);
         } catch (\Throwable $exception) {
             $this->logFailure($booking, 'refund_guest_completed', [$email], $exception);
