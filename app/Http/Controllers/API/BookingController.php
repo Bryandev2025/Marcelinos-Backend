@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\API;
 
 use App\Events\BookingCancelled;
+use App\Events\BookingEmailVerified;
 use App\Events\BookingRescheduled;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\API\StoreBookingRequest;
@@ -764,6 +765,9 @@ class BookingController extends Controller
 
         $booking->refresh();
         $booking->generateQrCode();
+
+        // Broadcast email verification event to frontend
+        BookingEmailVerified::dispatch($booking);
 
         $fresh = $booking->fresh(['guest', 'rooms', 'venues', 'roomLines']);
 
