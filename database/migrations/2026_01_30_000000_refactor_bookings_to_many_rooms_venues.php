@@ -13,9 +13,6 @@ return new class extends Migration
      */
     public function up(): void
     {
-        $driver = DB::getDriverName();
-        $supportsNamedForeignKeyDrop = in_array($driver, ['mysql', 'mariadb'], true);
-
         // Pivot: booking <-> rooms (many-to-many)
         Schema::create('booking_room', function (Blueprint $table) {
             $table->id();
@@ -51,14 +48,8 @@ return new class extends Migration
 
         // Drop foreign and column from bookings (only if they exist)
         if (Schema::hasColumn('bookings', 'room_id')) {
-            if ($supportsNamedForeignKeyDrop) {
-                $fkName = $this->getForeignKeyName('bookings', 'room_id');
-                if ($fkName) {
-                    DB::statement("ALTER TABLE bookings DROP FOREIGN KEY `{$fkName}`");
-                }
-            }
             Schema::table('bookings', function (Blueprint $table) {
-                // SQLite needs the FK dropped before rebuilding the table.
+                // Drop the foreign key constraint if it exists, then the column
                 $table->dropForeign(['room_id']);
                 $table->dropColumn('room_id');
             });
@@ -66,12 +57,6 @@ return new class extends Migration
 
         // If venue_id was added in another migration, drop it here too
         if (Schema::hasColumn('bookings', 'venue_id')) {
-            if ($supportsNamedForeignKeyDrop) {
-                $fkName = $this->getForeignKeyName('bookings', 'venue_id');
-                if ($fkName) {
-                    DB::statement("ALTER TABLE bookings DROP FOREIGN KEY `{$fkName}`");
-                }
-            }
             Schema::table('bookings', function (Blueprint $table) {
                 $table->dropForeign(['venue_id']);
                 $table->dropColumn('venue_id');
@@ -101,24 +86,5 @@ return new class extends Migration
 
         Schema::dropIfExists('booking_venue');
         Schema::dropIfExists('booking_room');
-    }
-
-    /**
-     * Get the foreign key constraint name for a column (MySQL).
-     */
-    private function getForeignKeyName(string $table, string $column): ?string
-    {
-        $driver = DB::getDriverName();
-        if (! in_array($driver, ['mysql', 'mariadb'], true)) {
-            return null;
-        }
-
-        $result = DB::selectOne(
-            "SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE 
-             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? AND REFERENCED_TABLE_NAME IS NOT NULL",
-            [$table, $column]
-        );
-
-        return $result?->CONSTRAINT_NAME;
     }
 };
