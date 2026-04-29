@@ -7,12 +7,14 @@ use App\Filament\Actions\TypedForceDeleteAction;
 use App\Filament\Resources\Bookings\BookingResource;
 use App\Filament\Resources\Bookings\Concerns\InteractsWithBookingOperations;
 use App\Models\Booking;
+use App\Models\Guest;
 use App\Support\BookingFullBalancePayment;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\ViewAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 
 class EditBooking extends EditRecord
@@ -56,6 +58,26 @@ class EditBooking extends EditRecord
     protected function mutateFormDataBeforeSave(array $data): array
     {
         $this->shouldRecordFullPaymentAfterSave = false;
+
+        $guestDataKeys = [
+            'guest_first_name',
+            'guest_middle_name',
+            'guest_last_name',
+            'guest_info_email',
+            'guest_info_contact_num',
+            'guest_gender',
+            'guest_is_international',
+            'guest_info_country',
+            'guest_region',
+            'guest_province',
+            'guest_municipality',
+            'guest_barangay',
+        ];
+
+        $incomingGuestData = Arr::only($data, $guestDataKeys);
+        foreach ($guestDataKeys as $guestDataKey) {
+            unset($data[$guestDataKey]);
+        }
 
         $venues = $data['venues'] ?? [];
         if (! is_array($venues) || empty(array_filter($venues))) {
@@ -118,6 +140,39 @@ class EditBooking extends EditRecord
                 if ($computed !== $incomingPaymentStatus) {
                     $data['payment_status'] = $computed;
                 }
+            }
+
+            if ($record->guest instanceof Guest) {
+                $isInternational = (bool) ($incomingGuestData['guest_is_international'] ?? false);
+                $country = trim((string) ($incomingGuestData['guest_info_country'] ?? ''));
+                $contactNum = trim((string) ($incomingGuestData['guest_info_contact_num'] ?? ''));
+
+                if ($isInternational && strcasecmp($country, 'Philippines') === 0) {
+                    throw ValidationException::withMessages([
+                        'guest_info_country' => ['Foreign guests cannot use Philippines as country.'],
+                    ]);
+                }
+
+                if (! $isInternational && $contactNum === '') {
+                    throw ValidationException::withMessages([
+                        'guest_info_contact_num' => ['Contact number is required for local guests.'],
+                    ]);
+                }
+
+                $record->guest->update([
+                    'first_name' => trim((string) ($incomingGuestData['guest_first_name'] ?? $record->guest->first_name)),
+                    'middle_name' => trim((string) ($incomingGuestData['guest_middle_name'] ?? $record->guest->middle_name)),
+                    'last_name' => trim((string) ($incomingGuestData['guest_last_name'] ?? $record->guest->last_name)),
+                    'email' => trim((string) ($incomingGuestData['guest_info_email'] ?? $record->guest->email)),
+                    'contact_num' => $contactNum,
+                    'gender' => (string) ($incomingGuestData['guest_gender'] ?? $record->guest->gender),
+                    'is_international' => $isInternational,
+                    'country' => $isInternational ? ($country !== '' ? $country : 'Philippines') : 'Philippines',
+                    'region' => $isInternational ? null : trim((string) ($incomingGuestData['guest_region'] ?? '')),
+                    'province' => $isInternational ? null : trim((string) ($incomingGuestData['guest_province'] ?? '')),
+                    'municipality' => $isInternational ? null : trim((string) ($incomingGuestData['guest_municipality'] ?? '')),
+                    'barangay' => $isInternational ? null : trim((string) ($incomingGuestData['guest_barangay'] ?? '')),
+                ]);
             }
         }
 

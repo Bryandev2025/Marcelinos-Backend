@@ -18,6 +18,7 @@ use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -139,55 +140,73 @@ class BookingForm
                         ->visibleOn('create')
                         ->columnSpanFull(),
                     Section::make('Guest information')
-                        ->description('Read-only details for the selected guest.')
+                        ->description('Edit guest details here. Changes are synced to the guest record after saving.')
                         ->columns(2)
                         ->schema([
-                            TextInput::make('guest_info_full_name')
-                                ->label('Full name')
-                                ->formatStateUsing(fn (?Booking $record): string => $record?->guest?->full_name ?? '—')
-                                ->disabled()
-                                ->dehydrated(false),
+                            TextInput::make('guest_first_name')
+                                ->label('First name')
+                                ->required()
+                                ->formatStateUsing(fn (?Booking $record): string => (string) ($record?->guest?->first_name ?? ''))
+                                ->visibleOn('edit'),
+                            TextInput::make('guest_middle_name')
+                                ->label('Middle name')
+                                ->formatStateUsing(fn (?Booking $record): string => (string) ($record?->guest?->middle_name ?? ''))
+                                ->visibleOn('edit'),
+                            TextInput::make('guest_last_name')
+                                ->label('Last name')
+                                ->required()
+                                ->formatStateUsing(fn (?Booking $record): string => (string) ($record?->guest?->last_name ?? ''))
+                                ->visibleOn('edit'),
                             TextInput::make('guest_info_email')
                                 ->label('Email')
-                                ->formatStateUsing(fn (?Booking $record): string => $record?->guest?->email ?? '—')
-                                ->disabled()
-                                ->dehydrated(false),
+                                ->email()
+                                ->required()
+                                ->formatStateUsing(fn (?Booking $record): string => (string) ($record?->guest?->email ?? ''))
+                                ->visibleOn('edit'),
+                            Select::make('guest_gender')
+                                ->label('Gender')
+                                ->options(Guest::genderOptions())
+                                ->required()
+                                ->formatStateUsing(fn (?Booking $record): ?string => $record?->guest?->gender)
+                                ->native(false)
+                                ->visibleOn('edit'),
+                            Toggle::make('guest_is_international')
+                                ->label('Foreign / international address')
+                                ->default(false)
+                                ->formatStateUsing(fn (?Booking $record): bool => (bool) ($record?->guest?->is_international ?? false))
+                                ->live()
+                                ->visibleOn('edit'),
                             TextInput::make('guest_info_contact_num')
                                 ->label('Contact number')
-                                ->formatStateUsing(fn (?Booking $record): string => $record?->guest?->contact_num ?? '—')
-                                ->disabled()
-                                ->dehydrated(false),
-                            TextInput::make('guest_info_gender')
-                                ->label('Gender')
-                                ->formatStateUsing(fn (?Booking $record): string => $record?->guest?->gender ? ucfirst((string) $record->guest->gender) : '—')
-                                ->disabled()
-                                ->dehydrated(false),
+                                ->required(fn (Get $get): bool => ! ((bool) $get('guest_is_international')))
+                                ->formatStateUsing(fn (?Booking $record): string => (string) ($record?->guest?->contact_num ?? ''))
+                                ->visibleOn('edit'),
                             TextInput::make('guest_info_country')
                                 ->label('Country')
-                                ->formatStateUsing(fn (?Booking $record): string => $record?->guest?->country ?? '—')
-                                ->disabled()
-                                ->dehydrated(false)
-                                ->visible(fn (?Booking $record): bool => $record?->guest?->is_international ?? false),
-                            TextInput::make('guest_info_address')
-                                ->label('Address')
-                                ->formatStateUsing(function (?Booking $record): string {
-                                    $guest = $record?->guest;
-                                    if (! $guest) {
-                                        return '—';
-                                    }
-
-                                    $parts = array_filter([
-                                        $guest->barangay,
-                                        $guest->municipality,
-                                        $guest->province,
-                                        $guest->region,
-                                    ]);
-
-                                    return $parts !== [] ? implode(', ', $parts) : '—';
-                                })
-                                ->disabled()
-                                ->visible(fn (?Booking $record): bool => ! ($record?->guest?->is_international ?? false))
-                                ->dehydrated(false),
+                                ->required(fn (Get $get): bool => (bool) $get('guest_is_international'))
+                                ->formatStateUsing(fn (?Booking $record): string => (string) ($record?->guest?->country ?? 'Philippines'))
+                                ->visible(fn (Get $get): bool => (bool) $get('guest_is_international'))
+                                ->visibleOn('edit'),
+                            TextInput::make('guest_region')
+                                ->label('Region')
+                                ->formatStateUsing(fn (?Booking $record): string => (string) ($record?->guest?->region ?? ''))
+                                ->visible(fn (Get $get): bool => ! ((bool) $get('guest_is_international')))
+                                ->visibleOn('edit'),
+                            TextInput::make('guest_province')
+                                ->label('Province')
+                                ->formatStateUsing(fn (?Booking $record): string => (string) ($record?->guest?->province ?? ''))
+                                ->visible(fn (Get $get): bool => ! ((bool) $get('guest_is_international')))
+                                ->visibleOn('edit'),
+                            TextInput::make('guest_municipality')
+                                ->label('Municipality')
+                                ->formatStateUsing(fn (?Booking $record): string => (string) ($record?->guest?->municipality ?? ''))
+                                ->visible(fn (Get $get): bool => ! ((bool) $get('guest_is_international')))
+                                ->visibleOn('edit'),
+                            TextInput::make('guest_barangay')
+                                ->label('Barangay')
+                                ->formatStateUsing(fn (?Booking $record): string => (string) ($record?->guest?->barangay ?? ''))
+                                ->visible(fn (Get $get): bool => ! ((bool) $get('guest_is_international')))
+                                ->visibleOn('edit'),
                         ])
                         ->columnSpanFull(),
 
