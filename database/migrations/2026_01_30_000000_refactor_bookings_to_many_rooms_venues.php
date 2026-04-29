@@ -51,12 +51,20 @@ return new class extends Migration
 
         // Drop foreign and column from bookings (only if they exist)
         if (Schema::hasColumn('bookings', 'room_id')) {
+<<<<<<< Updated upstream
             if ($supportsNamedForeignKeyDrop) {
                 $fkName = $this->getForeignKeyName('bookings', 'room_id');
                 if ($fkName) {
                     DB::statement("ALTER TABLE bookings DROP FOREIGN KEY `{$fkName}`");
                 }
             }
+=======
+            $fkName = $this->getForeignKeyName('bookings', 'room_id');
+            if ($fkName) {
+                DB::statement("ALTER TABLE bookings DROP FOREIGN KEY `{$fkName}`");
+            }
+
+>>>>>>> Stashed changes
             Schema::table('bookings', function (Blueprint $table) {
                 // SQLite needs the FK dropped before rebuilding the table.
                 $table->dropForeign(['room_id']);
@@ -66,12 +74,20 @@ return new class extends Migration
 
         // If venue_id was added in another migration, drop it here too
         if (Schema::hasColumn('bookings', 'venue_id')) {
+<<<<<<< Updated upstream
             if ($supportsNamedForeignKeyDrop) {
                 $fkName = $this->getForeignKeyName('bookings', 'venue_id');
                 if ($fkName) {
                     DB::statement("ALTER TABLE bookings DROP FOREIGN KEY `{$fkName}`");
                 }
             }
+=======
+            $fkName = $this->getForeignKeyName('bookings', 'venue_id');
+            if ($fkName) {
+                DB::statement("ALTER TABLE bookings DROP FOREIGN KEY `{$fkName}`");
+            }
+
+>>>>>>> Stashed changes
             Schema::table('bookings', function (Blueprint $table) {
                 $table->dropForeign(['venue_id']);
                 $table->dropColumn('venue_id');
