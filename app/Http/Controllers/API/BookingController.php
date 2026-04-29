@@ -841,6 +841,14 @@ class BookingController extends Controller
     {
         $validated = $request->validated();
 
+        $roomIds = isset($validated['room_ids']) && is_array($validated['room_ids'])
+            ? collect($validated['room_ids'])
+                ->map(fn ($id) => (int) $id)
+                ->filter()
+                ->unique()
+                ->values()
+                ->all()
+            : [];
         $roomLines = isset($validated['room_lines']) && is_array($validated['room_lines'])
             ? $validated['room_lines']
             : [];
@@ -891,7 +899,32 @@ class BookingController extends Controller
                 (string) ($validated['online_payment_plan'] ?? ''),
             );
 
-            $guest = Guest::store($request);
+            if ($hasRoomLines && $roomIds !== []) {
+                $availableRoomIds = Room::query()
+                    ->whereIn('id', $roomIds)
+                    ->availableBetween($checkIn, $checkOut, null)
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
+
+                $conflictingRoomIds = array_values(array_diff($roomIds, $availableRoomIds));
+
+                if ($conflictingRoomIds !== []) {
+                    $conflictingRooms = Room::whereIn('id', $conflictingRoomIds)
+                        ->get(['id', 'name']);
+
+                    return response()->json([
+                        'message' => 'One or more selected rooms are no longer available for the chosen dates. Please choose another room and try again.',
+                        'error' => 'room_unavailable',
+                        'conflicts' => [
+                            'rooms' => $conflictingRooms
+                                ->map(fn ($room) => ['id' => $room->id, 'name' => $room->name])
+                                ->values()
+                                ->all(),
+                        ],
+                    ], 422);
+                }
+            }
 
             if ($hasRoomLines) {
                 $roomLineError = $this->validateGuestRoomLines($roomLines, $checkIn, $checkOut, null);
@@ -925,6 +958,8 @@ class BookingController extends Controller
                     ], 422);
                 }
             }
+
+            $guest = Guest::store($request);
 
             $venueEventType = $hasVenues
                 ? ($validated['venue_event_type'] ?? BookingPricing::VENUE_EVENT_WEDDING)

@@ -48,6 +48,13 @@ class StoreBookingRequest extends FormRequest
             'website' => ['nullable', 'string', 'max:0'],
             'captcha_token' => ['nullable', 'string'],
             'reference_number' => 'nullable|string',
+            'room_ids' => [
+                Rule::requiredIf(fn () => is_array($this->room_lines) && count($this->room_lines) > 0),
+                'nullable',
+                'array',
+                'max:32',
+            ],
+            'room_ids.*' => ['required', 'integer', 'distinct', Rule::exists('rooms', 'id')],
             'room_lines' => 'nullable|array|max:32',
             'room_lines.*.room_type' => ['required', 'string', Rule::in(['standard', 'family', 'deluxe'])],
             'room_lines.*.inventory_group_key' => 'required|string|max:512',
