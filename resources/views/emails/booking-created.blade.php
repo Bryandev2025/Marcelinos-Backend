@@ -125,6 +125,42 @@
                         </td>
                     </tr>
 
+                    @php
+                        $bookingStatusLower = strtolower((string) ($booking->booking_status ?? ''));
+                        $paymentStatusLower = strtolower((string) ($booking->payment_status ?? ''));
+                        $showDownPaymentNotice = in_array($bookingStatusLower, ['reserved', 'rescheduled'], true)
+                            && $paymentStatusLower === \App\Models\Booking::PAYMENT_STATUS_UNPAID;
+
+                        $downPaymentPercent = 50;
+                        $deadlineAt = now()->timezone('Asia/Manila')->setTime(21, 0, 0);
+                        $depositDueLabel = $deadlineAt->format('F j, Y g:i A');
+                    @endphp
+
+                    @if ($showDownPaymentNotice)
+                        <tr>
+                            <td style="padding:0 32px 16px; font-family:'Poppins', Arial, Helvetica, sans-serif;">
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #fecaca; background:linear-gradient(135deg, #fff1f2 0%, #fffbeb 55%, #ffffff 100%); border-radius:14px; font-family:'Poppins', Arial, Helvetica, sans-serif;">
+                                    <tr>
+                                        <td style="padding:16px 16px; font-family:'Poppins', Arial, Helvetica, sans-serif;">
+                                            <div style="margin:0 0 8px; font-size:12px; line-height:18px; color:#991b1b; font-weight:900; letter-spacing:0.6px; text-transform:uppercase; font-family:'Poppins', Arial, Helvetica, sans-serif;">
+                                                Action required — avoid cancellation
+                                            </div>
+                                            <div style="margin:0; font-size:16px; line-height:24px; color:#111827; font-weight:800; font-family:'Poppins', Arial, Helvetica, sans-serif;">
+                                                Down payment: <span style="color:#b91c1c;">{{ $downPaymentPercent }}%</span> before <span style="color:#b91c1c;">9:00 PM today</span>.
+                                            </div>
+                                            <div style="margin-top:8px; font-size:13.5px; line-height:22px; color:#111827; font-weight:600; font-family:'Poppins', Arial, Helvetica, sans-serif;">
+                                                If not paid by <strong>{{ $depositDueLabel }}</strong> (Philippine time), your booking will be <strong style="color:#b91c1c;">cancelled</strong>.
+                                            </div>
+                                            <div style="margin-top:10px; font-size:12.5px; line-height:20px; color:#6b7280; font-family:'Poppins', Arial, Helvetica, sans-serif;">
+                                                Open your billing statement below for the exact amount and payment instructions.
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    @endif
+
                     <tr>
                         <td style="padding:0 32px 24px; font-family:'Poppins', Arial, Helvetica, sans-serif;">
                             <p style="margin:0 0 12px; font-size:13.5px; line-height:22px; color:#6b7280; font-family:'Poppins', Arial, Helvetica, sans-serif;">
