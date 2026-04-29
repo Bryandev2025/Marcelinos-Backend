@@ -77,6 +77,8 @@ Route::middleware([EnsureApiKeyIsValid::class])->group(function () {
         Route::patch('/bookings/{booking:reference_number}/cancel', [BookingController::class, 'cancel']);
         Route::get('/bookings/{booking:reference_number}/billing-statement/pdf', [BookingController::class, 'downloadBillingStatementPdf'])
             ->middleware('throttle:receipt_lookup');
+        Route::get('/billing/{id}', [BookingController::class, 'showBillingByAccessToken'])
+            ->middleware('throttle:receipt_lookup');
         Route::get('bookings/receipt/{token}', [BookingController::class, 'showByReceiptToken'])->middleware('throttle:receipt_lookup');
         Route::get('bookings/receipt/{token}/payment-status', [BookingController::class, 'paymentStatusByReceiptToken'])->middleware('throttle:receipt_lookup');
         Route::post('bookings/receipt/{token}/retry-payment', [BookingController::class, 'retryOnlinePaymentByReceiptToken'])->middleware('throttle:receipt_lookup');

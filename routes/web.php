@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\API\BookingController;
 use App\Filament\Pages\AdminDashboard;
 use App\Http\Controllers\Reports\GuestDemographicsExportController;
 use Filament\Facades\Filament;
@@ -53,6 +54,10 @@ Route::get('/testimonial/feedback/{token}', function (string $token) {
 })->where('token', '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}')
     ->name('testimonial.feedback.redirect')
     ->middleware('signed');
+
+Route::get('/billing-statements/{booking:reference_number}/pdf', [BookingController::class, 'downloadBillingStatementPdf'])
+    ->name('billing-statements.pdf')
+    ->middleware(['signed', 'throttle:receipt_lookup']);
 
 if ($adminPanel = Filament::getPanel('admin')) {
     $loginMiddleware = array_merge($adminPanel->getMiddleware(), ['guest']);

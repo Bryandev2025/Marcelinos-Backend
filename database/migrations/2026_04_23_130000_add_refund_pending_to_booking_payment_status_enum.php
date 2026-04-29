@@ -7,9 +7,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement("ALTER TABLE bookings MODIFY payment_status ENUM(
-            'unpaid','partial','paid','refund_pending','refunded'
-        ) NOT NULL DEFAULT 'unpaid'");
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE bookings MODIFY payment_status ENUM(
+                'unpaid','partial','paid','refund_pending','refunded'
+            ) NOT NULL DEFAULT 'unpaid'");
+        }
 
         // Existing rescheduled + refunded rows came from amount recalculation only.
         // Move them to refund_pending so staff can explicitly complete the refund.
@@ -25,8 +27,10 @@ return new class extends Migration
             SET payment_status = 'refunded'
             WHERE payment_status = 'refund_pending'");
 
-        DB::statement("ALTER TABLE bookings MODIFY payment_status ENUM(
-            'unpaid','partial','paid','refunded'
-        ) NOT NULL DEFAULT 'unpaid'");
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE bookings MODIFY payment_status ENUM(
+                'unpaid','partial','paid','refunded'
+            ) NOT NULL DEFAULT 'unpaid'");
+        }
     }
 };

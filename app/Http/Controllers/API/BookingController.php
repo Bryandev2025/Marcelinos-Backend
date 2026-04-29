@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
@@ -202,6 +203,59 @@ class BookingController extends Controller
     }
 
     /**
+     * Display a guest billing statement by booking id.
+     *
+     * Access is granted only when:
+     * - `?token=` matches the stored SHA-256 hash in `access_token` using `hash_equals()`
+     * - optional `token_expires_at` is not in the past
+     *
+     * Returns 403 on any access failure.
+     */
+    public function showBillingByAccessToken(int $id, Request $request): JsonResponse
+    {
+        $rawToken = $request->query('token');
+        if (! is_string($rawToken) || trim($rawToken) === '') {
+            return response()->json([
+                'message' => 'Invalid or expired billing link.',
+                'error' => 'billing_token_invalid',
+            ], 403);
+        }
+
+        $booking = Booking::query()->with(['guest', 'rooms', 'venues', 'roomLines', 'payments'])
+            ->find($id);
+
+        if (! $booking) {
+            return response()->json([
+                'message' => 'Invalid or expired billing link.',
+                'error' => 'billing_token_invalid',
+            ], 403);
+        }
+
+        $storedHash = (string) ($booking->access_token ?? '');
+        $computedHash = hash('sha256', $rawToken);
+
+        if ($storedHash === '' || ! hash_equals($storedHash, $computedHash)) {
+            return response()->json([
+                'message' => 'Invalid or expired billing link.',
+                'error' => 'billing_token_invalid',
+            ], 403);
+        }
+
+        if ($booking->token_expires_at !== null && $booking->token_expires_at->isPast()) {
+            return response()->json([
+                'message' => 'Billing link expired.',
+                'error' => 'token_expired',
+            ], 403);
+        }
+
+        if ($response = $this->rejectIfPendingVerification($booking)) {
+            return $response;
+        }
+
+        return $this->jsonReceiptForBooking($booking);
+    }
+
+    /**
      * Confirm a successful online payment from receipt return flow.
      * Uses opaque receipt token only and updates booking status to paid/partial.
      */
@@ -290,6 +344,11 @@ class BookingController extends Controller
         $balance = max(0, (float) $bookingPayload->balance);
         $amountDueNow = $this->resolveAmountDueNow($bookingPayload);
         $discountTarget = BookingSpecialDiscount::resolveDiscountTarget($bookingPayload, (string) ($bookingPayload->special_discount_target ?? null));
+        $billingStatementPdfUrl = $this->billingStatementPdfUrl($bookingPayload);
+
+        if ($billingStatementPdfUrl !== null) {
+            $bookingPayload->setAttribute('billing_statement_pdf_url', $billingStatementPdfUrl);
+        }
 
         $paymentSettings = $this->paymentSettingsConfig();
         $partialOptions = $paymentSettings['partial_payment_options'] ?? [];
@@ -325,9 +384,27 @@ class BookingController extends Controller
             'down_payment_notice_min_lead_days' => Booking::DOWN_PAYMENT_NOTICE_MIN_LEAD_DAYS,
             'down_payment_percent' => $downPaymentPercent,
             'qr_code_url' => $filename ? url("/qr-image/{$filename}") : null,
+            'billing_statement_pdf_url' => $billingStatementPdfUrl,
             'has_testimonial' => $hasTestimonial,
             'email_verification_required' => $pendingVerification,
         ], 200);
+    }
+
+    private function billingStatementPdfUrl(Booking $booking): ?string
+    {
+        $referenceNumber = trim((string) $booking->reference_number);
+
+        if ($referenceNumber === '') {
+            return null;
+        }
+
+        $ttlHours = max(1, (int) config('booking.billing_statement_url_ttl_hours', 24));
+
+        return URL::temporarySignedRoute(
+            'billing-statements.pdf',
+            now()->addHours($ttlHours),
+            ['booking' => $referenceNumber],
+        );
     }
 
     /**
@@ -714,9 +791,18 @@ class BookingController extends Controller
         }
 
         $base = rtrim((string) config('app.frontend_url'), '/');
-        $token = (string) $booking->receipt_token;
+        $billingToken = (string) request()->query('billing_token', '');
 
-        return redirect()->away("{$base}/booking-receipt/{$token}?verified=1");
+        if ($billingToken === '') {
+            // Backward-compatible fallback for any verification links that
+            // don't include the billing token query param.
+            $receiptToken = (string) $booking->receipt_token;
+            return redirect()->away("{$base}/booking-receipt/{$receiptToken}?verified=1");
+        }
+
+        return redirect()->away(
+            "{$base}/billing/{$booking->id}?token=".urlencode($billingToken)."&verified=1"
+        );
     }
 
     private function provisionOnlineInvoiceForPublicBooking(Booking $booking, Guest $guest): ?string

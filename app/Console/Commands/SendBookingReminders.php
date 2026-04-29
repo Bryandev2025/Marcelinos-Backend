@@ -70,7 +70,8 @@ class SendBookingReminders extends Command
                         $mail->cc($bookingCcAddress);
                     }
 
-                    $mail->send(new BookingReminderMail($booking));
+                    $billingToken = $booking->generateBillingAccessToken();
+                    $mail->send(new BookingReminderMail($booking, $billingToken));
                     $emailSent = true;
                 } catch (\Throwable $emailException) {
                     Log::error('Booking reminder email failed to send.', [

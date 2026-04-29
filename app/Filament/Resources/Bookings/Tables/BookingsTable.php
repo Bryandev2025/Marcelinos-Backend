@@ -813,12 +813,14 @@ class BookingsTable
                                         now()->addHours($hours),
                                         ['booking' => $record->id],
                                     );
-                                    $mail->send(new VerifyBookingEmail($record, $verifyUrl));
+                                    $billingToken = $record->generateBillingAccessToken();
+                                    $mail->send(new VerifyBookingEmail($record, $verifyUrl, $billingToken));
 
                                     return;
                                 }
 
-                                $mail->send(new BookingCreated($record));
+                                $billingToken = $record->generateBillingAccessToken();
+                                $mail->send(new BookingCreated($record, $billingToken));
                             }
                         }),
                 ]),

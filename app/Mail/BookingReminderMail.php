@@ -12,10 +12,12 @@ class BookingReminderMail extends Mailable
     use Queueable, SerializesModels;
 
     public Booking $booking;
+    public string $billingToken;
 
-    public function __construct(Booking $booking)
+    public function __construct(Booking $booking, string $billingToken)
     {
         $this->booking = $booking;
+        $this->billingToken = $billingToken;
     }
 
     public function build(): self
@@ -28,6 +30,8 @@ class BookingReminderMail extends Mailable
 
         return $this
             ->subject('Booking Reminder - Your Stay is Tomorrow')
-            ->view('emails.booking-reminder');
+            ->view('emails.booking-reminder', [
+                'billingToken' => $this->billingToken,
+            ]);
     }
 }

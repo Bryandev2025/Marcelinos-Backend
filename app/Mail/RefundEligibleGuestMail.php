@@ -12,10 +12,12 @@ class RefundEligibleGuestMail extends Mailable
     use Queueable, SerializesModels;
 
     public Booking $booking;
+    public string $billingToken;
 
-    public function __construct(Booking $booking)
+    public function __construct(Booking $booking, string $billingToken)
     {
         $this->booking = $booking;
+        $this->billingToken = $billingToken;
     }
 
     public function build(): self
@@ -35,6 +37,7 @@ class RefundEligibleGuestMail extends Mailable
             ->view('emails.refund-eligible-guest', [
                 'guestDisplayName' => $guestDisplayName,
                 'preheader' => $preheader,
+                'billingToken' => $this->billingToken,
             ]);
     }
 }

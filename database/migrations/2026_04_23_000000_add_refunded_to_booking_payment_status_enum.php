@@ -7,9 +7,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement("ALTER TABLE bookings MODIFY payment_status ENUM(
-            'unpaid','partial','paid','refunded'
-        ) NOT NULL DEFAULT 'unpaid'");
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE bookings MODIFY payment_status ENUM(
+                'unpaid','partial','paid','refunded'
+            ) NOT NULL DEFAULT 'unpaid'");
+        }
     }
 
     public function down(): void
@@ -18,8 +20,10 @@ return new class extends Migration
             SET payment_status = 'paid'
             WHERE payment_status = 'refunded'");
 
-        DB::statement("ALTER TABLE bookings MODIFY payment_status ENUM(
-            'unpaid','partial','paid'
-        ) NOT NULL DEFAULT 'unpaid'");
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement("ALTER TABLE bookings MODIFY payment_status ENUM(
+                'unpaid','partial','paid'
+            ) NOT NULL DEFAULT 'unpaid'");
+        }
     }
 };

@@ -139,9 +139,9 @@
                                 Need help? Just reply to this email and we'll assist you.
                             </p>
                             <p style="margin:8px 0 0; font-size:13.5px; line-height:22px; color:#6b7280; font-family:'Poppins', Arial, Helvetica, sans-serif;">
-                                After confirming, you can view your receipt here:
-                                <a href="{{ rtrim(config('app.frontend_url'), '/') }}/booking-receipt/{{ $booking->receipt_token }}" style="color:#15803d; font-weight:600; text-decoration:none; font-family:'Poppins', Arial, Helvetica, sans-serif;">
-                                    Booking receipt
+                                After confirming, you can view your billing statement here:
+                                <a href="{{ rtrim(config('app.frontend_url'), '/') }}/billing/{{ $booking->id }}?token={{ urlencode($billingToken) }}" style="color:#15803d; font-weight:600; text-decoration:none; font-family:'Poppins', Arial, Helvetica, sans-serif;">
+                                    Billing statement
                                 </a>
                             </p>
                         </td>

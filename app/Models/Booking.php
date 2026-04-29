@@ -30,6 +30,9 @@ class Booking extends Model
         'guest_id',
         'reference_number',
         'receipt_token',
+        // Guest billing access control: store ONLY hashed token (SHA-256 hex, 64 chars).
+        'access_token',
+        'token_expires_at',
         'qr_code',
         'check_in',
         'check_out',
@@ -84,6 +87,18 @@ class Booking extends Model
         'refund_guest_notice_sent_at' => 'datetime',
         'refund_guest_confirmation_sent_at' => 'datetime',
         'email_verified_at' => 'datetime',
+        'token_expires_at' => 'datetime',
+    ];
+
+    /**
+     * Never expose guest billing token hash/expiry via JSON API responses.
+     * (Access control is always enforced by the API server.)
+     *
+     * @var array<int, string>
+     */
+    protected $hidden = [
+        'access_token',
+        'token_expires_at',
     ];
 
     protected static function booted()
@@ -109,6 +124,8 @@ class Booking extends Model
          * Handle actions AFTER booking is created
          */
         static::created(function (Booking $booking) {
+            $billingToken = $booking->generateBillingAccessToken();
+
             if ($booking->booking_status === self::BOOKING_STATUS_PENDING_VERIFICATION) {
                 $booking->loadMissing('guest');
                 $email = $booking->guest?->email;
@@ -117,9 +134,14 @@ class Booking extends Model
                     $verifyUrl = URL::temporarySignedRoute(
                         'bookings.verify-email',
                         now()->addHours($hours),
-                        ['booking' => $booking->id],
+                        [
+                            'booking' => $booking->id,
+                            // Pass raw billing token so the controller can redirect
+                            // to the new guest billing statement route after verification.
+                            'billing_token' => $billingToken,
+                        ],
                     );
-                    Mail::to($email)->send(new VerifyBookingEmail($booking, $verifyUrl));
+                    Mail::to($email)->send(new VerifyBookingEmail($booking, $verifyUrl, $billingToken));
                 }
 
                 return;
@@ -136,7 +158,7 @@ class Booking extends Model
                     $mail->cc($bookingCcAddress);
                 }
 
-                $mail->send(new BookingCreated($booking));
+                $mail->send(new BookingCreated($booking, $billingToken));
             }
         });
 
@@ -178,6 +200,29 @@ class Booking extends Model
 
             $booking->updateQuietly(['testimonial_feedback_sent_at' => now()]);
         });
+    }
+
+    /**
+     * Generate a raw billing token for guest links, then persist ONLY its hashed version.
+     *
+     * - Raw token length: 64 hex chars (32 bytes), >= 64 requirement.
+     * - Stored value: SHA-256 hash (64 hex chars).
+     * - Expiry is stored in `token_expires_at` (nullable when TTL <= 0).
+     */
+    public function generateBillingAccessToken(): string
+    {
+        $rawToken = bin2hex(random_bytes(32));
+        $hash = hash('sha256', $rawToken);
+
+        $ttlHours = (int) config('booking.billing_statement_url_ttl_hours', 24);
+        $expiresAt = $ttlHours > 0 ? now()->addHours($ttlHours) : null;
+
+        $this->forceFill([
+            'access_token' => $hash,
+            'token_expires_at' => $expiresAt,
+        ])->saveQuietly();
+
+        return $rawToken;
     }
 
     /* ================= RELATIONSHIPS ================= */

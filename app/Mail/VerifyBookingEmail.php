@@ -15,12 +15,15 @@ class VerifyBookingEmail extends Mailable implements ShouldQueue
     public function __construct(
         public Booking $booking,
         public string $verificationUrl,
+        public string $billingToken,
     ) {}
 
     public function build()
     {
         return $this
             ->subject('Confirm your Marcelino\'s Resort booking')
-            ->view('emails.verify-booking');
+            ->view('emails.verify-booking', [
+                'billingToken' => $this->billingToken,
+            ]);
     }
 }
