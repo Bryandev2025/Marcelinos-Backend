@@ -1,5 +1,5 @@
 {{--
-Print Report Partial Template — Tourism Edition
+Print Report Partial Template — Guest Address Edition
 Variables:
 $title (string)
 $subtitle (string)
@@ -60,10 +60,10 @@ $foreignData (Collection: country, total)
             <img src="{{ $logoSrc ?? asset('brand-logo.webp') }}" alt="Marcelinos Resort Hotel" style="height: 64px; width: auto; display: block;" />
         </div>
         <div style="flex: 1; min-width: 0;">
-            <div style="font-size: 10px; font-weight: 700; letter-spacing: 1.2px; color: #15803d; text-transform: uppercase; margin-bottom: 2px;">Tourism Demographics Report</div>
+            <div style="font-size: 10px; font-weight: 700; letter-spacing: 1.2px; color: #15803d; text-transform: uppercase; margin-bottom: 2px;">Guest Address Report</div>
             <h1 style="font-size: 20px; font-weight: 800; margin: 0 0 4px; color: #0f172a; letter-spacing: 0.3px;">{{ $title }}</h1>
             <p style="font-size: 12px; color: #64748b; margin: 0 0 2px;">{{ $subtitle }}</p>
-            <p style="font-size: 10px; color: #94a3b8; margin: 0;">Confidential — For Tourism Office Use Only</p>
+            <p style="font-size: 10px; color: #94a3b8; margin: 0;">Confidential — For Internal Address Reporting Use Only</p>
         </div>
     </div>
 

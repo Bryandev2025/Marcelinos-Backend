@@ -14,7 +14,7 @@ class GuestDemographics extends Page
 {
     protected static \BackedEnum|string|null $navigationIcon = 'heroicon-o-map';
     protected static \UnitEnum|string|null $navigationGroup = 'Reports';
-    protected static ?string $title = 'Guest Demographics';
+    protected static ?string $title = 'Guest Address';
     protected static ?int $navigationSort = 3;
 
     protected string $view = 'filament.pages.guest-demographics';

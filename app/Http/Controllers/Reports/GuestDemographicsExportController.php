@@ -21,8 +21,8 @@ class GuestDemographicsExportController extends Controller
         $now = Carbon::now();
 
         [$start, $end, $title, $subtitle, $kind] = match ($type) {
-            'unpaid' => $this->resolvePresetReport($period, 'unpaid', 'Demographics Report: Unpaid Bookings (Pending)', $now),
-            'successful' => $this->resolvePresetReport($period, 'successful', 'Demographics Report: Successful Bookings (Paid/Confirmed)', $now),
+            'unpaid' => $this->resolvePresetReport($period, 'unpaid', 'Guest Address Report: Unpaid Bookings (Pending)', $now),
+            'successful' => $this->resolvePresetReport($period, 'successful', 'Guest Address Report: Successful Bookings (Paid/Confirmed)', $now),
             'overview_selected' => $this->resolveOverviewReport($request, 'successful', $now),
             default => $this->resolveOverviewReport($request, 'successful', $now),
         };
@@ -46,7 +46,7 @@ class GuestDemographicsExportController extends Controller
         ])->setPaper('a4', 'portrait');
 
         $safePeriod = $period ? Str::slug((string) $period) : 'selected';
-        $filename = 'guest-demographics-' . Str::slug($type) . '-' . $safePeriod . '-' . $now->format('Ymd-His') . '.pdf';
+        $filename = 'guest-address-' . Str::slug($type) . '-' . $safePeriod . '-' . $now->format('Ymd-His') . '.pdf';
 
         return $pdf->download($filename);
     }
@@ -78,7 +78,7 @@ class GuestDemographicsExportController extends Controller
             [$start, $end] = [$end, $start];
         }
 
-        $title = 'Comprehensive Demographics Report';
+        $title = 'Comprehensive Guest Address Report';
         $subtitle = $this->overviewLabel($start, $end) . '  ·  Generated: ' . $now->format('F j, Y, g:i a');
 
         return [$start, $end, $title, $subtitle, $kind];

@@ -2,7 +2,7 @@
     
     <!-- Filter UI Section -->
     <div class="sticky top-0 z-20 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md pb-4 pt-1 border-b border-gray-100 dark:border-white/5 mb-4 px-1">
-        <label for="search" class="sr-only">Search demographics...</label>
+        <label for="search" class="sr-only">Search guest addresses...</label>
         <div class="relative flex items-center">
             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <x-filament::icon icon="heroicon-m-magnifying-glass" class="w-5 h-5 text-gray-400" />
