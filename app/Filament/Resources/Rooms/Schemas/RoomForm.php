@@ -83,16 +83,6 @@ class RoomForm
                     ->searchable()
                     ->bulkToggleable()
                     ->helperText('Check the amenities available in this room. If none appear, add amenities in Properties → Amenities first.'),
-                CheckboxList::make('damageProperties')
-                    ->label('Damage checklist properties')
-                    ->relationship(
-                        titleAttribute: 'name',
-                        modifyQueryUsing: fn ($query) => $query->where('is_active', true)->orderBy('name'),
-                    )
-                    ->columns(2)
-                    ->searchable()
-                    ->bulkToggleable()
-                    ->helperText('Optional. Manually select damage properties that apply to this room. Manage the list in Properties → Damage Properties.'),
             ]);
     }
 }

@@ -9,7 +9,6 @@ use App\Filament\Resources\Bookings\Pages\RoomCalendar;
 use App\Filament\Resources\Bookings\Pages\VenueCalendar;
 use App\Filament\Resources\Bookings\Pages\ViewBooking;
 use App\Filament\Resources\Bookings\RelationManagers\PaymentsRelationManager;
-use App\Filament\Resources\Bookings\RelationManagers\RoomChecklistsRelationManager;
 use App\Filament\Resources\Bookings\RelationManagers\RoomLinesRelationManager;
 use App\Filament\Resources\Bookings\Schemas\BookingForm;
 use App\Filament\Resources\Bookings\Tables\BookingsTable;
@@ -166,7 +165,6 @@ class BookingResource extends Resource
         return [
             PaymentsRelationManager::class,
             RoomLinesRelationManager::class,
-            RoomChecklistsRelationManager::class,
         ];
     }
 
