@@ -83,9 +83,77 @@ class CreateBooking extends CreateRecord
             'province',
             'municipality',
             'barangay',
+            'booking_source',
+            'is_manual_booking',
+            'allow_manual_email_match',
+            'guest_status',
+            'existing_guest_id',
+            'existing_guest_id_picker',
+            'edit_returning_guest',
         ];
 
         $guestData = Arr::only($data, $guestKeys);
+        $guestStatus = (string) ($data['guest_status'] ?? 'new');
+        $existingGuestId = $data['existing_guest_id'] ?? null;
+        if ($existingGuestId === null && isset($data['existing_guest_id_picker'])) {
+            $existingGuestId = $data['existing_guest_id_picker'];
+        }
+        $existingGuestId = is_numeric($existingGuestId) ? (int) $existingGuestId : null;
+        $editReturningGuest = (bool) ($data['edit_returning_guest'] ?? false);
+
+        if ($guestStatus === 'returning' && $existingGuestId) {
+            $existing = Guest::query()->find($existingGuestId);
+            if (! $existing) {
+                throw ValidationException::withMessages([
+                    'data.email' => __('Selected returning guest was not found. Please search again.'),
+                ]);
+            }
+
+            if ($editReturningGuest) {
+                $patch = Arr::only($data, [
+                    'first_name',
+                    'middle_name',
+                    'last_name',
+                    'email',
+                    'contact_num',
+                    'gender',
+                    'is_international',
+                    'country',
+                    'region',
+                    'province',
+                    'municipality',
+                    'barangay',
+                ]);
+                $existing->fill($patch);
+                $existing->save();
+                $existing->refresh();
+            }
+
+            $data['guest_id'] = $existing->id;
+            $addressParts = array_values(array_filter([
+                $existing->barangay,
+                $existing->municipality,
+                $existing->province,
+                $existing->region,
+                $existing->country,
+            ], fn ($value) => is_string($value) && trim($value) !== ''));
+            $data['guest_name_snapshot'] = $existing->full_name;
+            $data['guest_email_snapshot'] = (string) ($data['email'] ?? $existing->email);
+            $data['guest_contact_snapshot'] = $existing->contact_num;
+            $data['guest_address_snapshot'] = $addressParts !== [] ? implode(', ', $addressParts) : null;
+
+            foreach ($guestKeys as $key) {
+                unset($data[$key]);
+            }
+
+            foreach (['ph_region_code', 'ph_province_code', 'ph_municipality_code', 'ph_barangay_code'] as $phKey) {
+                unset($data[$phKey]);
+            }
+
+            // Continue with booking fields.
+            goto after_guest_resolution;
+        }
+
         $guestData['is_international'] = (bool) ($guestData['is_international'] ?? false);
         if (! $guestData['is_international']) {
             $guestData['country'] = $guestData['country'] ?? 'Philippines';
@@ -105,8 +173,23 @@ class CreateBooking extends CreateRecord
             $guestData['contact_num'] = '';
         }
 
-        $guest = Guest::query()->create($guestData);
+        $guest = Guest::store($guestData);
         $data['guest_id'] = $guest->id;
+        $addressParts = array_values(array_filter([
+            $guestData['barangay'] ?? null,
+            $guestData['municipality'] ?? null,
+            $guestData['province'] ?? null,
+            $guestData['region'] ?? null,
+            $guestData['country'] ?? null,
+        ], fn ($value) => is_string($value) && trim($value) !== ''));
+        $data['guest_name_snapshot'] = trim(implode(' ', array_filter([
+            $guestData['first_name'] ?? null,
+            $guestData['middle_name'] ?? null,
+            $guestData['last_name'] ?? null,
+        ], fn ($value) => is_string($value) && trim($value) !== '')));
+        $data['guest_email_snapshot'] = $guestData['email'] ?? null;
+        $data['guest_contact_snapshot'] = $guestData['contact_num'] ?? null;
+        $data['guest_address_snapshot'] = $addressParts !== [] ? implode(', ', $addressParts) : null;
 
         foreach ($guestKeys as $key) {
             unset($data[$key]);
@@ -116,6 +199,7 @@ class CreateBooking extends CreateRecord
             unset($data[$phKey]);
         }
 
+        after_guest_resolution:
         $total = (float) ($data['total_price'] ?? 0);
         $mode = $data['admin_payment_mode'] ?? 'full';
         $payAmount = $mode === 'full'

@@ -28,6 +28,10 @@ class Booking extends Model
 
     protected $fillable = [
         'guest_id',
+        'guest_name_snapshot',
+        'guest_email_snapshot',
+        'guest_contact_snapshot',
+        'guest_address_snapshot',
         'reference_number',
         'receipt_token',
         // Guest billing access control: store ONLY hashed token (SHA-256 hex, 64 chars).

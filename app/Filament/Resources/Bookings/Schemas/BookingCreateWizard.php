@@ -11,6 +11,7 @@ use App\Models\Venue;
 use App\Support\BookingPricing;
 use Closure;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -273,43 +274,271 @@ class BookingCreateWizard
             Step::make('Guest details')
                 ->description('Create the guest profile for this booking.')
                 ->schema([
+                    Hidden::make('booking_source')
+                        ->default('manual')
+                        ->dehydrated(),
+                    Hidden::make('is_manual_booking')
+                        ->default(true)
+                        ->dehydrated(),
+                    Hidden::make('email_is_shared')
+                        ->default(false)
+                        ->dehydrated(),
+                    Hidden::make('existing_guest_found')
+                        ->default(false)
+                        ->dehydrated(false),
+                    Hidden::make('existing_guest_id')
+                        ->default(null)
+                        ->dehydrated(),
+                    Hidden::make('email_has_multiple_matches')
+                        ->default(false)
+                        ->dehydrated(false),
+                    Hidden::make('allow_manual_email_match')
+                        ->default(false)
+                        ->dehydrated(),
+                    Toggle::make('edit_returning_guest')
+                        ->label('Edit guest details for this booking')
+                        ->helperText('Enable to update the guest profile now. Leave off to keep it read-only.')
+                        ->default(false)
+                        ->live()
+                        ->visible(fn (Get $get): bool => $get('guest_status') === 'returning' && (bool) $get('existing_guest_found'))
+                        ->afterStateUpdated(function (Set $set, $state): void {
+                            if (! $state) {
+                                return;
+                            }
+
+                            // When enabling edit mode, ensure we keep returning guest selection flow.
+                            $set('allow_manual_email_match', false);
+                        })
+                        ->columnSpanFull(),
+                    Radio::make('guest_status')
+                        ->label('Guest status')
+                        ->options([
+                            'new' => 'New guest (walk-in / first time)',
+                            'returning' => 'Returning guest (booked before)',
+                        ])
+                        ->default('new')
+                        ->live()
+                        ->afterStateUpdated(function (Set $set, ?string $state): void {
+                            if ($state !== 'returning') {
+                                $set('existing_guest_found', false);
+                                $set('existing_guest_id', null);
+                                $set('email_has_multiple_matches', false);
+                                $set('allow_manual_email_match', false);
+                            }
+                        })
+                        ->columnSpanFull(),
+                    Text::make(fn (Get $get): string => $get('guest_status') === 'returning'
+                        ? 'Returning guest: enter the previous email. If we find a match, details will auto-fill and lock.'
+                        : 'New guest: fill out the details below.')
+                        ->color(fn (Get $get) => $get('guest_status') === 'returning' ? 'primary' : 'neutral')
+                        ->columnSpanFull(),
                     TextInput::make('first_name')
-                        ->required()
+                        ->required(fn (Get $get): bool => $get('guest_status') !== 'returning')
                         ->live(onBlur: true)
                         ->extraInputAttributes(['class' => 'uppercase'])
                         ->afterStateUpdated(fn (Set $set, ?string $state) => $set('first_name', Str::upper(trim((string) $state))))
                         ->dehydrateStateUsing(fn (?string $state): string => Str::upper(trim((string) $state)))
+                        ->disabled(fn (Get $get): bool => $get('guest_status') === 'returning' && ! (bool) $get('edit_returning_guest'))
+                        ->visible(fn (Get $get): bool => $get('guest_status') !== 'returning' || (bool) $get('existing_guest_found'))
                         ->maxLength(100),
                     TextInput::make('middle_name')
                         ->live(onBlur: true)
                         ->extraInputAttributes(['class' => 'uppercase'])
                         ->afterStateUpdated(fn (Set $set, ?string $state) => $set('middle_name', Str::upper(trim((string) $state))))
                         ->dehydrateStateUsing(fn (?string $state): string => Str::upper(trim((string) $state)))
+                        ->disabled(fn (Get $get): bool => $get('guest_status') === 'returning' && ! (bool) $get('edit_returning_guest'))
+                        ->visible(fn (Get $get): bool => $get('guest_status') !== 'returning' || (bool) $get('existing_guest_found'))
                         ->maxLength(100),
                     TextInput::make('last_name')
-                        ->required()
+                        ->required(fn (Get $get): bool => $get('guest_status') !== 'returning')
                         ->live(onBlur: true)
                         ->extraInputAttributes(['class' => 'uppercase'])
                         ->afterStateUpdated(fn (Set $set, ?string $state) => $set('last_name', Str::upper(trim((string) $state))))
                         ->dehydrateStateUsing(fn (?string $state): string => Str::upper(trim((string) $state)))
+                        ->disabled(fn (Get $get): bool => $get('guest_status') === 'returning' && ! (bool) $get('edit_returning_guest'))
+                        ->visible(fn (Get $get): bool => $get('guest_status') !== 'returning' || (bool) $get('existing_guest_found'))
                         ->maxLength(100),
                     Select::make('gender')
                         ->options(Guest::genderOptions())
-                        ->required()
+                        ->required(fn (Get $get): bool => $get('guest_status') !== 'returning')
+                        ->disabled(fn (Get $get): bool => $get('guest_status') === 'returning' && ! (bool) $get('edit_returning_guest'))
+                        ->visible(fn (Get $get): bool => $get('guest_status') !== 'returning' || (bool) $get('existing_guest_found'))
                         ->native(false),
                     TextInput::make('contact_num')
                         ->label('Phone number')
-                        ->required(fn (Get $get): bool => ! ((bool) $get('is_international')))
+                        ->required(fn (Get $get): bool => $get('guest_status') !== 'returning' && ! ((bool) $get('is_international')))
+                        ->disabled(fn (Get $get): bool => $get('guest_status') === 'returning' && ! (bool) $get('edit_returning_guest'))
+                        ->visible(fn (Get $get): bool => $get('guest_status') !== 'returning' || (bool) $get('existing_guest_found'))
                         ->maxLength(20),
                     TextInput::make('email')
+                        ->label(fn (Get $get): string => $get('guest_status') === 'returning' ? 'Email used before' : 'Email')
                         ->email()
                         ->required()
-                        ->helperText('Will be used to send booking confirmation and other notifications. You may reuse an email from a previous guest (same person or family).')
+                        ->live(onBlur: true)
+                        ->disabled(fn (Get $get): bool => $get('guest_status') === 'returning'
+                            && (bool) $get('existing_guest_found')
+                            && ! (bool) $get('edit_returning_guest'))
+                        ->helperText(function (Get $get): string {
+                            if ($get('guest_status') !== 'returning') {
+                                return 'For guests without email, you may use a placeholder email (e.g. resort email).';
+                            }
+
+                            if ((bool) $get('email_is_shared')) {
+                                return 'Shared/placeholder email detected. Select the guest below (same email can belong to many walk-ins).';
+                            }
+
+                            return (bool) $get('existing_guest_found')
+                                ? 'Guest found. Details were auto-filled.'
+                                : 'Enter the email they used before, then click outside the field. If found, details will auto-fill.';
+                        })
+                        ->rules([
+                            fn (Get $get) => function (string $attribute, mixed $value, Closure $fail) use ($get): void {
+                                if ($get('guest_status') !== 'returning') {
+                                    return;
+                                }
+                                if (! (bool) $get('email_is_shared') && ! (bool) $get('existing_guest_found')) {
+                                    $fail('No existing guest found for this email. Switch to New guest or use the correct previous email.');
+                                }
+                            },
+                        ])
+                        ->afterStateUpdated(function (Get $get, Set $set, ?string $state): void {
+                            $isShared = self::matchesSharedEmailPattern((string) $state);
+                            $set('email_is_shared', $isShared);
+
+                            $isReturning = $get('guest_status') === 'returning';
+                            if (! $isReturning || $isShared) {
+                                $set('existing_guest_found', false);
+                                $set('existing_guest_id', null);
+                                $set('email_has_multiple_matches', false);
+                                $set('allow_manual_email_match', false);
+
+                                return;
+                            }
+
+                            $candidates = self::findGuestsByEmail((string) $state);
+                            if ($candidates->isEmpty()) {
+                                $set('existing_guest_found', false);
+                                $set('existing_guest_id', null);
+                                $set('email_has_multiple_matches', false);
+                                $set('allow_manual_email_match', false);
+
+                                return;
+                            }
+
+                            if ($candidates->count() > 1) {
+                                // Multiple guests share the same email — force explicit selection.
+                                $set('existing_guest_found', false);
+                                $set('existing_guest_id', null);
+                                $set('email_has_multiple_matches', true);
+                                $set('allow_manual_email_match', false);
+
+                                return;
+                            }
+
+                            $guest = $candidates->first();
+                            if (! $guest) {
+                                $set('existing_guest_found', false);
+                                $set('existing_guest_id', null);
+                                $set('email_has_multiple_matches', false);
+                                $set('allow_manual_email_match', false);
+
+                                return;
+                            }
+
+                            $set('existing_guest_found', true);
+                            $set('existing_guest_id', $guest->id);
+                            $set('email_has_multiple_matches', false);
+                            $set('allow_manual_email_match', true);
+                            $set('first_name', (string) $guest->first_name);
+                            $set('middle_name', (string) ($guest->middle_name ?? ''));
+                            $set('last_name', (string) $guest->last_name);
+                            $set('contact_num', (string) ($guest->contact_num ?? ''));
+                            $set('gender', (string) ($guest->gender ?? Guest::GENDER_OTHER));
+                            $set('is_international', (bool) ($guest->is_international ?? false));
+                            $set('country', (string) ($guest->country ?? 'Philippines'));
+                            $set('region', $guest->is_international ? null : ($guest->region ?? null));
+                            $set('province', $guest->is_international ? null : ($guest->province ?? null));
+                            $set('municipality', $guest->is_international ? null : ($guest->municipality ?? null));
+                            $set('barangay', $guest->is_international ? null : ($guest->barangay ?? null));
+                        })
                         ->maxLength(255),
+                    Select::make('existing_guest_id_picker')
+                        ->label('Select guest (shared email)')
+                        ->visible(fn (Get $get): bool => $get('guest_status') === 'returning'
+                            && ((bool) $get('email_is_shared') || (bool) $get('email_has_multiple_matches'))
+                            && filled($get('email')))
+                        ->options(function (Get $get): array {
+                            $email = strtolower(trim((string) ($get('email') ?? '')));
+                            if ($email === '') {
+                                return [];
+                            }
+
+                            return Guest::query()
+                                ->whereRaw('LOWER(TRIM(email)) = ?', [$email])
+                                ->withCount('bookings')
+                                ->withMax('bookings', 'created_at')
+                                ->orderByDesc('bookings_max_created_at')
+                                ->orderByDesc('bookings_count')
+                                ->orderBy('last_name')
+                                ->orderBy('first_name')
+                                ->get(['id', 'first_name', 'middle_name', 'last_name', 'contact_num'])
+                                ->mapWithKeys(function (Guest $g): array {
+                                    $phone = trim((string) ($g->contact_num ?? ''));
+                                    $count = (int) ($g->bookings_count ?? 0);
+                                    $label = $g->full_name
+                                        .($phone !== '' ? " · {$phone}" : '')
+                                        ." · {$count} booking".($count === 1 ? '' : 's');
+
+                                    return [$g->id => $label];
+                                })
+                                ->all();
+                        })
+                        ->searchable()
+                        ->live()
+                        ->required(fn (Get $get): bool => $get('guest_status') === 'returning'
+                            && ((bool) $get('email_is_shared') || (bool) $get('email_has_multiple_matches')))
+                        ->afterStateUpdated(function (Set $set, $state): void {
+                            $id = is_numeric($state) ? (int) $state : null;
+                            if (! $id) {
+                                $set('existing_guest_found', false);
+                                $set('existing_guest_id', null);
+                                $set('email_has_multiple_matches', true);
+
+                                return;
+                            }
+
+                            $guest = Guest::query()->find($id);
+                            if (! $guest) {
+                                $set('existing_guest_found', false);
+                                $set('existing_guest_id', null);
+
+                                return;
+                            }
+
+                            $set('existing_guest_found', true);
+                            $set('existing_guest_id', $guest->id);
+                            // Shared email: never use email-based merge; we reuse by explicit selection.
+                            $set('allow_manual_email_match', false);
+                            $set('email_has_multiple_matches', false);
+                            $set('first_name', (string) $guest->first_name);
+                            $set('middle_name', (string) ($guest->middle_name ?? ''));
+                            $set('last_name', (string) $guest->last_name);
+                            $set('contact_num', (string) ($guest->contact_num ?? ''));
+                            $set('gender', (string) ($guest->gender ?? Guest::GENDER_OTHER));
+                            $set('is_international', (bool) ($guest->is_international ?? false));
+                            $set('country', (string) ($guest->country ?? 'Philippines'));
+                            $set('region', $guest->is_international ? null : ($guest->region ?? null));
+                            $set('province', $guest->is_international ? null : ($guest->province ?? null));
+                            $set('municipality', $guest->is_international ? null : ($guest->municipality ?? null));
+                            $set('barangay', $guest->is_international ? null : ($guest->barangay ?? null));
+                        })
+                        ->columnSpanFull(),
                     Toggle::make('is_international')
                         ->label('Foreign / international address')
                         ->default(false)
                         ->live()
+                        ->disabled(fn (Get $get): bool => $get('guest_status') === 'returning' && ! (bool) $get('edit_returning_guest'))
+                        ->visible(fn (Get $get): bool => $get('guest_status') !== 'returning' || (bool) $get('existing_guest_found'))
                         ->afterStateUpdated(function (Set $set, $state): void {
                             if ($state) {
                                 $set('ph_region_code', null);
@@ -329,6 +558,7 @@ class BookingCreateWizard
                         ->maxLength(100)
                         ->required(fn (Get $get) => (bool) $get('is_international'))
                         ->visible(fn (Get $get) => (bool) $get('is_international'))
+                        ->disabled(fn (Get $get): bool => $get('guest_status') === 'returning' && ! (bool) $get('edit_returning_guest'))
                         ->rules([
                             fn (Get $get) => function (string $attribute, mixed $value, Closure $fail) use ($get): void {
                                 if (! ((bool) $get('is_international'))) {
@@ -657,5 +887,70 @@ class BookingCreateWizard
                 $fail('Selected room(s) are not available for these dates (another booking or block overlaps).');
             }
         };
+    }
+
+    private static function matchesSharedEmailPattern(string $email): bool
+    {
+        $normalizedEmail = strtolower(trim($email));
+        if ($normalizedEmail === '') {
+            return false;
+        }
+
+        $patternsRaw = trim((string) env('GUEST_SHARED_EMAIL_PATTERNS', ''));
+        if ($patternsRaw === '') {
+            return false;
+        }
+
+        $patterns = array_values(array_filter(array_map(
+            static fn (string $item): string => strtolower(trim($item)),
+            explode(',', $patternsRaw)
+        )));
+
+        foreach ($patterns as $pattern) {
+            if ($pattern === '') {
+                continue;
+            }
+
+            if (str_starts_with($pattern, '@')) {
+                if (str_ends_with($normalizedEmail, $pattern)) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            if ($normalizedEmail === $pattern) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function findGuestByEmail(string $email): ?Guest
+    {
+        $normalizedEmail = strtolower(trim($email));
+        if ($normalizedEmail === '') {
+            return null;
+        }
+
+        return Guest::query()
+            ->whereRaw('LOWER(TRIM(email)) = ?', [$normalizedEmail])
+            ->first();
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, Guest>
+     */
+    private static function findGuestsByEmail(string $email)
+    {
+        $normalizedEmail = strtolower(trim($email));
+        if ($normalizedEmail === '') {
+            return collect();
+        }
+
+        return Guest::query()
+            ->whereRaw('LOWER(TRIM(email)) = ?', [$normalizedEmail])
+            ->get();
     }
 }
