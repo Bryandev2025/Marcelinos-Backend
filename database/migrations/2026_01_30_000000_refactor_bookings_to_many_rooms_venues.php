@@ -13,25 +13,43 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Pivot: booking <-> rooms (many-to-many)
-        Schema::create('booking_room', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('booking_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('room_id')->constrained()->cascadeOnDelete();
-            $table->timestamps();
+        $hasForeignKey = static function (string $table, string $foreignKey): bool {
+            $result = DB::selectOne(
+                'SELECT COUNT(*) AS aggregate
+                 FROM information_schema.table_constraints
+                 WHERE constraint_schema = DATABASE()
+                   AND table_name = ?
+                   AND constraint_name = ?
+                   AND constraint_type = ?',
+                [$table, $foreignKey, 'FOREIGN KEY']
+            );
 
-            $table->unique(['booking_id', 'room_id']);
-        });
+            return (int) ($result->aggregate ?? 0) > 0;
+        };
+
+        // Pivot: booking <-> rooms (many-to-many)
+        if (! Schema::hasTable('booking_room')) {
+            Schema::create('booking_room', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('booking_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('room_id')->constrained()->cascadeOnDelete();
+                $table->timestamps();
+
+                $table->unique(['booking_id', 'room_id']);
+            });
+        }
 
         // Pivot: booking <-> venues (many-to-many)
-        Schema::create('booking_venue', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('booking_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('venue_id')->constrained()->cascadeOnDelete();
-            $table->timestamps();
+        if (! Schema::hasTable('booking_venue')) {
+            Schema::create('booking_venue', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('booking_id')->constrained()->cascadeOnDelete();
+                $table->foreignId('venue_id')->constrained()->cascadeOnDelete();
+                $table->timestamps();
 
-            $table->unique(['booking_id', 'venue_id']);
-        });
+                $table->unique(['booking_id', 'venue_id']);
+            });
+        }
 
         // Migrate existing booking -> room data into pivot (skip if already migrated)
         if (Schema::hasColumn('bookings', 'room_id')) {
@@ -48,17 +66,26 @@ return new class extends Migration
 
         // Drop foreign and column from bookings (only if they exist)
         if (Schema::hasColumn('bookings', 'room_id')) {
+            if ($hasForeignKey('bookings', 'bookings_room_id_foreign')) {
+                Schema::table('bookings', function (Blueprint $table) {
+                    $table->dropForeign(['room_id']);
+                });
+            }
+
             Schema::table('bookings', function (Blueprint $table) {
-                // Drop the foreign key constraint if it exists, then the column
-                $table->dropForeign(['room_id']);
                 $table->dropColumn('room_id');
             });
         }
 
         // If venue_id was added in another migration, drop it here too
         if (Schema::hasColumn('bookings', 'venue_id')) {
+            if ($hasForeignKey('bookings', 'bookings_venue_id_foreign')) {
+                Schema::table('bookings', function (Blueprint $table) {
+                    $table->dropForeign(['venue_id']);
+                });
+            }
+
             Schema::table('bookings', function (Blueprint $table) {
-                $table->dropForeign(['venue_id']);
                 $table->dropColumn('venue_id');
             });
         }

@@ -8,6 +8,7 @@ use App\Events\FilamentNotificationSound;
 use App\Filament\Resources\Bookings\BookingResource;
 use App\Jobs\SyncBookingToGoogleSheet;
 use App\Models\Booking;
+use App\Models\Room;
 use App\Models\RoomChecklist;
 use App\Models\RoomChecklistItem;
 use App\Models\User;
@@ -15,7 +16,6 @@ use App\Notifications\Slack\BookingLifecycleSlackNotification;
 use App\Services\RefundNotificationService;
 use App\Support\ActivityLogger;
 use App\Support\BookingDoubleBookAlert;
-use App\Support\RoomDamageLossCharges;
 use App\Support\SlackBookingAlerts;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
@@ -279,18 +279,13 @@ class BookingObserver
     private function ensureCompletionRoomChecklists(Booking $booking): void
     {
         try {
-            $booking->loadMissing(['rooms']);
+            $booking->loadMissing(['rooms.damageProperties']);
 
             if ($booking->rooms->isEmpty()) {
                 return;
             }
 
-            $charges = RoomDamageLossCharges::all();
-            if ($charges === []) {
-                return;
-            }
-
-            DB::transaction(function () use ($booking, $charges): void {
+            DB::transaction(function () use ($booking): void {
                 foreach ($booking->rooms as $room) {
                     $roomId = (int) $room->id;
 
@@ -308,18 +303,11 @@ class BookingObserver
                         continue;
                     }
 
-                    $items = [];
-                    foreach ($charges as $i => $row) {
-                        $items[] = [
-                            'label' => (string) ($row['item'] ?? ''),
-                            'charge' => (string) ($row['charge'] ?? ''),
-                            'status' => RoomChecklistItem::STATUS_GOOD,
-                            'notes' => null,
-                            'sort_order' => $i,
-                        ];
-                    }
+                    $items = $this->buildChecklistItemsFromRoomDamageProperties($room);
 
-                    $checklist->items()->createMany($items);
+                    if ($items !== []) {
+                        $checklist->items()->createMany($items);
+                    }
                 }
             });
         } catch (\Throwable $e) {
@@ -329,6 +317,28 @@ class BookingObserver
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * @return list<array{label: string, charge: string, status: string, notes: null, sort_order: int}>
+     */
+    private function buildChecklistItemsFromRoomDamageProperties(Room $room): array
+    {
+        $room->loadMissing(['damageProperties']);
+
+        return $room->damageProperties
+            ->sortBy('name')
+            ->values()
+            ->map(function ($damageProperty, int $index): array {
+                return [
+                    'label' => (string) $damageProperty->name,
+                    'charge' => trim((string) ($damageProperty->default_charge ?? '')),
+                    'status' => RoomChecklistItem::STATUS_GOOD,
+                    'notes' => null,
+                    'sort_order' => $index,
+                ];
+            })
+            ->all();
     }
 
     private function collectBookingChanges(Booking $booking): array

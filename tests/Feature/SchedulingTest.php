@@ -10,10 +10,10 @@ class SchedulingTest extends TestCase
     {
         $this->artisan('schedule:list')
             ->assertSuccessful()
-            ->expectsOutputToContain('bookings:complete-checkouts')
-            ->expectsOutputToContain('bookings:activate-checkins')
             ->expectsOutputToContain('bookings:send-reminders')
             ->expectsOutputToContain('bookings:cancel-unpaid')
-            ->expectsOutputToContain('bookings:prune-pending-verification');
+            ->expectsOutputToContain('bookings:prune-pending-verification')
+            ->doesntExpectOutputToContain('bookings:complete-checkouts')
+            ->doesntExpectOutputToContain('bookings:activate-checkins');
     }
 }

@@ -444,6 +444,20 @@ class BookingForm
                                 ->label('Payment status')
                                 ->options(Booking::paymentStatusOptions())
                                 ->required(),
+                            Select::make('damage_settlement_status')
+                                ->label('Damage settlement')
+                                ->options(Booking::damageSettlementStatusOptions())
+                                ->disabled()
+                                ->dehydrated(false),
+                            TextInput::make('has_damage_claim')
+                                ->label('Damage claim')
+                                ->formatStateUsing(fn ($state): string => (bool) $state ? 'Yes' : 'No')
+                                ->disabled()
+                                ->dehydrated(false),
+                            TextInput::make('damage_settlement_notes')
+                                ->label('Damage settlement notes')
+                                ->disabled()
+                                ->dehydrated(false),
                             TextInput::make('reference_number')
                                 ->label('Reference number')
                                 ->disabled()

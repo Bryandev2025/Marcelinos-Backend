@@ -561,6 +561,8 @@
                                                     open: false,
                                                     payOpen: false,
                                                     payId: {{ (int) $row['id'] }},
+                                                    completeOpen: false,
+                                                    completeId: {{ (int) $row['id'] }},
                                                     cancelOpen: false,
                                                     cancelId: {{ (int) $row['id'] }},
                                                     delOpen: false,
@@ -575,6 +577,10 @@
                                                     submitCancel() {
                                                         $wire.cancelBooking(this.cancelId);
                                                         this.cancelOpen = false;
+                                                    },
+                                                    submitComplete(confirmed = false) {
+                                                        $wire.completeBooking(this.completeId, confirmed);
+                                                        this.completeOpen = false;
                                                     },
                                                     submitDelete() {
                                                         $wire.deleteBooking(this.delId, this.delVal);
@@ -650,11 +656,10 @@
                                                     @if (($row['can_complete'] ?? false) === true)
                                                         <button
                                                             type="button"
-                                                            wire:click="completeBooking({{ $row['id'] }})"
-                                                            @click="open = false"
+                                                            @click="open = false; completeOpen = true"
                                                             class="block w-full whitespace-nowrap px-3 py-1.5 text-left text-[13px] font-medium leading-5 text-gray-800 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
                                                         >
-                                                            Complete
+                                                            {{ $row['complete_label'] ?? __('Checkout') }}
                                                         </button>
                                                     @endif
 
@@ -709,6 +714,72 @@
                                                                     @click="submitPayBalance()"
                                                                 >
                                                                     {{ __('Yes, mark as paid') }}
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </template>
+
+                                                <template x-teleport="body">
+                                                    <div
+                                                        x-show="completeOpen"
+                                                        x-cloak
+                                                        class="fixed inset-0 z-[100] flex items-center justify-center p-4"
+                                                        style="display: none;"
+                                                    >
+                                                        <div class="absolute inset-0 bg-black/50" @click="completeOpen = false"></div>
+                                                        <div
+                                                            class="relative z-10 w-full max-w-xl rounded-xl border border-gray-200 bg-white p-5 shadow-xl dark:border-white/10 dark:bg-gray-900"
+                                                            @click.stop
+                                                        >
+                                                            @php
+                                                                $checklistSummary = $row['checklist_summary'] ?? [
+                                                                    'total_items' => 0,
+                                                                    'answered_items' => 0,
+                                                                    'incomplete_items' => 0,
+                                                                    'broken_items' => 0,
+                                                                    'missing_items' => 0,
+                                                                    'should_warn_on_complete' => false,
+                                                                ];
+                                                            @endphp
+                                                            <h3 class="text-base font-semibold text-gray-900 dark:text-white">
+                                                                {{ $row['complete_label'] ?? __('Checkout') }}
+                                                            </h3>
+                                                            <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                                                                {{ __('Review checklist progress before checkout completion.') }}
+                                                            </p>
+                                                            <div class="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-200">
+                                                                <div class="flex items-center justify-between">
+                                                                    <span>{{ __('Checklist progress') }}</span>
+                                                                    <span class="font-semibold tabular-nums">
+                                                                        {{ (int) ($checklistSummary['answered_items'] ?? 0) }}/{{ (int) ($checklistSummary['total_items'] ?? 0) }}
+                                                                    </span>
+                                                                </div>
+                                                                <div class="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+                                                                    <div>{{ __('Incomplete') }}: <span class="font-semibold tabular-nums">{{ (int) ($checklistSummary['incomplete_items'] ?? 0) }}</span></div>
+                                                                    <div>{{ __('Broken') }}: <span class="font-semibold tabular-nums">{{ (int) ($checklistSummary['broken_items'] ?? 0) }}</span></div>
+                                                                    <div>{{ __('Missing') }}: <span class="font-semibold tabular-nums">{{ (int) ($checklistSummary['missing_items'] ?? 0) }}</span></div>
+                                                                </div>
+                                                            </div>
+                                                            @if (($checklistSummary['should_warn_on_complete'] ?? false) === true)
+                                                                <p class="mt-3 rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-400/35 dark:bg-amber-500/10 dark:text-amber-100">
+                                                                    {{ __('Checklist has incomplete item(s). You can still complete this booking after confirmation.') }}
+                                                                </p>
+                                                            @endif
+                                                            <div class="mt-4 flex justify-end gap-2">
+                                                                <button
+                                                                    type="button"
+                                                                    class="rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-white/5"
+                                                                    @click="completeOpen = false"
+                                                                >
+                                                                    {{ __('Go back') }}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    class="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+                                                                    @click="submitComplete({{ (($checklistSummary['should_warn_on_complete'] ?? false) === true) ? 'true' : 'false' }})"
+                                                                >
+                                                                    {{ (($checklistSummary['should_warn_on_complete'] ?? false) === true) ? __('Complete anyway') : ($row['complete_label'] ?? __('Checkout')) }}
                                                                 </button>
                                                             </div>
                                                         </div>
@@ -809,6 +880,20 @@
                                         </div>
                                     </div>
                                     <div class="space-y-2 px-3 py-3 text-xs text-gray-600 dark:text-gray-400 sm:px-4">
+                                        @php
+                                            $inlineChecklistSummary = $row['checklist_summary'] ?? null;
+                                        @endphp
+                                        @if (is_array($inlineChecklistSummary))
+                                            <div class="rounded-lg border border-gray-200/80 bg-gray-50/80 px-2.5 py-2 text-[11px] text-gray-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-gray-200">
+                                                <div class="flex items-center justify-between">
+                                                    <span class="font-medium">{{ __('Checklist') }}</span>
+                                                    <span class="tabular-nums">{{ (int) ($inlineChecklistSummary['answered_items'] ?? 0) }}/{{ (int) ($inlineChecklistSummary['total_items'] ?? 0) }}</span>
+                                                </div>
+                                                <div class="mt-1 text-gray-600 dark:text-gray-400">
+                                                    {{ __('Incomplete: :count', ['count' => (int) ($inlineChecklistSummary['incomplete_items'] ?? 0)]) }}
+                                                </div>
+                                            </div>
+                                        @endif
                                         <div class="flex gap-2">
                                             <x-filament::icon
                                                 icon="heroicon-m-arrow-right-circle"

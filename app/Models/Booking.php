@@ -50,6 +50,11 @@ class Booking extends Model
         'special_discount_last_modified_at',
         'booking_status',
         'payment_status',
+        'has_damage_claim',
+        'damage_settlement_status',
+        'damage_settlement_notes',
+        'damage_settlement_marked_by',
+        'damage_settlement_marked_at',
         'payment_method',
         'online_payment_plan',
         'xendit_invoice_id',
@@ -88,6 +93,8 @@ class Booking extends Model
         'refund_guest_confirmation_sent_at' => 'datetime',
         'email_verified_at' => 'datetime',
         'token_expires_at' => 'datetime',
+        'has_damage_claim' => 'boolean',
+        'damage_settlement_marked_at' => 'datetime',
     ];
 
     /**
@@ -392,6 +399,11 @@ class Booking extends Model
         return $this->hasMany(Payment::class);
     }
 
+    public function damageSettlementMarker()
+    {
+        return $this->belongsTo(User::class, 'damage_settlement_marked_by');
+    }
+
     /* ================= BOOKING (STAY) STATUS ================= */
 
     /** Awaiting guest email confirmation; does not block public availability (see {@see availabilityBlockingStatuses()}). */
@@ -420,6 +432,14 @@ class Booking extends Model
     const PAYMENT_STATUS_NON_REFUNDABLE = 'non_refundable';
 
     const PAYMENT_STATUS_REFUNDED = 'refunded';
+
+    /* ================= DAMAGE SETTLEMENT STATUS ================= */
+
+    const DAMAGE_SETTLEMENT_STATUS_NONE = 'none';
+
+    const DAMAGE_SETTLEMENT_STATUS_PENDING = 'pending';
+
+    const DAMAGE_SETTLEMENT_STATUS_SETTLED = 'settled';
 
     /**
      * Testimonial email / review eligibility: fully paid stay marked completed.
@@ -555,6 +575,15 @@ class Booking extends Model
         ];
     }
 
+    public static function damageSettlementStatusOptions(): array
+    {
+        return [
+            self::DAMAGE_SETTLEMENT_STATUS_NONE => 'None',
+            self::DAMAGE_SETTLEMENT_STATUS_PENDING => 'Pending Settlement',
+            self::DAMAGE_SETTLEMENT_STATUS_SETTLED => 'Settled',
+        ];
+    }
+
     /**
      * Payment settlement deadline on the receipt: 9:00 PM Asia/Manila on the check-in calendar day
      * (same moment as unpaid auto-cancel). Null when the booking has no check-in datetime.
@@ -661,6 +690,18 @@ class Booking extends Model
             'warning' => self::PAYMENT_STATUS_REFUND_PENDING,
             'danger' => self::PAYMENT_STATUS_NON_REFUNDABLE,
             'gray' => self::PAYMENT_STATUS_REFUNDED,
+        ];
+    }
+
+    /**
+     * @return array<string, string> color => damage_settlement_status value
+     */
+    public static function damageSettlementStatusColors(): array
+    {
+        return [
+            'gray' => self::DAMAGE_SETTLEMENT_STATUS_NONE,
+            'danger' => self::DAMAGE_SETTLEMENT_STATUS_PENDING,
+            'success' => self::DAMAGE_SETTLEMENT_STATUS_SETTLED,
         ];
     }
 
@@ -895,5 +936,56 @@ class Booking extends Model
         $today = $at->copy()->timezone($tz)->startOfDay();
 
         return $checkOutDay->equalTo($today);
+    }
+
+    /**
+     * Whether the booking check-out calendar day is still in the future in Asia/Manila.
+     */
+    public function isCheckOutAfterTodayManila(?Carbon $at = null): bool
+    {
+        if (! $this->check_out) {
+            return false;
+        }
+
+        $at = $at ?? now();
+        $tz = self::timezoneManila();
+        $checkOutDay = $this->check_out->copy()->timezone($tz)->startOfDay();
+        $today = $at->copy()->timezone($tz)->startOfDay();
+
+        return $checkOutDay->gt($today);
+    }
+
+    /**
+     * Admin/staff checkout eligibility: occupied stay and payment already at least partial.
+     */
+    public function canAdminCheckout(?Carbon $at = null): bool
+    {
+        if ($this->trashed()) {
+            return false;
+        }
+
+        if ($this->booking_status !== self::BOOKING_STATUS_OCCUPIED) {
+            return false;
+        }
+
+        if (! in_array((string) $this->payment_status, [self::PAYMENT_STATUS_PARTIAL, self::PAYMENT_STATUS_PAID], true)) {
+            return false;
+        }
+
+        if (! $this->check_out) {
+            return false;
+        }
+
+        $at = $at ?? now();
+        $tz = self::timezoneManila();
+        $checkOutDay = $this->check_out->copy()->timezone($tz)->startOfDay();
+        $today = $at->copy()->timezone($tz)->startOfDay();
+
+        return $checkOutDay->gte($today);
+    }
+
+    public function adminCheckoutActionLabel(?Carbon $at = null): string
+    {
+        return $this->isCheckOutTodayManila($at) ? 'Checkout' : 'Checkout Early';
     }
 }

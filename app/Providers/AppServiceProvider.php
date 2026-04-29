@@ -21,6 +21,7 @@ use App\Models\Payment;
 use App\Models\Review;
 use App\Models\Room;
 use App\Models\RoomBlockedDate;
+use App\Models\RoomChecklistItem;
 use App\Models\User;
 use App\Models\Venue;
 use App\Models\VenueBlockedDate;
@@ -29,6 +30,7 @@ use App\Observers\BookingObserver;
 use App\Observers\GalleryObserver;
 use App\Observers\ReviewObserver;
 use App\Observers\RoomBlockedDateObserver;
+use App\Observers\RoomChecklistItemObserver;
 use App\Observers\RoomObserver;
 use App\Observers\VenueBlockedDateObserver;
 use App\Observers\VenueObserver;
@@ -89,6 +91,7 @@ class AppServiceProvider extends ServiceProvider
 
         Booking::observe(BookingObserver::class);
         Room::observe(RoomObserver::class);
+        RoomChecklistItem::observe(RoomChecklistItemObserver::class);
         Venue::observe(VenueObserver::class);
         BlockedDate::observe(BlockedDateObserver::class);
         RoomBlockedDate::observe(RoomBlockedDateObserver::class);

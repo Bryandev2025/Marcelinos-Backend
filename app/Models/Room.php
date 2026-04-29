@@ -254,6 +254,11 @@ class Room extends Model implements HasMedia
         return $this->belongsToMany(Amenity::class);
     }
 
+    public function damageProperties()
+    {
+        return $this->belongsToMany(DamageProperty::class, 'damage_property_room')->withTimestamps();
+    }
+
     /**
      * Reviews for this room (via bookings that include this room).
      * Used by Filament ReviewsRelationManager.

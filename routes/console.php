@@ -18,21 +18,6 @@ Artisan::command('inspire', function () {
 
 $manila = 'Asia/Manila';
 
-/**
- * Complete check-outs: occupied → completed when check_out has passed.
- * Runs every 10 minutes 10:00–10:50 and once at 11:00. Testimonial feedback email is sent
- * when booking becomes completed with payment Paid (see Booking model updated hook).
- */
-Schedule::command('bookings:complete-checkouts')
-    ->cron('0,10,20,30,40,50 10 * * *')
-    ->timezone($manila)
-    ->withoutOverlapping();
-
-Schedule::command('bookings:complete-checkouts')
-    ->dailyAt('11:00')
-    ->timezone($manila)
-    ->withoutOverlapping();
-
 /*
 |--------------------------------------------------------------------------
 | Daily at 12:00 — Manila
@@ -43,17 +28,6 @@ Schedule::command('bookings:complete-checkouts')
 */
 Schedule::command('bookings:send-reminders')
     ->dailyAt('12:00')
-    ->timezone($manila)
-    ->withoutOverlapping();
-
-/*
-|--------------------------------------------------------------------------
-| Every 15 minutes, 12:00–21:45 — Manila
-|--------------------------------------------------------------------------
-| bookings:activate-checkins — reserved + paid/partial with check-in today → occupied
-*/
-Schedule::command('bookings:activate-checkins')
-    ->cron('*/15 12-21 * * *')
     ->timezone($manila)
     ->withoutOverlapping();
 
