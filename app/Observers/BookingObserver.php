@@ -9,18 +9,16 @@ use App\Filament\Resources\Bookings\BookingResource;
 use App\Jobs\SyncBookingToGoogleSheet;
 use App\Models\Booking;
 use App\Models\Room;
-use App\Models\RoomChecklist;
-use App\Models\RoomChecklistItem;
 use App\Models\User;
 use App\Notifications\Slack\BookingLifecycleSlackNotification;
 use App\Services\RefundNotificationService;
 use App\Support\ActivityLogger;
 use App\Support\BookingDoubleBookAlert;
+use App\Support\BookingLifecycleActions;
 use App\Support\SlackBookingAlerts;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class BookingObserver
@@ -279,37 +277,7 @@ class BookingObserver
     private function ensureCompletionRoomChecklists(Booking $booking): void
     {
         try {
-            $booking->loadMissing(['rooms.damageProperties']);
-
-            if ($booking->rooms->isEmpty()) {
-                return;
-            }
-
-            DB::transaction(function () use ($booking): void {
-                foreach ($booking->rooms as $room) {
-                    $roomId = (int) $room->id;
-
-                    $checklist = RoomChecklist::query()->firstOrCreate(
-                        [
-                            'booking_id' => (int) $booking->id,
-                            'room_id' => $roomId,
-                        ],
-                        [
-                            'generated_at' => now(),
-                        ],
-                    );
-
-                    if ($checklist->items()->exists()) {
-                        continue;
-                    }
-
-                    $items = $this->buildChecklistItemsFromRoomDamageProperties($room);
-
-                    if ($items !== []) {
-                        $checklist->items()->createMany($items);
-                    }
-                }
-            });
+            BookingLifecycleActions::ensureCompletionRoomChecklists($booking);
         } catch (\Throwable $e) {
             Log::warning('Failed generating room completion checklist', [
                 'booking_id' => $booking->id,
@@ -317,28 +285,6 @@ class BookingObserver
                 'error' => $e->getMessage(),
             ]);
         }
-    }
-
-    /**
-     * @return list<array{label: string, charge: string, status: string, notes: null, sort_order: int}>
-     */
-    private function buildChecklistItemsFromRoomDamageProperties(Room $room): array
-    {
-        $room->loadMissing(['damageProperties']);
-
-        return $room->damageProperties
-            ->sortBy('name')
-            ->values()
-            ->map(function ($damageProperty, int $index): array {
-                return [
-                    'label' => (string) $damageProperty->name,
-                    'charge' => trim((string) ($damageProperty->default_charge ?? '')),
-                    'status' => RoomChecklistItem::STATUS_GOOD,
-                    'notes' => null,
-                    'sort_order' => $index,
-                ];
-            })
-            ->all();
     }
 
     private function collectBookingChanges(Booking $booking): array

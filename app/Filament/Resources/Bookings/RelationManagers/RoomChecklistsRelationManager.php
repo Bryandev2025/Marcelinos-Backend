@@ -13,8 +13,10 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ToggleButtons;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
+use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\HtmlString;
 
 class RoomChecklistsRelationManager extends RelationManager
 {
@@ -44,7 +46,7 @@ class RoomChecklistsRelationManager extends RelationManager
 
             Placeholder::make('checklist_empty_state')
                 ->label('Setup reminder')
-                ->content('No damage checklist properties are assigned to this room yet. Add them in Properties -> Rooms -> Edit Room -> Damage checklist properties so staff can inspect damaged/missing items here.')
+                ->content('No checklist items are available for this room. Staff can still complete checkout and add notes when needed.')
                 ->visible(fn (?RoomChecklist $record): bool => (int) ($record?->items()->count() ?? 0) === 0),
 
             Repeater::make('items')
@@ -119,11 +121,67 @@ class RoomChecklistsRelationManager extends RelationManager
                     ->label('Completed')
                     ->dateTime()
                     ->sortable(),
+
+                BadgeColumn::make('damage_count')
+                    ->label('Damage / Missing')
+                    ->getStateUsing(function (RoomChecklist $record): string {
+                        $count = (int) $record->items()
+                            ->whereIn('status', [
+                                RoomChecklistItem::STATUS_BROKEN,
+                                RoomChecklistItem::STATUS_MISSING,
+                            ])
+                            ->count();
+
+                        return (string) $count;
+                    })
+                    ->color(fn (string $state): string => ((int) $state) > 0 ? 'danger' : 'success')
+                    ->formatStateUsing(fn (string $state): string => ((int) $state) > 0 ? "{$state} issue(s)" : 'None'),
+
+                TextColumn::make('items_inline')
+                    ->label('Checklist details')
+                    ->html()
+                    ->wrap()
+                    ->getStateUsing(function (RoomChecklist $record): HtmlString {
+                        $items = $record->items()->get(['label', 'status', 'notes']);
+                        if ($items->isEmpty()) {
+                            return new HtmlString('<span class="text-gray-500">No checklist items configured.</span>');
+                        }
+
+                        $rows = $items->map(function (RoomChecklistItem $item): string {
+                            $status = (string) ($item->status ?: RoomChecklistItem::STATUS_GOOD);
+                            $statusLabel = match ($status) {
+                                RoomChecklistItem::STATUS_BROKEN => 'Broken',
+                                RoomChecklistItem::STATUS_MISSING => 'Missing',
+                                default => 'Good',
+                            };
+                            $statusClass = match ($status) {
+                                RoomChecklistItem::STATUS_BROKEN => 'text-amber-700 dark:text-amber-300',
+                                RoomChecklistItem::STATUS_MISSING => 'text-red-700 dark:text-red-300',
+                                default => 'text-emerald-700 dark:text-emerald-300',
+                            };
+                            $label = e((string) $item->label);
+                            $notes = trim((string) ($item->notes ?? ''));
+                            $notesHtml = $notes !== ''
+                                ? '<div class="text-[11px] text-gray-500 dark:text-gray-400">'.e($notes).'</div>'
+                                : '';
+
+                            return '<div class="py-1">'
+                                .'<div class="flex items-center justify-between gap-2">'
+                                .'<span class="font-medium text-gray-800 dark:text-gray-100">'.$label.'</span>'
+                                .'<span class="text-xs font-semibold '.$statusClass.'">'.$statusLabel.'</span>'
+                                .'</div>'
+                                .$notesHtml
+                                .'</div>';
+                        })->implode('');
+
+                        return new HtmlString('<div class="space-y-1">'.$rows.'</div>');
+                    }),
             ])
             ->recordActions([
                 EditAction::make()
                     ->modalHeading('Room condition checklist')
-                    ->modalSubmitActionLabel('Save'),
+                    ->modalSubmitActionLabel('Save')
+                    ->label('Update'),
             ]);
     }
 }

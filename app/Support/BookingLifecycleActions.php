@@ -3,9 +3,9 @@
 namespace App\Support;
 
 use App\Models\Booking;
-use App\Models\Room;
 use App\Models\RoomChecklist;
 use App\Models\RoomChecklistItem;
+use App\Models\RoomChecklistTemplate;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
@@ -170,15 +170,39 @@ final class BookingLifecycleActions
         );
     }
 
-    private static function ensureCompletionRoomChecklists(Booking $booking): void
+    public static function ensureCompletionRoomChecklists(Booking $booking): void
     {
-        $booking->loadMissing(['rooms.damageProperties']);
+        $booking->loadMissing('rooms');
 
         if ($booking->rooms->isEmpty()) {
             return;
         }
 
-        DB::transaction(function () use ($booking): void {
+        $templateRows = RoomChecklistTemplate::query()
+            ->active()
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['label', 'default_charge', 'sort_order'])
+            ->map(fn (RoomChecklistTemplate $template): array => [
+                'label' => (string) $template->label,
+                'charge' => filled($template->default_charge) ? (string) $template->default_charge : null,
+                'sort_order' => (int) $template->sort_order,
+            ])
+            ->values()
+            ->all();
+
+        if ($templateRows === []) {
+            $templateRows = collect(RoomChecklistDefaults::labels())
+                ->values()
+                ->map(fn (string $label, int $index): array => [
+                    'label' => $label,
+                    'charge' => null,
+                    'sort_order' => $index + 1,
+                ])
+                ->all();
+        }
+
+        DB::transaction(function () use ($booking, $templateRows): void {
             foreach ($booking->rooms as $room) {
                 $checklist = RoomChecklist::query()->firstOrCreate(
                     [
@@ -194,34 +218,8 @@ final class BookingLifecycleActions
                     continue;
                 }
 
-                $items = self::buildChecklistItemsFromRoomDamageProperties($room);
-
-                if ($items !== []) {
-                    $checklist->items()->createMany($items);
-                }
+                $checklist->items()->createMany($templateRows);
             }
         });
-    }
-
-    /**
-     * @return list<array{label: string, charge: string, status: string, notes: null, sort_order: int}>
-     */
-    private static function buildChecklistItemsFromRoomDamageProperties(Room $room): array
-    {
-        $room->loadMissing(['damageProperties']);
-
-        return $room->damageProperties
-            ->sortBy('name')
-            ->values()
-            ->map(function ($damageProperty, int $index): array {
-                return [
-                    'label' => (string) $damageProperty->name,
-                    'charge' => trim((string) ($damageProperty->default_charge ?? '')),
-                    'status' => RoomChecklistItem::STATUS_GOOD,
-                    'notes' => null,
-                    'sort_order' => $index,
-                ];
-            })
-            ->all();
     }
 }

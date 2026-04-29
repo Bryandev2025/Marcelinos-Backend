@@ -35,6 +35,13 @@ class GuestsTable
                     ->label('Email address')
                     ->searchable(),
 
+                TextColumn::make('pending_settlement_bookings_count')
+                    ->label('Pending settlement')
+                    ->badge()
+                    ->formatStateUsing(fn ($state): string => ((int) ($state ?? 0)) > 0 ? 'Pending' : 'None')
+                    ->color(fn ($state): string => ((int) ($state ?? 0)) > 0 ? 'danger' : 'success')
+                    ->sortable(),
+
                 // ✅ Gender Badge
                 TextColumn::make('gender')
                     ->badge()
