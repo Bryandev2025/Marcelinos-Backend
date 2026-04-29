@@ -48,10 +48,13 @@ return new class extends Migration
 
         // Drop foreign and column from bookings (only if they exist)
         if (Schema::hasColumn('bookings', 'room_id')) {
+<<<<<<< Updated upstream
             $fkName = $this->getForeignKeyName('bookings', 'room_id');
             if ($fkName) {
                 DB::statement("ALTER TABLE bookings DROP FOREIGN KEY `{$fkName}`");
             }
+=======
+>>>>>>> Stashed changes
             Schema::table('bookings', function (Blueprint $table) {
                 $table->dropColumn('room_id');
             });
@@ -59,10 +62,13 @@ return new class extends Migration
 
         // If venue_id was added in another migration, drop it here too
         if (Schema::hasColumn('bookings', 'venue_id')) {
+<<<<<<< Updated upstream
             $fkName = $this->getForeignKeyName('bookings', 'venue_id');
             if ($fkName) {
                 DB::statement("ALTER TABLE bookings DROP FOREIGN KEY `{$fkName}`");
             }
+=======
+>>>>>>> Stashed changes
             Schema::table('bookings', function (Blueprint $table) {
                 $table->dropColumn('venue_id');
             });
