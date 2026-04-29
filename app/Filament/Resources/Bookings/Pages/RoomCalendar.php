@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Bookings\Pages;
 use App\Filament\Resources\Bookings\BookingResource;
 use App\Models\Booking;
 use App\Models\Room;
+use App\Models\RoomChecklistItem;
 use App\Models\Venue;
 use App\Support\BookingCheckInEligibility;
 use App\Support\BookingFullBalancePayment;
@@ -467,7 +468,7 @@ class RoomCalendar extends Page
                 $q->whereHas('rooms', fn ($q2) => $q2->where('type', $this->modalType))
                     ->orWhereHas('roomLines', fn ($q2) => $q2->where('room_type', $this->modalType));
             })
-            ->with(['guest', 'rooms', 'roomLines', 'venues'])
+            ->with(['guest', 'rooms', 'roomLines', 'venues', 'roomChecklists.items'])
             ->orderBy('check_in')
             ->get()
             ->map(function (Booking $b) {
@@ -475,6 +476,7 @@ class RoomCalendar extends Page
                 $canCheckIn = BookingCheckInEligibility::assess($b)['allowed'];
                 $activeDateRange = $this->formatActiveDateRange($b);
                 $discountMeta = $this->specialDiscountMetaForBooking($b);
+                $checklistSummary = $this->checkoutChecklistSummaryForBooking($b);
 
                 return [
                     'id' => $b->id,
@@ -493,11 +495,14 @@ class RoomCalendar extends Page
                     'has_assigned_rooms' => $hasAssignedRooms,
                     'can_pay_balance' => $this->canPayBalanceForBooking($b),
                     'can_check_in' => $canCheckIn,
+                    'can_complete' => $b->canAdminCheckout(),
+                    'complete_label' => $b->adminCheckoutActionLabel(),
                     'can_mark_refund_completed' => $this->canMarkRefundCompletedForBooking($b),
                     'booking_badge_kind' => $this->bookingBadgeKindForCalendar($b),
                     'has_special_discount' => $discountMeta['has_special_discount'],
                     'discount_badge_text' => $discountMeta['discount_badge_text'],
                     'discount_tooltip' => $discountMeta['discount_tooltip'],
+                    'checklist_summary' => $checklistSummary,
                 ];
             })
             ->values()
@@ -541,6 +546,8 @@ class RoomCalendar extends Page
                     'has_assigned_rooms' => $hasAssignedRooms,
                     'can_pay_balance' => $this->canPayBalanceForBooking($b),
                     'can_check_in' => $canCheckIn,
+                    'can_complete' => $b->canAdminCheckout(),
+                    'complete_label' => $b->adminCheckoutActionLabel(),
                     'can_mark_refund_completed' => $this->canMarkRefundCompletedForBooking($b),
                     'booking_badge_kind' => $this->bookingBadgeKindForCalendar($b),
                     'has_special_discount' => $discountMeta['has_special_discount'],
@@ -619,6 +626,40 @@ class RoomCalendar extends Page
         return $checkIn->isSameDay($checkOut)
             ? $checkIn->format('F j')
             : $checkIn->format('F j').' - '.$checkOut->format('F j');
+    }
+
+    /**
+     * @return array{
+     *   total_items: int,
+     *   answered_items: int,
+     *   incomplete_items: int,
+     *   broken_items: int,
+     *   missing_items: int,
+     *   has_damage_items: bool,
+     *   should_warn_on_complete: bool
+     * }
+     */
+    protected function checkoutChecklistSummaryForBooking(Booking $booking): array
+    {
+        $items = $booking->roomChecklists
+            ->flatMap(fn ($checklist) => $checklist->items)
+            ->values();
+
+        $totalItems = (int) $items->count();
+        $answeredItems = (int) $items->filter(fn ($item) => filled($item->status))->count();
+        $brokenItems = (int) $items->where('status', RoomChecklistItem::STATUS_BROKEN)->count();
+        $missingItems = (int) $items->where('status', RoomChecklistItem::STATUS_MISSING)->count();
+        $incompleteItems = max(0, $totalItems - $answeredItems);
+
+        return [
+            'total_items' => $totalItems,
+            'answered_items' => $answeredItems,
+            'incomplete_items' => $incompleteItems,
+            'broken_items' => $brokenItems,
+            'missing_items' => $missingItems,
+            'has_damage_items' => ($brokenItems + $missingItems) > 0,
+            'should_warn_on_complete' => $incompleteItems > 0,
+        ];
     }
 
     /**
@@ -775,15 +816,36 @@ class RoomCalendar extends Page
             ->send();
     }
 
-    public function completeBooking(int $bookingId): void
+    public function completeBooking(
+        int $bookingId,
+        bool $confirmed = false,
+        bool $includeDamageChecklist = false,
+        array $damageChecklist = [],
+    ): void
     {
-        $booking = Booking::query()->find($bookingId);
+        $booking = Booking::query()
+            ->with(['roomChecklists.items'])
+            ->find($bookingId);
 
         if (! $booking) {
             return;
         }
 
+        $checklistSummary = $this->checkoutChecklistSummaryForBooking($booking);
+        if (! $confirmed && ($checklistSummary['should_warn_on_complete'] ?? false)) {
+            Notification::make()
+                ->title('Checklist is not fully complete.')
+                ->body('Some checklist items are still incomplete. Review checklist details and confirm "Complete anyway" to proceed.')
+                ->warning()
+                ->send();
+
+            return;
+        }
+
         try {
+            if ($includeDamageChecklist) {
+                BookingLifecycleActions::saveCheckoutChecklistItems($booking, $damageChecklist);
+            }
             BookingLifecycleActions::complete($booking);
         } catch (\InvalidArgumentException $e) {
             Notification::make()
