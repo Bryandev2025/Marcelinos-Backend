@@ -104,10 +104,10 @@
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between w-full gap-2">
                         <div>
                             <div class="text-sm font-semibold text-gray-900 dark:text-gray-50">
-                                Print Tourism Demographics Report
+                                Print Guest Address Report
                             </div>
                             <p class="text-xs text-gray-500 dark:text-gray-400">
-                                Choose a month, year, or custom dates to generate a printable tourism report.
+                                Choose a month, year, or custom dates to generate a printable guest address report.
                             </p>
                         </div>
                         <div class="flex flex-wrap items-center gap-2 self-start sm:self-auto">
@@ -185,7 +185,7 @@
                         </div>
                         <div wire:loading wire:target="selectOverviewPreset,overviewStart,overviewEnd"
                             class="mt-2 text-[10px] font-semibold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">
-                            Refreshing demographics...
+                            Refreshing guest address data...
                         </div>
                     </div>
                 </div>
@@ -398,7 +398,7 @@
             @endphp
             <div id="tpl-{{ $typeKey }}-{{ $periodKey }}" style="display:none;">
                 @include('filament.pages.partials.print-report-template', [
-                    'title' => 'Demographics Report: ' . $typeLabel,
+                    'title' => 'Guest Address Report: ' . $typeLabel,
                     'subtitle' => 'Period: ' . $periodLabel . '  ·  Printed: ' . now()->format('M d, Y'),
                     'localData' => $repLocal,
                     'foreignData' => $repForeign,
@@ -409,7 +409,7 @@
 
     <div id="tpl-overview_selected-null" style="display:none;">
         @include('filament.pages.partials.print-report-template', [
-            'title' => 'Comprehensive Demographics Report',
+            'title' => 'Comprehensive Guest Address Report',
             'subtitle' => $overviewLabel . '  ·  Generated: ' . now()->format('F j, Y, g:i a'),
             'localData' => $overviewLocalDemographics->values(),
             'foreignData' => $overviewForeignDemographics->values(),
@@ -419,7 +419,7 @@
     <script>
         var _printTarget = null;
         const guestDemographicsComponentId = @js($this->getId());
-        const guestDemographicsPdfUrl = @js(route('reports.guest-demographics.pdf'));
+        const guestDemographicsPdfUrl = @js(route('reports.guest-address.pdf'));
 
         window.addEventListener('beforeprint', function () {
             if (_printTarget) {

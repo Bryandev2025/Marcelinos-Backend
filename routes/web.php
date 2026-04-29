@@ -69,6 +69,9 @@ if ($adminPanel = Filament::getPanel('admin')) {
 }
 
 Route::middleware(['web', 'auth'])->group(function (): void {
+    Route::get('/reports/guest-address/pdf', [GuestDemographicsExportController::class, 'pdf'])
+        ->name('reports.guest-address.pdf');
+
     Route::get('/reports/guest-demographics/pdf', [GuestDemographicsExportController::class, 'pdf'])
         ->name('reports.guest-demographics.pdf');
 });

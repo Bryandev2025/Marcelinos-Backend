@@ -145,7 +145,7 @@ class User extends Authenticatable implements FilamentUser
 
             // Reports
             'view_export_revenue' => 'Reports · Export revenue',
-            'view_guest_demographics' => 'Reports · Guest demographics',
+            'view_guest_demographics' => 'Reports · Guest address',
             'manage_activity_logs' => 'Reports · Activity history',
         ];
     }
@@ -184,7 +184,7 @@ class User extends Authenticatable implements FilamentUser
             ],
             'Reports' => [
                 'view_export_revenue' => 'Export revenue',
-                'view_guest_demographics' => 'Guest demographics',
+                'view_guest_demographics' => 'Guest address',
                 'manage_activity_logs' => 'Activity history',
             ],
         ];
