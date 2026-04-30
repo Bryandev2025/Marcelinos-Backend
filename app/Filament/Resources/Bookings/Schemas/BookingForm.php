@@ -566,27 +566,65 @@ class BookingForm
         $roomIds = array_filter($roomIds);
         $venueIds = array_filter($venueIds);
 
+        // For the create-booking wizard (new record), expose breakdown fields and allow
+        // an editable venue subtotal ONLY when venue event type is "Others".
+        $routeRecord = request()->route('record');
+        $record = $routeRecord instanceof Booking ? $routeRecord : null;
+        $isWizardCreate = ! $record instanceof Booking;
+
         if (($roomIds || $venueIds) && $days > 0) {
             if ($roomIds !== []) {
                 $roomsTotal = Room::whereIn('id', $roomIds)->sum('price');
             } else {
                 $roomsTotal = 0.0;
-                $routeRecord = request()->route('record');
-                if ($routeRecord instanceof Booking) {
-                    $routeRecord->loadMissing('roomLines');
-                    if ($routeRecord->roomLines->isNotEmpty()) {
-                        $roomsTotal = (float) $routeRecord->roomLines->sum(
+                if ($record instanceof Booking) {
+                    $record->loadMissing('roomLines');
+                    if ($record->roomLines->isNotEmpty()) {
+                        $roomsTotal = (float) $record->roomLines->sum(
                             fn ($line) => $line->quantity * (float) $line->unit_price_per_night
                         );
                     }
                 }
             }
-            $venueEventType = $get('venue_event_type');
+            $venueEventTypeRaw = is_string($get('venue_event_type')) ? $get('venue_event_type') : null;
+            $venueEventType = BookingPricing::normalizeVenueEventType($venueEventTypeRaw);
             $venues = Venue::whereIn('id', $venueIds)->get();
-            $venuesTotal = BookingPricing::sumVenueLine($venues, $venueEventType);
-            $set('total_price', ($roomsTotal + $venuesTotal) * $days);
+            $computedVenuesTotal = BookingPricing::sumVenueLine($venues, $venueEventType);
+
+            $effectiveVenuesTotal = $computedVenuesTotal;
+            if ($isWizardCreate && $venueIds !== [] && $venueEventType === BookingPricing::VENUE_EVENT_OTHERS) {
+                $manual = $get('venue_subtotal');
+                if ($manual !== null && $manual !== '') {
+                    $effectiveVenuesTotal = max(0.0, (float) $manual);
+                } else {
+                    $effectiveVenuesTotal = max(0.0, (float) $computedVenuesTotal);
+                }
+            }
+
+            if ($isWizardCreate) {
+                $set('rooms_subtotal', (float) $roomsTotal);
+
+                if ($venueIds === []) {
+                    $set('venue_subtotal', 0);
+                } elseif ($venueEventType === BookingPricing::VENUE_EVENT_OTHERS) {
+                    // Only initialize default when empty; don't overwrite user edits.
+                    $current = $get('venue_subtotal');
+                    if ($current === null || $current === '') {
+                        $set('venue_subtotal', (float) $effectiveVenuesTotal);
+                    }
+                } else {
+                    // Fixed venue pricing for non-Others.
+                    $set('venue_subtotal', (float) $computedVenuesTotal);
+                }
+            }
+
+            $set('total_price', ($roomsTotal + $effectiveVenuesTotal) * $days);
         } else {
             $set('total_price', 0);
+            if ($isWizardCreate) {
+                $set('rooms_subtotal', 0);
+                $set('venue_subtotal', 0);
+            }
         }
     }
 

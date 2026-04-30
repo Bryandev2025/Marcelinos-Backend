@@ -14,6 +14,9 @@ class BookingPricing
     /** Meetings and seminars — priced per venue. */
     public const VENUE_EVENT_MEETING_STAFF = 'meeting_staff';
 
+    /** Other event types (manual pricing / catch-all). */
+    public const VENUE_EVENT_OTHERS = 'others';
+
     /** @deprecated Use VENUE_EVENT_MEETING_STAFF; still accepted for legacy payloads. */
     public const VENUE_EVENT_SEMINAR = 'seminar';
 
@@ -24,6 +27,7 @@ class BookingPricing
             self::VENUE_EVENT_WEDDING => 'Wedding',
             self::VENUE_EVENT_BIRTHDAY => 'Birthday',
             self::VENUE_EVENT_MEETING_STAFF => 'Meeting/Seminar',
+            self::VENUE_EVENT_OTHERS => 'Others',
         ];
     }
 
