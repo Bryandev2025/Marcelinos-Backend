@@ -82,6 +82,7 @@ class StoreBookingRequest extends FormRequest
                     BookingPricing::VENUE_EVENT_WEDDING,
                     BookingPricing::VENUE_EVENT_BIRTHDAY,
                     BookingPricing::VENUE_EVENT_MEETING_STAFF,
+                    BookingPricing::VENUE_EVENT_OTHERS,
                 ]),
                 Rule::requiredIf(fn () => is_array($this->venues) && count($this->venues) > 0),
             ],

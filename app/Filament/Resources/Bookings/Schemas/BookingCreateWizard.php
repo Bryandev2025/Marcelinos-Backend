@@ -36,261 +36,321 @@ class BookingCreateWizard
             Step::make('Accommodation')
                 ->description('Pick dates, then select available room(s) for those dates.')
                 ->schema([
-                    Select::make('booking_type')
-                        ->label('Booking type')
-                        ->options([
-                            'rooms' => 'Rooms',
-                            'venue' => 'Venue',
-                            'rooms_and_venues' => 'Rooms + venue',
-                        ])
-                        ->default('rooms')
-                        ->live()
-                        ->afterStateUpdated(function (Get $get, Set $set, ?string $state): void {
-                            if ($state === 'venue') {
-                                $set('rooms', []);
-                                self::applyVenueFixedTimes($get, $set);
-                            }
-
-                            if ($state === 'rooms') {
-                                $set('venues', []);
-                                $set('venue_event_type', null);
-                            }
-
-                            BookingForm::updatePricing($get, $set);
-                        })
-                        ->columnSpanFull(),
-
-                    DateTimePicker::make('check_in')
-                        ->label('Check-in')
-                        ->required()
-                        ->default(fn () => now()->startOfDay()->addHours(12))
-                        ->native(false)
-                        ->live(onBlur: true)
-                        ->seconds(false)
-                        ->minDate(now()->startOfDay())
-                        ->disabledDates(fn (Get $get): array => BookingForm::disabledCalendarDateStringsForWizard([]))
-                        ->helperText('Blocked days (maintenance / closed) show in red on the calendar and cannot be picked.')
-                        ->rules([
-                            fn (Get $get) => self::roomAvailabilityRuleForCheckIn($get),
-                        ])
-                        ->afterStateUpdated(function (Get $get, Set $set): void {
-                            self::applyVenueFixedTimes($get, $set);
-                            BookingForm::updatePricing($get, $set);
-                        }),
-
-                    DateTimePicker::make('check_out')
-                        ->label('Check-out')
-                        ->required()
-                        ->default(fn () => now()->startOfDay()->addDay()->addHours(10))
-                        ->native(false)
-                        ->live(onBlur: true)
-                        ->seconds(false)
-                        ->disabledDates(function (Get $get): array {
-                            $disabled = BookingForm::disabledCalendarDateStringsForWizard([]);
-
-                            $checkIn = $get('check_in');
-                            if (filled($checkIn) && ! self::bookingTypeIsVenueOnly($get)) {
-                                try {
-                                    $disabled[] = Carbon::parse($checkIn)->format('Y-m-d');
-                                } catch (\Exception $e) {
-                                    // ignore invalid date
-                                }
-                            }
-
-                            return array_values(array_unique($disabled));
-                        })
-                        ->helperText('Same blocked days as check-in; venue-only bookings may use same-day checkout.')
-                        ->minDate(fn (Get $get) => filled($get('check_in'))
-                            ? (self::bookingTypeIsVenueOnly($get)
-                                ? Carbon::parse($get('check_in'))->startOfDay()
-                                : Carbon::parse($get('check_in'))->startOfDay()->addDay())
-                            : now())
-                        ->rules([
-                            fn (Get $get) => function (string $attribute, $value, $fail) use ($get): void {
-                                $checkIn = $get('check_in');
-                                if (! $checkIn || ! $value) {
-                                    return;
-                                }
-                                try {
-                                    $start = Carbon::parse($checkIn);
-                                    $end = Carbon::parse($value);
-                                } catch (\Exception $e) {
-                                    return;
-                                }
-
-                                if (self::bookingTypeIsVenueOnly($get)) {
-                                    if ($end->copy()->startOfDay()->lt($start->copy()->startOfDay())) {
-                                        $fail('Check-out date cannot be before check-in date.');
+                    Section::make()
+                        ->columns(2)
+                        ->schema([
+                            Select::make('booking_type')
+                                ->label('Booking type')
+                                ->options([
+                                    'rooms' => 'Rooms',
+                                    'venue' => 'Venue',
+                                    'rooms_and_venues' => 'Rooms + venue',
+                                ])
+                                ->default('rooms')
+                                ->live()
+                                ->afterStateUpdated(function (Get $get, Set $set, ?string $state): void {
+                                    if ($state === 'venue') {
+                                        $set('rooms', []);
+                                        self::applyVenueFixedTimes($get, $set);
                                     }
 
-                                    return;
-                                }
+                                    if ($state === 'rooms') {
+                                        $set('venues', []);
+                                        $set('venue_event_type', null);
+                                    }
 
-                                if ($end->lessThanOrEqualTo($start) || $end->isSameDay($start)) {
-                                    $fail('Check-out must be at least the next day after check-in.');
-                                }
-                            },
-                            fn (Get $get) => self::roomAvailabilityRuleForCheckOut($get),
-                        ])
-                        ->afterStateUpdated(function (Get $get, Set $set): void {
-                            self::applyVenueFixedTimes($get, $set);
-                            BookingForm::updatePricing($get, $set);
-                        }),
+                                    BookingForm::updatePricing($get, $set);
+                                })
+                                ->columnSpanFull(),
 
-                    Select::make('rooms')
-                        ->label('Rooms')
-                        ->relationship(
-                            'rooms',
-                            'name',
-                            modifyQueryUsing: function ($query, ?string $search, ?Booking $record, Get $get): void {
-                                $checkIn = $get('check_in');
-                                $checkOut = $get('check_out');
-                                if (! $checkIn || ! $checkOut) {
-                                    $query->whereRaw('0 = 1');
+                            DateTimePicker::make('check_in')
+                                ->label('Check-in')
+                                ->required()
+                                ->default(fn () => now()->startOfDay()->addHours(12))
+                                ->native(false)
+                                ->live(onBlur: true)
+                                ->seconds(false)
+                                ->minDate(now()->startOfDay())
+                                ->disabledDates(fn (Get $get): array => BookingForm::disabledCalendarDateStringsForWizard([]))
+                                ->helperText('Blocked days (maintenance / closed) show in red on the calendar and cannot be picked.')
+                                ->rules([
+                                    fn (Get $get) => self::roomAvailabilityRuleForCheckIn($get),
+                                ])
+                                ->afterStateUpdated(function (Get $get, Set $set): void {
+                                    self::applyVenueFixedTimes($get, $set);
+                                    BookingForm::updatePricing($get, $set);
+                                }),
 
-                                    return;
-                                }
-                                try {
-                                    $start = Carbon::parse((string) $checkIn);
-                                    $end = Carbon::parse((string) $checkOut);
-                                } catch (\Exception $e) {
-                                    $query->whereRaw('0 = 1');
+                            DateTimePicker::make('check_out')
+                                ->label('Check-out')
+                                ->required()
+                                ->default(fn () => now()->startOfDay()->addDay()->addHours(10))
+                                ->native(false)
+                                ->live(onBlur: true)
+                                ->seconds(false)
+                                ->disabledDates(function (Get $get): array {
+                                    $disabled = BookingForm::disabledCalendarDateStringsForWizard([]);
 
-                                    return;
-                                }
-                                if ($end->lessThanOrEqualTo($start)) {
-                                    $query->whereRaw('0 = 1');
+                                    $checkIn = $get('check_in');
+                                    if (filled($checkIn) && ! self::bookingTypeIsVenueOnly($get)) {
+                                        try {
+                                            $disabled[] = Carbon::parse($checkIn)->format('Y-m-d');
+                                        } catch (\Exception $e) {
+                                            // ignore invalid date
+                                        }
+                                    }
 
-                                    return;
-                                }
+                                    return array_values(array_unique($disabled));
+                                })
+                                ->helperText('Same blocked days as check-in; venue-only bookings may use same-day checkout.')
+                                ->minDate(fn (Get $get) => filled($get('check_in'))
+                                    ? (self::bookingTypeIsVenueOnly($get)
+                                        ? Carbon::parse($get('check_in'))->startOfDay()
+                                        : Carbon::parse($get('check_in'))->startOfDay()->addDay())
+                                    : now())
+                                ->rules([
+                                    fn (Get $get) => function (string $attribute, $value, $fail) use ($get): void {
+                                        $checkIn = $get('check_in');
+                                        if (! $checkIn || ! $value) {
+                                            return;
+                                        }
+                                        try {
+                                            $start = Carbon::parse($checkIn);
+                                            $end = Carbon::parse($value);
+                                        } catch (\Exception $e) {
+                                            return;
+                                        }
 
-                                $typeCol = $query->getModel()->qualifyColumn('type');
-                                $nameCol = $query->getModel()->qualifyColumn('name');
-                                $query->availableBetween($start, $end, null)
-                                    ->with(['bedSpecifications'])
-                                    ->orderBy($typeCol)
-                                    ->orderBy($nameCol);
-                            },
-                        )
-                        ->multiple()
-                        ->searchable()
-                        ->preload()
-                        ->required(fn (Get $get): bool => self::bookingTypeRequiresRooms($get))
-                        ->visible(fn (Get $get): bool => self::bookingTypeUsesRooms($get))
-                        ->live()
-                        ->helperText('Rooms are filtered by availability for the selected dates.')
-                        ->rules([
-                            fn (Get $get, ?Booking $record) => function (string $attribute, $value, $fail) use ($get, $record): void {
-                                if (! self::bookingTypeUsesRooms($get)) {
-                                    return;
-                                }
-                                if (BookingForm::hasRoomConflicts($value, $get('check_in'), $get('check_out'), $record)) {
-                                    $fail('One or more selected rooms are not available for the chosen dates.');
-                                }
-                            },
-                        ])
-                        ->afterStateUpdated(fn (Get $get, Set $set) => BookingForm::updatePricing($get, $set))
-                        ->columnSpanFull(),
+                                        if (self::bookingTypeIsVenueOnly($get)) {
+                                            if ($end->copy()->startOfDay()->lt($start->copy()->startOfDay())) {
+                                                $fail('Check-out date cannot be before check-in date.');
+                                            }
 
-                    Select::make('venues')
-                        ->label('Venues')
-                        ->relationship(
-                            'venues',
-                            'name',
-                            modifyQueryUsing: function ($query, ?string $search, ?Booking $record, Get $get): void {
-                                BookingForm::constrainAvailableVenuesQuery($query, $get, $record);
-                            },
-                        )
-                        ->multiple()
-                        ->searchable()
-                        ->preload()
-                        ->live()
-                        ->visible(fn (Get $get): bool => self::bookingTypeUsesVenues($get))
-                        ->required(fn (Get $get): bool => self::bookingTypeRequiresVenues($get))
-                        ->helperText('Optional for rooms-only bookings. Uses the same date-range availability checks.')
-                        ->rules([
-                            fn (Get $get, ?Booking $record) => function (string $attribute, $value, $fail) use ($get, $record): void {
-                                if (! self::bookingTypeUsesVenues($get)) {
-                                    return;
-                                }
-                                if (BookingForm::hasVenueConflicts(
-                                    $value,
-                                    $get('check_in'),
-                                    $get('check_out'),
-                                    $record,
-                                    is_string($get('venue_event_type')) ? $get('venue_event_type') : null,
-                                )) {
-                                    $fail('One or more selected venues are not available for the chosen dates.');
-                                }
-                            },
-                        ])
-                        ->afterStateUpdated(fn (Get $get, Set $set) => BookingForm::updatePricing($get, $set))
-                        ->columnSpanFull(),
+                                            return;
+                                        }
 
-                    Radio::make('venue_event_type')
-                        ->label('Venue event type')
-                        ->options(BookingPricing::venueEventTypeOptions())
-                        ->default(BookingPricing::VENUE_EVENT_WEDDING)
-                        ->visible(fn (Get $get): bool => self::bookingTypeUsesVenues($get)
-                            && ! empty(array_filter((array) ($get('venues') ?? []))))
-                        ->live()
-                        ->afterStateUpdated(fn (Get $get, Set $set) => BookingForm::updatePricing($get, $set)),
+                                        if ($end->lessThanOrEqualTo($start) || $end->isSameDay($start)) {
+                                            $fail('Check-out must be at least the next day after check-in.');
+                                        }
+                                    },
+                                    fn (Get $get) => self::roomAvailabilityRuleForCheckOut($get),
+                                ])
+                                ->afterStateUpdated(function (Get $get, Set $set): void {
+                                    self::applyVenueFixedTimes($get, $set);
+                                    BookingForm::updatePricing($get, $set);
+                                }),
 
-                    TextInput::make('no_of_days')
-                        ->label(fn (Get $get): string => self::stayUnitLabel($get))
-                        ->numeric()
-                        ->suffix(fn (Get $get): string => self::stayUnitSuffix($get))
-                        ->readOnly()
-                        ->dehydrated(),
+                            Select::make('rooms')
+                                ->label('Rooms')
+                                ->relationship(
+                                    'rooms',
+                                    'name',
+                                    modifyQueryUsing: function ($query, ?string $search, ?Booking $record, Get $get): void {
+                                        $checkIn = $get('check_in');
+                                        $checkOut = $get('check_out');
+                                        if (! $checkIn || ! $checkOut) {
+                                            $query->whereRaw('0 = 1');
 
-                    TextInput::make('total_price')
-                        ->label(fn (Get $get): string => self::totalEstimateLabel($get))
-                        ->default(0)
-                        ->readOnly()
-                        ->dehydrated()
-                        ->numeric()
-                        ->prefix('₱')
-                        ->helperText('Rooms × nights. Additional payment step records what the guest pays now.'),
+                                            return;
+                                        }
+                                        try {
+                                            $start = Carbon::parse((string) $checkIn);
+                                            $end = Carbon::parse((string) $checkOut);
+                                        } catch (\Exception $e) {
+                                            $query->whereRaw('0 = 1');
+
+                                            return;
+                                        }
+                                        if ($end->lessThanOrEqualTo($start)) {
+                                            $query->whereRaw('0 = 1');
+
+                                            return;
+                                        }
+
+                                        $typeCol = $query->getModel()->qualifyColumn('type');
+                                        $nameCol = $query->getModel()->qualifyColumn('name');
+                                        $query->availableBetween($start, $end, null)
+                                            ->with(['bedSpecifications'])
+                                            ->orderBy($typeCol)
+                                            ->orderBy($nameCol);
+                                    },
+                                )
+                                ->multiple()
+                                ->searchable()
+                                ->preload()
+                                ->required(fn (Get $get): bool => self::bookingTypeRequiresRooms($get))
+                                ->visible(fn (Get $get): bool => self::bookingTypeUsesRooms($get))
+                                ->live()
+                                ->helperText('Rooms are filtered by availability for the selected dates.')
+                                ->rules([
+                                    fn (Get $get, ?Booking $record) => function (string $attribute, $value, $fail) use ($get, $record): void {
+                                        if (! self::bookingTypeUsesRooms($get)) {
+                                            return;
+                                        }
+                                        if (BookingForm::hasRoomConflicts($value, $get('check_in'), $get('check_out'), $record)) {
+                                            $fail('One or more selected rooms are not available for the chosen dates.');
+                                        }
+                                    },
+                                ])
+                                ->afterStateUpdated(fn (Get $get, Set $set) => BookingForm::updatePricing($get, $set)),
+
+                            Select::make('venues')
+                                ->label('Venues')
+                                ->relationship(
+                                    'venues',
+                                    'name',
+                                    modifyQueryUsing: function ($query, ?string $search, ?Booking $record, Get $get): void {
+                                        BookingForm::constrainAvailableVenuesQuery($query, $get, $record);
+                                    },
+                                )
+                                ->multiple()
+                                ->searchable()
+                                ->preload()
+                                ->live()
+                                ->visible(fn (Get $get): bool => self::bookingTypeUsesVenues($get))
+                                ->required(fn (Get $get): bool => self::bookingTypeRequiresVenues($get))
+                                ->helperText('Optional for rooms-only bookings. Uses the same date-range availability checks.')
+                                ->rules([
+                                    fn (Get $get, ?Booking $record) => function (string $attribute, $value, $fail) use ($get, $record): void {
+                                        if (! self::bookingTypeUsesVenues($get)) {
+                                            return;
+                                        }
+                                        if (BookingForm::hasVenueConflicts(
+                                            $value,
+                                            $get('check_in'),
+                                            $get('check_out'),
+                                            $record,
+                                            is_string($get('venue_event_type')) ? $get('venue_event_type') : null,
+                                        )) {
+                                            $fail('One or more selected venues are not available for the chosen dates.');
+                                        }
+                                    },
+                                ])
+                                ->afterStateUpdated(function (Get $get, Set $set): void {
+                                    // If venues were cleared, reset venue subtotal so stale manual totals don't linger.
+                                    $venueIds = array_filter((array) ($get('venues') ?? []));
+                                    if ($venueIds === []) {
+                                        $set('venue_subtotal', 0);
+                                    }
+
+                                    BookingForm::updatePricing($get, $set);
+                                }),
+
+                            Radio::make('venue_event_type')
+                                ->label('Venue event type')
+                                ->options(BookingPricing::venueEventTypeOptions())
+                                ->default(BookingPricing::VENUE_EVENT_WEDDING)
+                                ->visible(fn (Get $get): bool => self::bookingTypeUsesVenues($get)
+                                    && ! empty(array_filter((array) ($get('venues') ?? []))))
+                                ->live()
+                                ->afterStateUpdated(fn (Get $get, Set $set) => BookingForm::updatePricing($get, $set))
+                                ->columnSpanFull(),
+
+                            TextInput::make('no_of_days')
+                                ->label(fn (Get $get): string => self::stayUnitLabel($get))
+                                ->numeric()
+                                ->suffix(fn (Get $get): string => self::stayUnitSuffix($get))
+                                ->readOnly()
+                                ->dehydrated(),
+
+                            TextInput::make('rooms_subtotal')
+                                ->label('Room total (per night)')
+                                ->default(0)
+                                ->readOnly()
+                                ->dehydrated(false)
+                                ->numeric()
+                                ->prefix('₱')
+                                ->visible(fn (Get $get): bool => self::bookingTypeUsesRooms($get)),
+
+                            TextInput::make('venue_subtotal')
+                                ->label('Venue total (per day)')
+                                ->default(0)
+                                ->readOnly(function (Get $get): bool {
+                                    $venues = array_filter((array) ($get('venues') ?? []));
+                                    if ($venues === []) {
+                                        return true;
+                                    }
+
+                                    $venueEventType = BookingPricing::normalizeVenueEventType(
+                                        is_string($get('venue_event_type')) ? $get('venue_event_type') : null
+                                    );
+
+                                    return $venueEventType !== BookingPricing::VENUE_EVENT_OTHERS;
+                                })
+                                ->dehydrated(false)
+                                ->numeric()
+                                ->prefix('₱')
+                                ->minValue(0)
+                                ->live(onBlur: true)
+                                ->afterStateUpdated(fn (Get $get, Set $set) => BookingForm::updatePricing($get, $set))
+                                ->visible(fn (Get $get): bool => self::bookingTypeUsesVenues($get)
+                                    && ! empty(array_filter((array) ($get('venues') ?? [])))),
+
+                            TextInput::make('total_price')
+                                ->label(fn (Get $get): string => self::totalEstimateLabel($get))
+                                ->default(0)
+                                ->readOnly()
+                                ->dehydrated()
+                                ->numeric()
+                                ->prefix('₱')
+                                ->minValue(0)
+                                ->helperText(function (Get $get): string {
+                                    $bookingType = (string) ($get('booking_type') ?? 'rooms');
+                                    $venueEventType = BookingPricing::normalizeVenueEventType(
+                                        is_string($get('venue_event_type')) ? $get('venue_event_type') : null
+                                    );
+
+                                    if (in_array($bookingType, ['venue', 'rooms_and_venues'], true) && $venueEventType === BookingPricing::VENUE_EVENT_OTHERS) {
+                                        return 'Total is computed from fixed room rates and your editable Venue total (Others). Additional payment step records what the guest pays now.';
+                                    }
+
+                                    return 'Auto-calculated from selected rooms/venues and nights/days. Additional payment step records what the guest pays now.';
+                                })
+                                ->columnSpanFull(),
+                        ]),
                 ]),
             Step::make('Guest details')
                 ->description('Create the guest profile for this booking.')
                 ->schema([
-                    Hidden::make('booking_source')
-                        ->default('manual')
-                        ->dehydrated(),
-                    Hidden::make('is_manual_booking')
-                        ->default(true)
-                        ->dehydrated(),
-                    Hidden::make('email_is_shared')
-                        ->default(false)
-                        ->dehydrated(),
-                    Hidden::make('existing_guest_found')
-                        ->default(false)
-                        ->dehydrated(false),
-                    Hidden::make('existing_guest_id')
-                        ->default(null)
-                        ->dehydrated(),
-                    Hidden::make('email_has_multiple_matches')
-                        ->default(false)
-                        ->dehydrated(false),
-                    Hidden::make('allow_manual_email_match')
-                        ->default(false)
-                        ->dehydrated(),
-                    Toggle::make('edit_returning_guest')
-                        ->label('Edit guest details for this booking')
-                        ->helperText('Enable to update the guest profile now. Leave off to keep it read-only.')
-                        ->default(false)
-                        ->live()
-                        ->visible(fn (Get $get): bool => $get('guest_status') === 'returning' && (bool) $get('existing_guest_found'))
-                        ->afterStateUpdated(function (Set $set, $state): void {
-                            if (! $state) {
-                                return;
-                            }
+                    Section::make()
+                        ->columns(2)
+                        ->schema([
+                            Hidden::make('booking_source')
+                                ->default('manual')
+                                ->dehydrated(),
+                            Hidden::make('is_manual_booking')
+                                ->default(true)
+                                ->dehydrated(),
+                            Hidden::make('email_is_shared')
+                                ->default(false)
+                                ->dehydrated(),
+                            Hidden::make('existing_guest_found')
+                                ->default(false)
+                                ->dehydrated(false),
+                            Hidden::make('existing_guest_id')
+                                ->default(null)
+                                ->dehydrated(),
+                            Hidden::make('email_has_multiple_matches')
+                                ->default(false)
+                                ->dehydrated(false),
+                            Hidden::make('allow_manual_email_match')
+                                ->default(false)
+                                ->dehydrated(),
+                            Toggle::make('edit_returning_guest')
+                                ->label('Edit guest details for this booking')
+                                ->helperText('Enable to update the guest profile now. Leave off to keep it read-only.')
+                                ->default(false)
+                                ->live()
+                                ->visible(fn (Get $get): bool => $get('guest_status') === 'returning' && (bool) $get('existing_guest_found'))
+                                ->afterStateUpdated(function (Set $set, $state): void {
+                                    if (! $state) {
+                                        return;
+                                    }
 
-                            // When enabling edit mode, ensure we keep returning guest selection flow.
-                            $set('allow_manual_email_match', false);
-                        })
-                        ->columnSpanFull(),
+                                    // When enabling edit mode, ensure we keep returning guest selection flow.
+                                    $set('allow_manual_email_match', false);
+                                })
+                                ->columnSpanFull(),
                     Radio::make('guest_status')
                         ->label('Guest status')
                         ->options([
@@ -534,25 +594,26 @@ class BookingCreateWizard
                                 $set('country', 'Philippines');
                             }
                         }),
-                    TextInput::make('country')
-                        ->default('Philippines')
-                        ->maxLength(100)
-                        ->required(fn (Get $get) => (bool) $get('is_international'))
-                        ->visible(fn (Get $get) => (bool) $get('is_international'))
-                        ->disabled(fn (Get $get): bool => $get('guest_status') === 'returning' && ! (bool) $get('edit_returning_guest'))
-                        ->rules([
-                            fn (Get $get) => function (string $attribute, mixed $value, Closure $fail) use ($get): void {
-                                if (! ((bool) $get('is_international'))) {
-                                    return;
-                                }
+                            TextInput::make('country')
+                                ->default('Philippines')
+                                ->maxLength(100)
+                                ->required(fn (Get $get) => (bool) $get('is_international'))
+                                ->visible(fn (Get $get) => (bool) $get('is_international'))
+                                ->disabled(fn (Get $get): bool => $get('guest_status') === 'returning' && ! (bool) $get('edit_returning_guest'))
+                                ->rules([
+                                    fn (Get $get) => function (string $attribute, mixed $value, Closure $fail) use ($get): void {
+                                        if (! ((bool) $get('is_international'))) {
+                                            return;
+                                        }
 
-                                $country = trim((string) $value);
-                                if ($country !== '' && strcasecmp($country, 'Philippines') === 0) {
-                                    $fail('Foreign guests cannot use Philippines as country.');
-                                }
-                            },
+                                        $country = trim((string) $value);
+                                        if ($country !== '' && strcasecmp($country, 'Philippines') === 0) {
+                                            $fail('Foreign guests cannot use Philippines as country.');
+                                        }
+                                    },
+                                ]),
+                            ...PhAddressFields::make(),
                         ]),
-                    ...PhAddressFields::make(),
                 ]),
             Step::make('Review')
                 ->description('Confirm stay and guest details before payment. Use the step tabs above to go back and edit.')
@@ -603,25 +664,30 @@ class BookingCreateWizard
             Step::make('Payment')
                 ->description('Record what the guest pays now: full balance or any custom amount.')
                 ->schema([
-                    Radio::make('admin_payment_mode')
-                        ->label('Payment')
-                        ->options([
-                            'full' => 'Pay full amount (matches booking total)',
-                            'custom' => 'Custom amount (partial deposit or other)',
-                        ])
-                        ->default('full')
-                        ->live()
-                        ->required(),
-                    TextInput::make('admin_payment_amount')
-                        ->label('Amount to record')
-                        ->helperText('Only when using a custom amount. Whole pesos; cannot exceed the booking total.')
-                        ->numeric()
-                        ->prefix('₱')
-                        ->minValue(0)
-                        ->maxValue(fn (Get $get) => max(0, (int) ceil((float) ($get('total_price') ?? 0))))
-                        ->visible(fn (Get $get) => $get('admin_payment_mode') === 'custom')
-                        ->required(fn (Get $get) => $get('admin_payment_mode') === 'custom')
-                        ->dehydrated(fn (Get $get) => $get('admin_payment_mode') === 'custom'),
+                    Section::make()
+                        ->columns(2)
+                        ->schema([
+                            Radio::make('admin_payment_mode')
+                                ->label('Payment')
+                                ->options([
+                                    'full' => 'Pay full amount (matches booking total)',
+                                    'custom' => 'Custom amount (partial deposit or other)',
+                                ])
+                                ->default('full')
+                                ->live()
+                                ->required()
+                                ->columnSpanFull(),
+                            TextInput::make('admin_payment_amount')
+                                ->label('Amount to record')
+                                ->helperText('Only when using a custom amount. Whole pesos; cannot exceed the booking total.')
+                                ->numeric()
+                                ->prefix('₱')
+                                ->minValue(0)
+                                ->maxValue(fn (Get $get) => max(0, (int) ceil((float) ($get('total_price') ?? 0))))
+                                ->visible(fn (Get $get) => $get('admin_payment_mode') === 'custom')
+                                ->required(fn (Get $get) => $get('admin_payment_mode') === 'custom')
+                                ->dehydrated(fn (Get $get) => $get('admin_payment_mode') === 'custom'),
+                        ]),
                 ]),
             Step::make('Confirmation')
                 ->description('Everything below will be saved when you create the booking.')

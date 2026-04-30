@@ -35,6 +35,7 @@ class StaffPanelProvider extends PanelProvider
         return $panel
             ->id('staff')
             ->path('staff')
+            ->maxContentWidth('7xl')
             ->passwordReset()
             ->databaseNotifications(true, AppDatabaseNotifications::class, false)
             ->databaseNotificationsPolling('1s')

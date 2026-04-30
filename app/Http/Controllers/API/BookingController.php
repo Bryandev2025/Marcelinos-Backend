@@ -633,6 +633,7 @@ class BookingController extends Controller
             'seminar', 'meeting', 'meeting_staff' => 'meeting_staff',
             'birthday' => 'birthday',
             'wedding' => 'wedding',
+            'others' => 'others',
             default => 'wedding',
         };
     }
@@ -642,7 +643,8 @@ class BookingController extends Controller
         return match ($this->normalizeVenueEventType($eventType)) {
             'birthday' => 'Birthday',
             'meeting_staff' => 'Meeting / Staff',
-            default => 'Wedding',
+            'others' => 'Others',
+            default => 'Birthday',
         };
     }
 

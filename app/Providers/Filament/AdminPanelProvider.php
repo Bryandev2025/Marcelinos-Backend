@@ -35,6 +35,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            ->maxContentWidth('7xl')
             ->login(Login::class)
             ->passwordReset()
             ->databaseNotifications(true, AppDatabaseNotifications::class, false)
