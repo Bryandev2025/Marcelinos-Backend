@@ -19,13 +19,15 @@ final class BookingLifecycleActions
      */
     public static function checkIn(Booking $booking): void
     {
-        $assessment = BookingCheckInEligibility::assess($booking);
-        if (! $assessment['allowed']) {
-            throw new \InvalidArgumentException($assessment['message'] ?? __('Cannot check in this booking.'));
-        }
+        BookingActorContext::run(self::resolveActor(), function () use ($booking): void {
+            $assessment = BookingCheckInEligibility::assess($booking);
+            if (! $assessment['allowed']) {
+                throw new \InvalidArgumentException($assessment['message'] ?? __('Cannot check in this booking.'));
+            }
 
-        $booking->update(['booking_status' => Booking::BOOKING_STATUS_OCCUPIED]);
-        self::logManualLifecycleTrigger($booking, 'checkin_triggered');
+            $booking->update(['booking_status' => Booking::BOOKING_STATUS_OCCUPIED]);
+            self::logManualLifecycleTrigger($booking, 'checkin_triggered');
+        });
     }
 
     /**
@@ -33,21 +35,23 @@ final class BookingLifecycleActions
      */
     public static function complete(Booking $booking): void
     {
-        if ($booking->trashed()) {
-            throw new \InvalidArgumentException(__('Cannot complete a deleted booking.'));
-        }
+        BookingActorContext::run(self::resolveActor(), function () use ($booking): void {
+            if ($booking->trashed()) {
+                throw new \InvalidArgumentException(__('Cannot complete a deleted booking.'));
+            }
 
-        if (! $booking->canAdminCheckout()) {
-            throw new \InvalidArgumentException(__('Booking must be occupied with at least partial payment, and checkout day must be today or later.'));
-        }
+            if (! $booking->canAdminCheckout()) {
+                throw new \InvalidArgumentException(__('Booking must be occupied with at least partial payment, and checkout day must be today or later.'));
+            }
 
-        $booking->update(['booking_status' => Booking::BOOKING_STATUS_COMPLETED]);
-        self::logManualLifecycleTrigger($booking, 'checkout_triggered');
-        $actor = auth()->user();
-        BookingDamageSettlement::syncFromChecklist(
-            $booking->fresh(['roomChecklists.items']),
-            $actor instanceof User ? $actor : null,
-        );
+            $booking->update(['booking_status' => Booking::BOOKING_STATUS_COMPLETED]);
+            self::logManualLifecycleTrigger($booking, 'checkout_triggered');
+
+            BookingDamageSettlement::syncFromChecklist(
+                $booking->fresh(['roomChecklists.items']),
+                self::resolveActor(),
+            );
+        });
     }
 
     /**
@@ -135,20 +139,22 @@ final class BookingLifecycleActions
      */
     public static function cancel(Booking $booking): void
     {
-        if ($booking->trashed()) {
-            throw new \InvalidArgumentException(__('Cannot cancel a deleted booking.'));
-        }
+        BookingActorContext::run(self::resolveActor(), function () use ($booking): void {
+            if ($booking->trashed()) {
+                throw new \InvalidArgumentException(__('Cannot cancel a deleted booking.'));
+            }
 
-        if (in_array($booking->booking_status, [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED], true)) {
-            throw new \InvalidArgumentException(__('This booking is already cancelled or completed.'));
-        }
+            if (in_array($booking->booking_status, [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED], true)) {
+                throw new \InvalidArgumentException(__('This booking is already cancelled or completed.'));
+            }
 
-        $booking->update(['booking_status' => Booking::BOOKING_STATUS_CANCELLED]);
+            $booking->update(['booking_status' => Booking::BOOKING_STATUS_CANCELLED]);
+        });
     }
 
     private static function logManualLifecycleTrigger(Booking $booking, string $event): void
     {
-        $actor = auth()->user();
+        $actor = BookingActorContext::current() ?? auth()->user();
         if (! $actor instanceof User || ! in_array((string) $actor->role, ['admin', 'staff'], true)) {
             return;
         }
@@ -175,8 +181,21 @@ final class BookingLifecycleActions
         );
     }
 
+    private static function resolveActor(): ?User
+    {
+        $actor = BookingActorContext::current() ?? auth()->user();
+
+        return $actor instanceof User ? $actor : null;
+    }
+
     public static function ensureCompletionRoomChecklists(Booking $booking): void
     {
+        // Allow disabling automatic checklist generation via env var when rooms
+        // already include checklist information.
+        if (! (bool) env('ROOM_CHECKLIST_AUTOGEN', true)) {
+            return;
+        }
+
         $booking->loadMissing('rooms');
 
         if ($booking->rooms->isEmpty()) {

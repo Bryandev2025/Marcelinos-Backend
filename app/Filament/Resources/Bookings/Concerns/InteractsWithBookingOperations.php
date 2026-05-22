@@ -579,9 +579,11 @@ trait InteractsWithBookingOperations
             return;
         }
 
-        $record->update([
-            'payment_status' => Booking::PAYMENT_STATUS_REFUNDED,
-        ]);
+        BookingActorContext::run(auth()->user(), function () use ($record): void {
+            $record->update([
+                'payment_status' => Booking::PAYMENT_STATUS_REFUNDED,
+            ]);
+        });
 
         Notification::make()
             ->title(__('Refund marked as completed.'))

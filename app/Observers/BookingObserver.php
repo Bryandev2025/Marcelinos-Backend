@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Notifications\Slack\BookingLifecycleSlackNotification;
 use App\Services\RefundNotificationService;
 use App\Support\ActivityLogger;
+use App\Support\BookingActorContext;
 use App\Support\BookingDoubleBookAlert;
 use App\Support\BookingLifecycleActions;
 use App\Support\SlackBookingAlerts;
@@ -138,7 +139,7 @@ class BookingObserver
             $this->dispatchNewBookingStaffAlerts($booking);
         }
 
-        $user = auth()->user();
+        $user = BookingActorContext::current() ?? auth()->user();
         $isStaffOrAdmin = $user && in_array($user->role, ['admin', 'staff'], true);
 
         if ($isStaffOrAdmin) {

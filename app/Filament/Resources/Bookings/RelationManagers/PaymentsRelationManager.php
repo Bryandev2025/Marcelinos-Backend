@@ -129,7 +129,9 @@ class PaymentsRelationManager extends RelationManager
                             );
 
                             if ((string) $booking->payment_status !== $nextPaymentStatus) {
-                                $booking->update(['payment_status' => $nextPaymentStatus]);
+                                BookingActorContext::run(auth()->user(), function () use ($booking, $nextPaymentStatus): void {
+                                    $booking->update(['payment_status' => $nextPaymentStatus]);
+                                });
                             }
                         }
 

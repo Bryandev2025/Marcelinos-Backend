@@ -32,25 +32,31 @@ class RecordBookingWizardInitialPayment
         $totalInt = (int) round((float) $record->total_price);
         $paid = $totalInt > 0 ? min($pending, $totalInt) : $pending;
 
-        Payment::query()->create([
-            'booking_id' => $record->id,
-            'total_amount' => $totalInt,
-            'partial_amount' => $paid,
-            'is_fullypaid' => $totalInt > 0 && $paid >= $totalInt,
-        ]);
+        BookingActorContext::run(auth()->user(), function () use ($record, $totalInt, $paid): void {
+            Payment::query()->create([
+                'booking_id' => $record->id,
+                'total_amount' => $totalInt,
+                'partial_amount' => $paid,
+                'is_fullypaid' => $totalInt > 0 && $paid >= $totalInt,
+            ]);
+        });
 
         if (in_array($record->booking_status, [Booking::BOOKING_STATUS_CANCELLED, Booking::BOOKING_STATUS_COMPLETED], true)) {
             return;
         }
 
         if ($totalInt > 0 && $paid >= $totalInt) {
-            $record->update(['payment_status' => Booking::PAYMENT_STATUS_PAID]);
+            BookingActorContext::run(auth()->user(), function () use ($record): void {
+                $record->update(['payment_status' => Booking::PAYMENT_STATUS_PAID]);
+            });
 
             return;
         }
 
         if ($paid > 0 && $totalInt > 0 && $paid < $totalInt) {
-            $record->update(['payment_status' => Booking::PAYMENT_STATUS_PARTIAL]);
+            BookingActorContext::run(auth()->user(), function () use ($record): void {
+                $record->update(['payment_status' => Booking::PAYMENT_STATUS_PARTIAL]);
+            });
         }
     }
 }

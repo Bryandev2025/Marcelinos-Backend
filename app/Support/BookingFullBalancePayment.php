@@ -87,19 +87,21 @@ final class BookingFullBalancePayment
             throw new \InvalidArgumentException($assessment['message'] ?? 'Cannot record full balance payment.');
         }
 
-        DB::transaction(function () use ($booking): void {
-            $booking->refresh();
+        BookingActorContext::run(BookingActorContext::current() ?? auth()->user(), function () use ($booking): void {
+            DB::transaction(function () use ($booking): void {
+                $booking->refresh();
 
-            if ((float) $booking->balance <= 0.009) {
-                throw new \InvalidArgumentException('No remaining balance.');
-            }
+                if ((float) $booking->balance <= 0.009) {
+                    throw new \InvalidArgumentException('No remaining balance.');
+                }
 
-            $booking->payments()->create([
-                'total_amount' => $booking->total_price,
-                'partial_amount' => $booking->balance,
-                'is_fullypaid' => true,
-            ]);
-            $booking->update(['payment_status' => Booking::PAYMENT_STATUS_PAID]);
+                $booking->payments()->create([
+                    'total_amount' => $booking->total_price,
+                    'partial_amount' => $booking->balance,
+                    'is_fullypaid' => true,
+                ]);
+                $booking->update(['payment_status' => Booking::PAYMENT_STATUS_PAID]);
+            });
         });
     }
 }

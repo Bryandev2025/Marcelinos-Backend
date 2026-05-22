@@ -249,7 +249,9 @@ class EditBooking extends EditRecord
                     $booking->refresh();
                     $nextStatus = Booking::paymentStatusFromAmounts((float) $booking->total_price, (float) $booking->total_paid);
                     if ($nextStatus !== $booking->payment_status) {
-                        $booking->update(['payment_status' => $nextStatus]);
+                        BookingActorContext::run(auth()->user(), function () use ($booking, $nextStatus): void {
+                            $booking->update(['payment_status' => $nextStatus]);
+                        });
                     }
                 });
             } catch (ValidationException $e) {
